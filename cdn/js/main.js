@@ -262,7 +262,7 @@ function checkStatus() {
 
     // 4. Update UI
     if (newState === 'live') {
-        // Always re-render during LIVE state to update active DJ glow
+        // Always re-render during LIVE state to update active DJ glow/animation
         currentState = newState;
         renderEventView(true);
     } 
@@ -329,7 +329,18 @@ function renderEventView(isLive) {
         }
 
         const activeClass = isActive ? 'dj-active' : '';
-        const liveTag = isActive ? '<span class="live-tag">ON AIR</span>' : '';
+        
+        // Construct the Live Tag (Text + Visualizer Bars)
+        const liveTag = isActive ? 
+            `<span class="live-tag">
+                ON AIR 
+                <div class="visualizer">
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                </div>
+            </span>` 
+            : '';
 
         // Generate Social Links
         let linksHtml = '';

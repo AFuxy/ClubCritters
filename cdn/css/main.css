@@ -23,7 +23,7 @@ body {
     transition: justify-content 0.5s ease;
 }
 
-/* Center Mode: Activated via JS when in Offline/Finished state */
+/* Vertical Center Mode: Used when site is Offline or Finished */
 body.body-centered {
     justify-content: center;
 }
@@ -35,14 +35,14 @@ body.body-centered {
     flex-direction: column;
     padding-bottom: 50px;
     margin-top: 20px;
-    text-align: center; /* Default text center for headers */
+    text-align: center; /* Centers headers and loose text */
 }
 
 /* =========================================
    2. COMPONENTS & UTILITIES
    ========================================= */
 
-/* Logo & Headers */
+/* Header Logo */
 .logo-container { margin: 10px 0 20px 0; }
 
 .logo {
@@ -60,7 +60,7 @@ h1 {
 
 #status-subtext { color: #ccc; margin: 0 0 20px 0; }
 
-/* Navigation Pill Button */
+/* Navigation Pill Button (Archive/Back) */
 .nav-pill {
     display: inline-block;
     margin: 10px 0 20px 0;
@@ -74,7 +74,7 @@ h1 {
     transition: all 0.2s;
     background: transparent;
     cursor: pointer;
-    align-self: center; /* Prevents button from stretching full width */
+    align-self: center; /* Prevents button from stretching to full container width */
 }
 .nav-pill:hover { background: var(--primary-blue); color: #000; }
 
@@ -135,7 +135,7 @@ h1 {
 
 /* Individual DJ Card */
 .dj-card {
-    --accent-color: var(--primary-blue); /* Default Color, overridden by JS */
+    --accent-color: var(--primary-blue); /* Default variable, overridden by JS */
     
     background-color: var(--card-bg);
     border-radius: 15px;
@@ -145,7 +145,7 @@ h1 {
     align-items: flex-start;
     text-align: left;
     
-    border-left: 5px solid var(--accent-color); /* Uses dynamic color */
+    border-left: 5px solid var(--accent-color); 
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     transition: all 0.3s ease;
 }
@@ -169,7 +169,7 @@ h1 {
 
 .dj-content { flex-grow: 1; }
 
-/* THIS WAS THE MISSING PIECE! */
+/* Header layout: Name on Left, Time on Right */
 .dj-header { 
     display: flex; 
     justify-content: space-between; 
@@ -179,19 +179,6 @@ h1 {
 .dj-content h3 { margin: 0; color: var(--accent-color); font-size: 1.1rem; }
 .dj-content .time { font-weight: bold; color: var(--primary-purple); font-size: 0.9rem; }
 .dj-content .genre { font-style: italic; color: #aaa; font-size: 0.85rem; display: block; margin-bottom: 8px;}
-
-/* Live Tag */
-.live-tag {
-    background: var(--accent-red);
-    color: white;
-    font-size: 0.7rem;
-    padding: 2px 8px;
-    border-radius: 4px;
-    margin-left: 10px;
-    vertical-align: middle;
-    font-weight: bold;
-    animation: pulse 1.5s infinite;
-}
 
 /* Social Buttons */
 .social-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
@@ -213,7 +200,47 @@ h1 {
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
 /* =========================================
-   5. ARCHIVE STYLES
+   5. VISUALIZER ANIMATION
+   ========================================= */
+.live-tag {
+    background: var(--accent-red);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+    vertical-align: middle;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+}
+
+.visualizer {
+    display: inline-flex;
+    align-items: flex-end;
+    height: 10px;
+    margin-left: 6px;
+    gap: 2px;
+}
+
+.viz-bar {
+    width: 2px;
+    background-color: white;
+    animation: bounce 0.5s infinite ease-in-out;
+}
+
+/* Staggered animation delays to create random effect */
+.viz-bar:nth-child(1) { height: 6px; animation-delay: 0.1s; }
+.viz-bar:nth-child(2) { height: 10px; animation-delay: 0.2s; }
+.viz-bar:nth-child(3) { height: 4px; animation-delay: 0.3s; }
+
+@keyframes bounce {
+    0%, 100% { height: 3px; }
+    50% { height: 10px; }
+}
+
+/* =========================================
+   6. ARCHIVE STYLES
    ========================================= */
 .set-list { border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: 5px; }
 .set-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
