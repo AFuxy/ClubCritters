@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Club Critters - Community Hub</title>
+    
+    <link rel="icon" type="image/png" href="cdn/logos/club/HeadOnly.png">
+    <link rel="stylesheet" href="cdn/css/main.css">
+
+    <meta name="title" content="Club Critters">
+    <meta name="description" content="The Club Critters Community Hub. Check event times, DJ lineups, and join us in VRChat!">
+    <meta name="theme-color" content="#29C5F6">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://club.afuxy.com"> 
+    <meta property="og:title" content="Club Critters">
+    <meta property="og:description" content="The Club Critters Community Hub. Check event times, DJ lineups, and join us in VRChat!">
+    <meta property="og:image" content="https://club.afuxy.com/cdn/logos/club/HeadOnly.png">
+
+    <meta property="twitter:card" content="summary">
+    <meta property="twitter:url" content="https://club.afuxy.com">
+    <meta property="twitter:title" content="Club Critters">
+    <meta property="twitter:description" content="The Club Critters Community Hub. Check event times, DJ lineups, and join us in VRChat!">
+    <meta property="twitter:image" content="https://club.afuxy.com/cdn/logos/club/HeadOnly.png">
+</head>
+<body>
+
+    <div class="container">
+        <a href="archive/" id="archive-link" class="nav-pill hidden">📂 Archive</a>
+
+        <div class="logo-container">
+            <video class="logo" autoplay loop muted playsinline>
+                <source src="cdn/logos/club/logo.webm" type="video/webm">
+                <img src="cdn/logos/club/HeadOnly.png" alt="Little Critters Logo"> 
+            </video>
+        </div>
+
+        <h1 id="main-title">Club Critters</h1>
+        <p id="status-subtext">Community Hub</p>
+        
+        <div id="status-badge-container"></div>
+
+        <div id="loading-view" class="hidden">
+            <div class="spinner"></div>
+            <p>Loading Schedule...</p>
+        </div>
+
+        <div id="offline-view" class="btn-group hidden">
+            <a href="https://discord.gg/YOUR_INVITE_LINK" class="btn">Join our Discord</a>
+            <div class="grid-buttons">
+                <a href="https://vrchat.com/home/group/YOUR_GROUP_ID" class="btn btn-secondary btn-small">VRChat Group</a>
+                <a href="https://vrc.tl/g/YOUR_GROUP_ID" class="btn btn-secondary btn-small">VRC.TL Page</a>
+            </div>
+        </div>
+
+        <div id="event-view" class="hidden">
+            <div class="event-links-box">
+                <p>Event Links</p>
+                <div class="grid-buttons">
+                    <a href="https://vrchat.com/home/group/YOUR_GROUP_ID" class="btn btn-small btn-secondary">VRC Group</a>
+                    <a href="https://vrc.tl/" class="btn btn-small btn-secondary">VRC.TL Calendar</a>
+                </div>
+            </div>
+
+            <div id="dj-container" class="dj-list">
+                </div>
+            
+            <div style="margin-top:30px;">
+                <a href="https://discord.gg/YOUR_INVITE_LINK" style="color:#666; text-decoration:none; font-size:0.9rem;">Join the Discord</a>
+            </div>
+        </div>
+
+        </div>
+
+    <script src="cdn/js/main.js"></script>
+</body>
+</html>

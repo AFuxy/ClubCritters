@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Club Critters - Set Archive</title>
+    
+    <link rel="icon" type="image/png" href="../cdn/logos/club/HeadOnly.png">
+    <link rel="stylesheet" href="../cdn/css/main.css">
+
+    <meta name="title" content="Club Critters Archive">
+    <meta name="description" content="Missed a night? Listen back to every DJ set from Club Critters history.">
+    
+    <meta name="theme-color" content="#B36AF4">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://club.afuxy.com/archive/">
+    <meta property="og:title" content="Club Critters - Set Archive">
+    <meta property="og:description" content="Missed a night? Listen back to every DJ set from Club Critters history.">
+    <meta property="og:image" content="https://club.afuxy.com/cdn/logos/club/HeadOnly.png">
+
+    <meta property="twitter:card" content="summary">
+    <meta property="twitter:url" content="https://club.afuxy.com/archive/">
+    <meta property="twitter:title" content="Club Critters - Set Archive">
+    <meta property="twitter:description" content="Missed a night? Listen back to every DJ set from Club Critters history.">
+    <meta property="twitter:image" content="https://club.afuxy.com/cdn/logos/club/HeadOnly.png">
+</head>
+<body>
+
+    <div class="container">
+        <a href="../" class="nav-pill">← Back to Hub</a>
+
+        <div class="logo-container" style="margin-top: 10px;">
+            <img src="../cdn/logos/club/HeadOnly.png" alt="Logo" class="logo" style="width:80px; height:80px;">
+        </div>
+
+        <h1 style="margin-bottom: 5px;">Set Archive</h1>
+        <p style="color:#ccc; margin-bottom:40px;">Listen back to previous nights</p>
+
+        <div id="loading-view">
+            <div class="spinner"></div>
+            <p style="color:#666;">Loading Archive...</p>
+        </div>
+
+        <div id="archive-list" class="dj-list hidden"></div>
+        
+        <p id="empty-msg" class="hidden" style="color:#666;">No archives found.</p>
+
+    </div>
+
+    <script src="../cdn/js/archive.js"></script>
+</body>
+</html>
