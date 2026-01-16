@@ -1,5 +1,7 @@
 /**
- * CLUB CRITTERS - MAIN APP LOGIC
+ * CLUB CRITTERS - MAIN APPLICATION LOGIC
+ * * Handles schedule data fetching, time zone conversion (UTC -> Local),
+ * real-time state management (Live/Upcoming/Offline), and UI rendering.
  */
 
 // ==========================================
@@ -32,12 +34,16 @@ const djContainer = document.getElementById('dj-container');
 const subtext = document.getElementById('status-subtext');
 const archiveLink = document.getElementById('archive-link');
 
-// Global State
+// ==========================================
+//          GLOBAL STATE
+// ==========================================
+
 let eventStartTime = null;
 let eventEndTime = null;
 let forceOffline = false;
 let djSchedule = [];
 let currentState = null; 
+let userTimezoneCode = ""; // e.g., "GMT", "EST", "JST"
 
 // ==========================================
 //          INITIALIZATION
@@ -47,11 +53,22 @@ async function init() {
     console.clear();
     console.log("%c CLUB CRITTERS %c SYSTEM BOOT SEQUENCE INITIATED ", logStyle.banner, logStyle.tag);
 
+    // 1. Detect User Timezone Code (falls back to empty string on failure)
+    try {
+        userTimezoneCode = Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+            .formatToParts(new Date())
+            .find(part => part.type == 'timeZoneName').value;
+    } catch (e) {
+        userTimezoneCode = "";
+    }
+
+    // 2. Set Initial UI State
     loadingView.classList.remove('hidden');
     offlineView.classList.add('hidden');
     eventView.classList.add('hidden');
     archiveLink.classList.add('hidden');
 
+    // 3. Fetch Data & Start System
     try {
         console.log("%c[NETWORK]%c Fetching schedule configuration...", "color: #999;", "color: #fff;");
         await fetchAndParseSheet();
@@ -66,6 +83,7 @@ async function init() {
         showOffline("Community Hub"); 
     }
 
+    // 4. Start Heartbeat (Updates UI every 5 seconds)
     console.log("%c[SYSTEM]%c Heartbeat monitor active (Tick: 5000ms)", "color: #29C5F6;", "color: #ccc;");
     setInterval(checkStatus, 5000);
 }
@@ -85,27 +103,30 @@ async function fetchAndParseSheet() {
     const headers = rows[0].split(',').map(h => h.trim());
     const settingsRow = rows[1].split(',').map(c => c.trim());
     
-    // These are expected to be ISO UTC strings (e.g. 2026-01-16T20:00:00Z)
+    // Config: Event Times (Expected in ISO UTC) & Force Offline Toggle
     eventStartTime = settingsRow[0];
     eventEndTime = settingsRow[1];
-    
     const offlineCell = settingsRow[2] ? settingsRow[2].toUpperCase() : "";
     forceOffline = (offlineCell === "TRUE" || offlineCell === "YES" || offlineCell === "1");
 
+    // Schedule Parsing
     djSchedule = [];
     for (let i = 1; i < rows.length; i++) {
         if (!rows[i]) continue;
         const cols = rows[i].split(',').map(c => c.trim());
+        
+        // Ensure row has minimum data (DJ Name in Col 4)
         if (cols.length < 4 || !cols[3]) continue; 
 
         const dj = {
             name: cols[3],
-            timeRaw: cols[4], // Store the raw UTC string (e.g. "16:30 - 17:30")
+            timeRaw: cols[4], // Raw UTC string (e.g. "16:30 - 17:30")
             genre: cols[5],
             image: cols[6] || "cdn/logos/club/HeadOnly.png",
             links: {}
         };
 
+        // Parse Dynamic Social Links (Cols 8+)
         for (let x = 7; x < cols.length; x++) {
             const url = cols[x];
             const label = headers[x]; 
@@ -118,48 +139,42 @@ async function fetchAndParseSheet() {
 }
 
 // ==========================================
-//          HELPER: PARSE & CONVERT TIME
+//          TIMEZONE CONVERSION HELPER
 // ==========================================
 
 /**
- * Takes a UTC time range string (e.g. "16:30 - 17:30") 
- * and converts it to the User's Local Time string, 
- * plus returns the start/end Date objects for logic.
+ * Parses a UTC time range string (e.g. "16:30 - 17:30") 
+ * and converts it to the User's Local Time string with timezone code appended.
  */
 function processDjTime(timeStr) {
     if (!timeStr || !eventStartTime) return null;
 
-    // 1. Extract times from sheet (Assumed UTC)
     const times = timeStr.match(/(\d{1,2}):(\d{2})/g);
     if (!times || times.length < 2) return null;
 
-    // 2. Base everything on the Event Start Day (UTC)
     const eventDate = new Date(eventStartTime);
     
     const [startH, startM] = times[0].split(':').map(Number);
     const [endH, endM] = times[1].split(':').map(Number);
 
-    // 3. Create Date objects using UTC methods
+    // Create Date objects relative to the Event Start Date (UTC)
     const start = new Date(eventDate);
     start.setUTCHours(startH, startM, 0, 0);
 
     const end = new Date(eventDate);
     end.setUTCHours(endH, endM, 0, 0);
 
-    // 4. Handle Rollovers (If DJ is 01:00 but event started 20:00 prev day)
-    // Logic: If DJ hour is significantly smaller than Event Start hour, add a day
+    // Handle Day Rollovers (e.g., set goes past midnight)
     if (startH < eventDate.getUTCHours() - 6) { 
         start.setDate(start.getDate() + 1);
         end.setDate(end.getDate() + 1);
-    } 
-    // If End is smaller than Start (23:00 - 01:00), End is next day
-    else if (end < start) {
+    } else if (end < start) {
         end.setDate(end.getDate() + 1);
     }
 
-    // 5. Create Display String (Local Time)
+    // Format for Display: "HH:MM - HH:MM TZ"
     const timeOptions = { hour: '2-digit', minute: '2-digit' };
-    const localDisplay = `${start.toLocaleTimeString([], timeOptions)} - ${end.toLocaleTimeString([], timeOptions)}`;
+    const localDisplay = `${start.toLocaleTimeString([], timeOptions)} - ${end.toLocaleTimeString([], timeOptions)} ${userTimezoneCode}`;
 
     return {
         startObj: start,
@@ -173,6 +188,7 @@ function processDjTime(timeStr) {
 // ==========================================
 
 function checkStatus() {
+    // 1. Check for Manual Override
     if (forceOffline) {
         if (currentState !== 'disabled') {
             showOffline("Community Hub");
@@ -181,6 +197,7 @@ function checkStatus() {
         return;
     }
 
+    // 2. Check for Missing Config
     if (!eventStartTime || !eventEndTime) {
         if (currentState !== 'disabled') {
             showOffline("Community Hub");
@@ -189,6 +206,7 @@ function checkStatus() {
         return;
     }
 
+    // 3. Determine Time State
     const now = new Date();
     const start = new Date(eventStartTime);
     const end = new Date(eventEndTime);
@@ -198,8 +216,9 @@ function checkStatus() {
     else if (now >= start) newState = 'live';
     else newState = 'upcoming';
 
-    // If LIVE, re-render frequently to update the Glow/Time
+    // 4. Update UI
     if (newState === 'live') {
+        // Always re-render during LIVE state to update active DJ glow
         currentState = newState;
         renderEventView(true);
     } 
@@ -220,22 +239,24 @@ function checkStatus() {
 
 function showOffline(message) {
     document.title = "Club Critters - " + message.replace(/<[^>]*>?/gm, '');
-    document.body.classList.add('body-centered');
+    document.body.classList.add('body-centered'); // Center content vertically
     archiveLink.classList.remove('hidden');
     loadingView.classList.add('hidden');
     offlineView.classList.remove('hidden');
     eventView.classList.add('hidden');
+    
     badgeContainer.innerHTML = '';
     subtext.innerHTML = message;
 }
 
 function renderEventView(isLive) {
-    document.body.classList.remove('body-centered');
+    document.body.classList.remove('body-centered'); // Top align for scrolling list
     archiveLink.classList.add('hidden');
     loadingView.classList.add('hidden');
     offlineView.classList.add('hidden');
     eventView.classList.remove('hidden');
 
+    // Header Updates
     if (isLive) {
         document.title = "Club Critters - LIVE NOW";
         badgeContainer.innerHTML = '<div class="status-badge status-live">🔴 EVENT LIVE NOW</div>';
@@ -243,33 +264,32 @@ function renderEventView(isLive) {
     } else {
         document.title = "Club Critters - UPCOMING";
         const dateOptions = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' };
-        // This converts the ISO UTC event start to Local Date String
         const localDateString = new Date(eventStartTime).toLocaleDateString(undefined, dateOptions);
         badgeContainer.innerHTML = `<div class="status-badge status-upcoming">📅 STARTING: ${localDateString}</div>`;
         subtext.innerText = "Upcoming Schedule";
     }
 
+    // Render DJ Cards
     djContainer.innerHTML = ''; 
     const now = new Date();
 
     djSchedule.forEach(dj => {
-        // --- 1. Process Time (UTC -> Local) ---
+        // Convert UTC time to Local Time
         const timeData = processDjTime(dj.timeRaw);
         
-        // If time format is broken, fallback to raw text
+        // Fallback to raw text if parsing fails, otherwise use formatted string
         const displayTime = timeData ? timeData.displayString : dj.timeRaw;
         
-        // Check if currently playing
+        // Determine if this DJ is currently playing
         let isActive = false;
         if (isLive && timeData) {
             isActive = (now >= timeData.startObj && now < timeData.endObj);
         }
 
-        // --- 2. Build UI ---
         const activeClass = isActive ? 'dj-active' : '';
         const liveTag = isActive ? '<span class="live-tag">ON AIR</span>' : '';
 
-        // Social Links
+        // Generate Social Links
         let linksHtml = '';
         const linkKeys = Object.keys(dj.links);
         if (linkKeys.length > 0) {
@@ -298,4 +318,5 @@ function renderEventView(isLive) {
     });
 }
 
+// Start Application
 init();
