@@ -1,7 +1,5 @@
 /**
  * CLUB CRITTERS - MAIN APP LOGIC
- * Handles the schedule fetching, state management (Live/Upcoming/Offline),
- * and UI rendering for the main hub.
  */
 
 // ==========================================
@@ -49,7 +47,6 @@ async function init() {
     console.clear();
     console.log("%c CLUB CRITTERS %c SYSTEM BOOT SEQUENCE INITIATED ", logStyle.banner, logStyle.tag);
 
-    // Set initial UI state
     loadingView.classList.remove('hidden');
     offlineView.classList.add('hidden');
     eventView.classList.add('hidden');
@@ -60,13 +57,7 @@ async function init() {
         await fetchAndParseSheet();
         
         console.log("%c[SUCCESS]%c Schedule loaded successfully.", logStyle.success, "color: #ccc;");
-        if(djSchedule.length > 0) {
-            console.groupCollapsed("📂 Loaded Schedule Data");
-            console.table(djSchedule);
-            console.groupEnd();
-        }
-
-        // Run initial status check immediately
+        
         checkStatus();
         
     } catch (error) {
@@ -75,7 +66,6 @@ async function init() {
         showOffline("Community Hub"); 
     }
 
-    // Start heartbeat to check time every 5 seconds
     console.log("%c[SYSTEM]%c Heartbeat monitor active (Tick: 5000ms)", "color: #29C5F6;", "color: #ccc;");
     setInterval(checkStatus, 5000);
 }
@@ -92,35 +82,30 @@ async function fetchAndParseSheet() {
     const rows = text.split(/\r?\n/);
     if (rows.length < 2) throw new Error("Sheet is empty or missing header");
 
-    // Parse Settings (Row 2)
     const headers = rows[0].split(',').map(h => h.trim());
     const settingsRow = rows[1].split(',').map(c => c.trim());
     
+    // These are expected to be ISO UTC strings (e.g. 2026-01-16T20:00:00Z)
     eventStartTime = settingsRow[0];
     eventEndTime = settingsRow[1];
     
-    // Check for Force Offline override (Column C)
     const offlineCell = settingsRow[2] ? settingsRow[2].toUpperCase() : "";
     forceOffline = (offlineCell === "TRUE" || offlineCell === "YES" || offlineCell === "1");
 
-    // Parse Schedule (Rows 3+)
     djSchedule = [];
     for (let i = 1; i < rows.length; i++) {
         if (!rows[i]) continue;
         const cols = rows[i].split(',').map(c => c.trim());
-        
-        // Ensure row has minimum data (DJ Name in Col 4)
         if (cols.length < 4 || !cols[3]) continue; 
 
         const dj = {
             name: cols[3],
-            time: cols[4],
+            timeRaw: cols[4], // Store the raw UTC string (e.g. "16:30 - 17:30")
             genre: cols[5],
             image: cols[6] || "cdn/logos/club/HeadOnly.png",
             links: {}
         };
 
-        // Parse dynamic social links starting from Col 8
         for (let x = 7; x < cols.length; x++) {
             const url = cols[x];
             const label = headers[x]; 
@@ -133,31 +118,77 @@ async function fetchAndParseSheet() {
 }
 
 // ==========================================
+//          HELPER: PARSE & CONVERT TIME
+// ==========================================
+
+/**
+ * Takes a UTC time range string (e.g. "16:30 - 17:30") 
+ * and converts it to the User's Local Time string, 
+ * plus returns the start/end Date objects for logic.
+ */
+function processDjTime(timeStr) {
+    if (!timeStr || !eventStartTime) return null;
+
+    // 1. Extract times from sheet (Assumed UTC)
+    const times = timeStr.match(/(\d{1,2}):(\d{2})/g);
+    if (!times || times.length < 2) return null;
+
+    // 2. Base everything on the Event Start Day (UTC)
+    const eventDate = new Date(eventStartTime);
+    
+    const [startH, startM] = times[0].split(':').map(Number);
+    const [endH, endM] = times[1].split(':').map(Number);
+
+    // 3. Create Date objects using UTC methods
+    const start = new Date(eventDate);
+    start.setUTCHours(startH, startM, 0, 0);
+
+    const end = new Date(eventDate);
+    end.setUTCHours(endH, endM, 0, 0);
+
+    // 4. Handle Rollovers (If DJ is 01:00 but event started 20:00 prev day)
+    // Logic: If DJ hour is significantly smaller than Event Start hour, add a day
+    if (startH < eventDate.getUTCHours() - 6) { 
+        start.setDate(start.getDate() + 1);
+        end.setDate(end.getDate() + 1);
+    } 
+    // If End is smaller than Start (23:00 - 01:00), End is next day
+    else if (end < start) {
+        end.setDate(end.getDate() + 1);
+    }
+
+    // 5. Create Display String (Local Time)
+    const timeOptions = { hour: '2-digit', minute: '2-digit' };
+    const localDisplay = `${start.toLocaleTimeString([], timeOptions)} - ${end.toLocaleTimeString([], timeOptions)}`;
+
+    return {
+        startObj: start,
+        endObj: end,
+        displayString: localDisplay
+    };
+}
+
+// ==========================================
 //          STATE MANAGEMENT
 // ==========================================
 
 function checkStatus() {
-    // 1. Check for Manual Override
     if (forceOffline) {
         if (currentState !== 'disabled') {
-            console.log("%c[MODE]%c Manual Override: FORCE OFFLINE active.", logStyle.warning, "color: #ccc");
             showOffline("Community Hub");
             currentState = 'disabled';
         }
         return;
     }
 
-    // 2. Check for Missing Configuration
     if (!eventStartTime || !eventEndTime) {
         if (currentState !== 'disabled') {
-            console.log("%c[MODE]%c Configuration Missing: Defaulting to Offline.", logStyle.warning, "color: #ccc");
             showOffline("Community Hub");
             currentState = 'disabled';
         }
         return;
     }
 
-    // 3. Determine Time State
     const now = new Date();
     const start = new Date(eventStartTime);
     const end = new Date(eventEndTime);
@@ -167,17 +198,15 @@ function checkStatus() {
     else if (now >= start) newState = 'live';
     else newState = 'upcoming';
 
-    // 4. Update UI if State Changed
-    if (newState !== currentState) {
-        const icon = newState === 'live' ? '🔴' : (newState === 'upcoming' ? '📅' : '🏁');
-        console.log(`%c CLUB CRITTERS %c STATE CHANGE: ${icon} ${newState.toUpperCase()} `, logStyle.banner, logStyle.tag);
+    // If LIVE, re-render frequently to update the Glow/Time
+    if (newState === 'live') {
         currentState = newState;
-
+        renderEventView(true);
+    } 
+    else if (newState !== currentState) {
+        currentState = newState;
         if (newState === 'finished') {
             showOffline("Thanks for partying with us! <br><span style='font-size:0.8rem; color:#888; display:block; margin-top:5px;'>(Archives take a short time to process/upload)</span>"); 
-        } 
-        else if (newState === 'live') {
-            renderEventView(true);
         } 
         else if (newState === 'upcoming') {
             renderEventView(false);
@@ -190,34 +219,23 @@ function checkStatus() {
 // ==========================================
 
 function showOffline(message) {
-    document.title = "Club Critters - " + message.replace(/<[^>]*>?/gm, ''); // Strip HTML for title tag
-    
-    // Center the layout for simple text view
+    document.title = "Club Critters - " + message.replace(/<[^>]*>?/gm, '');
     document.body.classList.add('body-centered');
-
-    // Show the Archive link when offline
     archiveLink.classList.remove('hidden');
-
     loadingView.classList.add('hidden');
     offlineView.classList.remove('hidden');
     eventView.classList.add('hidden');
-    
     badgeContainer.innerHTML = '';
     subtext.innerHTML = message;
 }
 
 function renderEventView(isLive) {
-    // Reset layout to top-aligned for list view
     document.body.classList.remove('body-centered');
-    
-    // Hide Archive link during events
     archiveLink.classList.add('hidden');
-
     loadingView.classList.add('hidden');
     offlineView.classList.add('hidden');
     eventView.classList.remove('hidden');
 
-    // Set Badges and Titles
     if (isLive) {
         document.title = "Club Critters - LIVE NOW";
         badgeContainer.innerHTML = '<div class="status-badge status-live">🔴 EVENT LIVE NOW</div>';
@@ -225,20 +243,35 @@ function renderEventView(isLive) {
     } else {
         document.title = "Club Critters - UPCOMING";
         const dateOptions = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' };
+        // This converts the ISO UTC event start to Local Date String
         const localDateString = new Date(eventStartTime).toLocaleDateString(undefined, dateOptions);
         badgeContainer.innerHTML = `<div class="status-badge status-upcoming">📅 STARTING: ${localDateString}</div>`;
         subtext.innerText = "Upcoming Schedule";
     }
 
-    // Render DJ Cards
     djContainer.innerHTML = ''; 
-    console.log(`%c[UI]%c Rendering ${djSchedule.length} DJ Cards...`, "color: #29C5F6", "color: #ccc");
+    const now = new Date();
 
     djSchedule.forEach(dj => {
-        // Generate Social Links HTML
+        // --- 1. Process Time (UTC -> Local) ---
+        const timeData = processDjTime(dj.timeRaw);
+        
+        // If time format is broken, fallback to raw text
+        const displayTime = timeData ? timeData.displayString : dj.timeRaw;
+        
+        // Check if currently playing
+        let isActive = false;
+        if (isLive && timeData) {
+            isActive = (now >= timeData.startObj && now < timeData.endObj);
+        }
+
+        // --- 2. Build UI ---
+        const activeClass = isActive ? 'dj-active' : '';
+        const liveTag = isActive ? '<span class="live-tag">ON AIR</span>' : '';
+
+        // Social Links
         let linksHtml = '';
         const linkKeys = Object.keys(dj.links);
-        
         if (linkKeys.length > 0) {
             linksHtml = '<div class="social-tags">';
             linkKeys.forEach(platformName => {
@@ -248,15 +281,14 @@ function renderEventView(isLive) {
             linksHtml += '</div>';
         }
 
-        // Create Card Element
         const card = document.createElement('div');
-        card.className = 'dj-card';
+        card.className = `dj-card ${activeClass}`; 
         card.innerHTML = `
             <img src="${dj.image}" alt="${dj.name}" class="dj-img">
             <div class="dj-content">
                 <div class="dj-header">
-                    <h3>${dj.name}</h3>
-                    <span class="time">${dj.time}</span>
+                    <h3>${dj.name} ${liveTag}</h3>
+                    <span class="time">${displayTime}</span>
                 </div>
                 <span class="genre">${dj.genre}</span>
                 ${linksHtml}
@@ -266,5 +298,4 @@ function renderEventView(isLive) {
     });
 }
 
-// Start App
 init();

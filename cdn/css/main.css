@@ -237,6 +237,26 @@ h1 {
 .dj-content .time { font-weight: bold; color: var(--primary-purple); font-size: 0.9rem; }
 .dj-content .genre { font-style: italic; color: #aaa; font-size: 0.85rem; display: block; margin-bottom: 8px;}
 
+.dj-active {
+    border-color: var(--accent-red) !important;
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+    background: linear-gradient(to right, rgba(255, 68, 68, 0.1), transparent);
+    transform: scale(1.02);
+    transition: all 0.3s ease;
+}
+
+.live-tag {
+    background: var(--accent-red);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+    vertical-align: middle;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+}
+
 /* Social Tags (Live View) */
 .social-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
 .social-tag {
