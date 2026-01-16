@@ -302,3 +302,65 @@ h1 {
 .play-btn-small:hover { background: var(--primary-blue); color: #000; border-color: var(--primary-blue); }
 
 .hidden { display: none !important; }
+
+/* =========================================
+   8. FEATURED SET (Offline Mode)
+   ========================================= */
+.featured-card {
+    background: linear-gradient(135deg, rgba(41, 197, 246, 0.15), rgba(179, 106, 244, 0.15));
+    border: 1px solid var(--primary-purple);
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 25px; /* Space between card and Discord buttons */
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.featured-card:hover {
+    transform: scale(1.02);
+    background: linear-gradient(135deg, rgba(41, 197, 246, 0.25), rgba(179, 106, 244, 0.25));
+}
+
+/* "Latest Set" Badge */
+.featured-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--primary-purple);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 0 0 0 6px;
+}
+
+.featured-img {
+    width: 60px; height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #000;
+    flex-shrink: 0;
+}
+
+.featured-info h3 {
+    margin: 0;
+    color: var(--primary-blue);
+    font-size: 1rem;
+}
+
+.featured-info p {
+    margin: 2px 0 0 0;
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+/* Mobile: Stack vertically if screen is tight */
+@media (max-width: 400px) {
+    .featured-card { flex-direction: column; text-align: center; }
+    .featured-badge { right: 50%; transform: translateX(50%); border-radius: 0 0 6px 6px; }
+}

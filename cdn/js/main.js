@@ -1,17 +1,20 @@
 /**
  * CLUB CRITTERS - MAIN APP LOGIC
  * Handles schedule fetching, time zone conversion, color contrast,
- * visualizers, live countdown timer, and social sharing.
+ * visualizers, live countdown timer, social sharing, and featured sets.
  */
 
 // ==========================================
 //          CONFIGURATION
 // ==========================================
 
+// URL for the "Schedule" Tab (Tab 1)
 const googleSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?output=csv";
 
+// URL for the "Archive" Tab (Tab 2) - REQUIRED for Offline Featured Set
+const archiveSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=532548123&single=true&output=csv"; 
+
 // Template for the 'Share' button clipboard text. 
-// Use {dj} and {genre} as placeholders for dynamic data.
 const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://club.afuxy.com";
 
 // ==========================================
@@ -23,7 +26,8 @@ const logStyle = {
     success: "color: #00e676; font-weight: bold;",
     warning: "color: #ff9100; font-weight: bold;",
     error: "background: #ff4444; color: #fff; padding: 2px 5px; border-radius: 2px;",
-    dj: "color: #B36AF4; font-weight: bold;"
+    state: "background: #B36AF4; color: #fff; font-weight: bold; padding: 2px 8px; border-radius: 4px;",
+    info: "color: #888; font-style: italic;"
 };
 
 // ==========================================
@@ -56,14 +60,15 @@ let countdownInterval = null;
 
 async function init() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c SYSTEM BOOT SEQUENCE INITIATED ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB CRITTERS %c SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
 
     try {
         userTimezoneCode = Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
             .formatToParts(new Date())
             .find(part => part.type == 'timeZoneName').value;
+        console.log(`%c[SYSTEM] User Timezone Detected: ${userTimezoneCode}`, logStyle.info);
     } catch (e) {
-        userTimezoneCode = "";
+        userTimezoneCode = "LOC";
     }
 
     loadingView.classList.remove('hidden');
@@ -72,9 +77,7 @@ async function init() {
     archiveLink.classList.add('hidden');
 
     try {
-        console.log("%c[NETWORK]%c Fetching schedule configuration...", "color: #999;", "color: #fff;");
         await fetchAndParseSheet();
-        console.log("%c[SUCCESS]%c Schedule loaded successfully.", logStyle.success, "color: #ccc;");
         checkStatus();
     } catch (error) {
         console.log("%c[CRITICAL FAILURE]%c Unable to load schedule.", logStyle.error, "color: #ff4444;");
@@ -82,21 +85,26 @@ async function init() {
         showOffline("Community Hub"); 
     }
 
-    console.log("%c[SYSTEM]%c Heartbeat monitor active (Tick: 5000ms)", "color: #29C5F6;", "color: #ccc;");
+    // Heartbeat logic (Silenced in console to prevent spam)
     setInterval(checkStatus, 5000);
 }
 
 // ==========================================
-//          DATA FETCHING & PARSING
+//          DATA FETCHING (SCHEDULE)
 // ==========================================
 
 async function fetchAndParseSheet() {
+    console.groupCollapsed("📦 Fetching Schedule Data");
+    console.log(`%c[NETWORK] Requesting CSV...`, logStyle.info);
+
     const response = await fetch(googleSheetUrl);
     if (!response.ok) throw new Error("Google Sheet returned " + response.status);
 
     const text = await response.text();
     const rows = text.split(/\r?\n/);
     if (rows.length < 2) throw new Error("Sheet is empty or missing header");
+
+    console.log(`%c[NETWORK] Received ${rows.length} rows. Parsing...`, logStyle.success);
 
     const headers = rows[0].split(',').map(h => h.trim());
     const settingsRow = rows[1].split(',').map(c => c.trim());
@@ -136,6 +144,11 @@ async function fetchAndParseSheet() {
         }
         djSchedule.push(dj);
     }
+
+    // --- FANCY DEBUG TABLE ---
+    console.log(`%c[DATA] Schedule Parsed Successfully:`, logStyle.success);
+    console.table(djSchedule, ['name', 'timeRaw', 'genre', 'color']);
+    console.groupEnd();
 }
 
 // ==========================================
@@ -200,6 +213,7 @@ function ensureReadableColor(hex) {
 function checkStatus() {
     if (forceOffline) {
         if (currentState !== 'disabled') {
+            console.log("%c[STATE CHANGE]%c FORCE OFFLINE ENABLED", logStyle.state, "color: #ccc;");
             showOffline("Community Hub");
             currentState = 'disabled';
         }
@@ -208,6 +222,7 @@ function checkStatus() {
 
     if (!eventStartTime || !eventEndTime) {
         if (currentState !== 'disabled') {
+            console.log("%c[STATE CHANGE]%c MISSING CONFIG -> DISABLED", logStyle.state, "color: #ccc;");
             showOffline("Community Hub");
             currentState = 'disabled';
         }
@@ -224,12 +239,17 @@ function checkStatus() {
     else newState = 'upcoming';
 
     if (newState === 'live') {
+        if (currentState !== 'live') {
+             console.log("%c[STATE CHANGE]%c EVENT IS LIVE! 🔴", logStyle.state, "color: #ff4444; font-weight:bold;");
+        }
         currentState = newState;
         if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
         renderEventView(true);
     } 
     else if (newState !== currentState) {
+        console.log(`%c[STATE CHANGE]%c Switching to: ${newState.toUpperCase()}`, logStyle.state, "color: #ccc;");
         currentState = newState;
+        
         if (newState === 'finished') {
             if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
             showOffline("Thanks for partying with us! <br><span style='font-size:0.8rem; color:#888; display:block; margin-top:5px;'>(Archives take a short time to process/upload)</span>"); 
@@ -239,6 +259,14 @@ function checkStatus() {
             startCountdown(start);
         }
     }
+
+    // Handle initial offline load (if state wasn't 'finished' but page just loaded)
+    if (currentState === 'disabled' || currentState === 'finished') {
+         fetchAndShowFeaturedSet();
+    }
+    if (!eventStartTime && !forceOffline) {
+         fetchAndShowFeaturedSet();
+    }
 }
 
 // ==========================================
@@ -247,6 +275,8 @@ function checkStatus() {
 
 function startCountdown(startTime) {
     if (countdownInterval) clearInterval(countdownInterval);
+
+    console.log("%c[TIMER]%c Countdown logic armed.", "color: #29C5F6", logStyle.info);
 
     countdownInterval = setInterval(() => {
         const now = new Date();
@@ -271,6 +301,120 @@ function startCountdown(startTime) {
 }
 
 // ==========================================
+//          FEATURED SET LOGIC (Offline)
+// ==========================================
+
+async function fetchAndShowFeaturedSet() {
+    const container = document.getElementById('featured-container');
+    if (!container) return;
+    if (container.innerHTML !== "") return;
+
+    console.groupCollapsed("💾 Fetching Featured Set (Offline Mode)");
+
+    try {
+        const response = await fetch(archiveSheetUrl);
+        if (!response.ok) throw new Error("Archive fetch failed");
+
+        const text = await response.text();
+        const rows = text.split(/\r?\n/);
+        
+        console.log(`%c[NETWORK] Analyzing ${rows.length} archive entries...`, logStyle.info);
+
+        let potentialSets = [];
+        let latestDateObj = new Date(0); // Start at Epoch
+
+        // STEP 1: Scan all rows
+        for (let i = 1; i < rows.length; i++) {
+            if (!rows[i]) continue;
+            const cols = rows[i].split(',').map(c => c.trim());
+            if (cols.length < 3) continue;
+
+            const djName = cols[0];
+            const djImage = cols[1] || "cdn/logos/club/HeadOnly.png";
+
+            // Archive format: Name, Image, [Title, Date, Link]...
+            for (let x = 2; x < cols.length; x += 3) {
+                const title = cols[x];
+                const dateStr = cols[x+1];
+                const link = cols[x+2];
+
+                if (title && link && dateStr) {
+                    const d = new Date(dateStr);
+                    if (!isNaN(d)) {
+                        potentialSets.push({
+                            dj: djName,
+                            image: djImage,
+                            title: title,
+                            dateStr: dateStr,
+                            dateObj: d,
+                            link: link
+                        });
+
+                        // Track newest date found
+                        if (d > latestDateObj) {
+                            latestDateObj = d;
+                        }
+                    }
+                }
+            }
+        }
+
+        // STEP 2: Filter for sets that match the newest date (Release Day Carousel)
+        const featuredSets = potentialSets.filter(set => 
+            set.dateObj.getTime() === latestDateObj.getTime()
+        );
+
+        if (featuredSets.length > 0) {
+            console.log(`%c[SUCCESS] Found ${featuredSets.length} sets from ${latestDateObj.toDateString()}`, logStyle.success);
+            renderFeaturedSets(featuredSets);
+        } else {
+            console.log(`%c[INFO] No valid sets found to feature.`, logStyle.info);
+        }
+
+    } catch (e) {
+        console.warn("Could not fetch featured set", e);
+    }
+    console.groupEnd();
+}
+
+function renderFeaturedSets(sets) {
+    const container = document.getElementById('featured-container');
+    if (!container) return;
+
+    let html = '';
+
+    sets.forEach(set => {
+        // Format YYYY-MM-DD into "Jan 16, 2026"
+        let displayDate = set.dateStr;
+        try {
+            if (!isNaN(set.dateObj)) {
+                displayDate = set.dateObj.toLocaleDateString(undefined, { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                });
+            }
+        } catch (e) {}
+
+        html += `
+            <a href="${set.link}" target="_blank" style="text-decoration:none;">
+                <div class="featured-card">
+                    <div class="featured-badge">LATEST SET</div>
+                    <img src="${set.image}" alt="${set.dj}" class="featured-img">
+                    <div class="featured-info">
+                        <h3>${set.title}</h3>
+                        <p>By <strong>${set.dj}</strong> • ${displayDate}</p>
+                    </div>
+                    <div style="margin-left:auto; font-size:1.2rem; color:var(--primary-blue);">▶</div>
+                </div>
+            </a>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// ==========================================
 //          UI RENDERING
 // ==========================================
 
@@ -283,6 +427,9 @@ function showOffline(message) {
     eventView.classList.add('hidden');
     badgeContainer.innerHTML = '';
     subtext.innerHTML = message;
+    
+    // Trigger Featured Set Fetch
+    fetchAndShowFeaturedSet();
 }
 
 function renderEventView(isLive) {
@@ -319,20 +466,16 @@ function renderEventView(isLive) {
         const activeClass = isActive ? 'dj-active' : '';
         
         // --- SHARE BUTTON LOGIC ---
-        // Generates the share button only if the DJ is currently active
         let shareButton = '';
         if (isActive) {
-            // Replace placeholders in the template with actual DJ data
             const shareText = shareMessageTemplate
                 .replace("{dj}", dj.name)
                 .replace("{genre}", dj.genre);
-            
-            // Escape special characters to prevent HTML errors in the onclick attribute
             const safeShareText = shareText.replace(/'/g, "\\'");
-            
             shareButton = `<button class="share-btn" onclick="copyToClipboard('${safeShareText}', this)">🔗 Share</button>`;
         }
 
+        // --- VISUALIZER LOGIC ---
         const liveTag = isActive ? 
             `<span class="live-tag">
                 ON AIR 
@@ -381,7 +524,6 @@ function renderEventView(isLive) {
 
 window.copyToClipboard = function(text, btnElement) {
     navigator.clipboard.writeText(text).then(() => {
-        // Add class to trigger the 'Copied!' tooltip animation
         btnElement.classList.add('copied');
         setTimeout(() => btnElement.classList.remove('copied'), 2000);
     }).catch(err => console.error('Failed to copy', err));
