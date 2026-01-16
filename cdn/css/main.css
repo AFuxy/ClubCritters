@@ -364,3 +364,35 @@ h1 {
     .featured-card { flex-direction: column; text-align: center; }
     .featured-badge { right: 50%; transform: translateX(50%); border-radius: 0 0 6px 6px; }
 }
+
+/* =========================================
+   9. SEARCH BAR (Archive Page)
+   ========================================= */
+.search-container {
+    width: 100%;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.search-bar {
+    width: 100%;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    color: white;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.3s ease;
+    box-sizing: border-box; /* Ensures padding doesn't break layout */
+}
+
+.search-bar:focus {
+    border-color: var(--primary-purple);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 15px rgba(179, 106, 244, 0.3);
+}
+
+.search-bar::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
