@@ -23,10 +23,6 @@ body {
     transition: justify-content 0.5s ease;
 }
 
-/* =========================================
-   2. MAIN LAYOUT
-   ========================================= */
-
 /* Center Mode: Activated via JS when in Offline/Finished state */
 body.body-centered {
     justify-content: center;
@@ -39,22 +35,18 @@ body.body-centered {
     flex-direction: column;
     padding-bottom: 50px;
     margin-top: 20px;
-    /* Default alignment is centered text for headers/footers */
-    text-align: center; 
+    text-align: center; /* Default text center for headers */
 }
 
 /* =========================================
-   3. TYPOGRAPHY & LOGOS
+   2. COMPONENTS & UTILITIES
    ========================================= */
 
-.logo-container { 
-    margin-top: 10px; 
-    margin-bottom: 20px;
-}
+/* Logo & Headers */
+.logo-container { margin: 10px 0 20px 0; }
 
 .logo {
-    width: 200px;
-    height: 200px;
+    width: 200px; height: 200px;
     object-fit: cover;
     filter: drop-shadow(0 0 10px rgba(41, 197, 246, 0.5));
 }
@@ -66,21 +58,12 @@ h1 {
     margin-bottom: 5px;
 }
 
-#status-subtext { 
-    color: #ccc; 
-    margin-top: 0; 
-    margin-bottom: 20px; 
-}
+#status-subtext { color: #ccc; margin: 0 0 20px 0; }
 
-/* =========================================
-   4. NAVIGATION & BUTTONS
-   ========================================= */
-
-/* Pill Button (Used for Archive & Back Navigation) */
+/* Navigation Pill Button */
 .nav-pill {
     display: inline-block;
-    margin-top: 10px;
-    margin-bottom: 20px;
+    margin: 10px 0 20px 0;
     color: var(--primary-blue);
     text-decoration: none;
     font-weight: bold;
@@ -91,22 +74,27 @@ h1 {
     transition: all 0.2s;
     background: transparent;
     cursor: pointer;
-    align-self: center; /* Ensures button does not stretch full width */
+    align-self: center; /* Prevents button from stretching full width */
 }
+.nav-pill:hover { background: var(--primary-blue); color: #000; }
 
-.nav-pill:hover {
-    background: var(--primary-blue);
-    color: #000;
-}
+/* Loading Spinner */
+#loading-view { margin: 20px auto; min-height: 150px; }
 
-/* Standard Action Buttons */
-.btn-group { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 15px; 
-    margin-top: 10px; 
-    width: 100%; 
+.spinner {
+    width: 40px; height: 40px;
+    border: 4px solid rgba(41, 197, 246, 0.3);
+    border-top: 4px solid var(--primary-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px auto;
 }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* =========================================
+   3. BUTTONS
+   ========================================= */
+.btn-group { display: flex; flex-direction: column; gap: 15px; margin-top: 10px; width: 100%; }
 
 .btn {
     background: linear-gradient(45deg, var(--primary-blue), var(--primary-purple));
@@ -120,71 +108,15 @@ h1 {
     display: block;
     text-align: center;
 }
-
-.btn:hover { 
-    transform: scale(1.02); 
-    box-shadow: 0 0 15px rgba(179, 106, 244, 0.6); 
-}
+.btn:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(179, 106, 244, 0.6); }
 
 .btn-secondary { background: transparent; border: 2px solid var(--primary-purple); }
 .btn-small { padding: 10px 15px; font-size: 0.9rem; }
-
-.grid-buttons { 
-    display: grid; 
-    grid-template-columns: 1fr 1fr; 
-    gap: 10px; 
-    width: 100%; 
-}
+.grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
 
 /* =========================================
-   5. COMPONENTS (Loader, Cards, Badges)
+   4. EVENT & DJ CARDS
    ========================================= */
-
-/* Loading Spinner */
-#loading-view {
-    margin: 20px auto; 
-    min-height: 150px;
-}
-
-.spinner {
-    width: 40px;
-    height: 40px;
-    box-sizing: border-box; 
-    border: 4px solid rgba(41, 197, 246, 0.3);
-    border-top: 4px solid var(--primary-blue);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 15px auto;
-}
-
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-/* Status Badges */
-#status-badge-container { text-align: center; }
-
-.status-badge {
-    display: inline-block;
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 0.9rem;
-    margin-bottom: 10px;
-}
-
-.status-live { 
-    background-color: rgba(255, 68, 68, 0.2); 
-    color: var(--accent-red); 
-    border: 1px solid var(--accent-red); 
-    animation: pulse 1.5s infinite; 
-}
-
-.status-upcoming { 
-    background-color: rgba(41, 197, 246, 0.2); 
-    color: var(--primary-blue); 
-    border: 1px solid var(--primary-blue); 
-}
-
-@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
 /* Event Links Box */
 .event-links-box {
@@ -198,32 +130,36 @@ h1 {
 }
 .event-links-box p { color: var(--primary-blue); font-weight: bold; margin-bottom: 10px; }
 
-/* =========================================
-   6. DJ LIST & ARCHIVE
-   ========================================= */
+/* DJ List Container */
+.dj-list { list-style: none; padding: 0; margin-top: 20px; width: 100%; }
 
-.dj-list { 
-    list-style: none; 
-    padding: 0; 
-    margin-top: 20px; 
-    width: 100%; 
-}
-
+/* Individual DJ Card */
 .dj-card {
+    --accent-color: var(--primary-blue); /* Default Color, overridden by JS */
+    
     background-color: var(--card-bg);
     border-radius: 15px;
     padding: 15px;
     margin-bottom: 20px;
     display: flex;
     align-items: flex-start;
-    text-align: left; /* Internal content remains left-aligned */
-    border-left: 5px solid var(--primary-blue);
+    text-align: left;
+    
+    border-left: 5px solid var(--accent-color); /* Uses dynamic color */
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+/* Active State (Live DJ) */
+.dj-active {
+    border-color: var(--accent-red) !important;
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+    background: linear-gradient(to right, rgba(255, 68, 68, 0.1), transparent);
+    transform: scale(1.02);
 }
 
 .dj-img {
-    width: 70px;
-    height: 70px;
+    width: 70px; height: 70px;
     border-radius: 50%;
     object-fit: cover;
     margin-right: 15px;
@@ -232,19 +168,19 @@ h1 {
 }
 
 .dj-content { flex-grow: 1; }
-.dj-header { display: flex; justify-content: space-between; align-items: baseline; }
-.dj-content h3 { margin: 0; color: var(--primary-blue); font-size: 1.1rem;}
+
+/* THIS WAS THE MISSING PIECE! */
+.dj-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: baseline; 
+}
+
+.dj-content h3 { margin: 0; color: var(--accent-color); font-size: 1.1rem; }
 .dj-content .time { font-weight: bold; color: var(--primary-purple); font-size: 0.9rem; }
 .dj-content .genre { font-style: italic; color: #aaa; font-size: 0.85rem; display: block; margin-bottom: 8px;}
 
-.dj-active {
-    border-color: var(--accent-red) !important;
-    box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
-    background: linear-gradient(to right, rgba(255, 68, 68, 0.1), transparent);
-    transform: scale(1.02);
-    transition: all 0.3s ease;
-}
-
+/* Live Tag */
 .live-tag {
     background: var(--accent-red);
     color: white;
@@ -257,7 +193,7 @@ h1 {
     animation: pulse 1.5s infinite;
 }
 
-/* Social Tags (Live View) */
+/* Social Buttons */
 .social-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
 .social-tag {
     background: #222;
@@ -268,42 +204,24 @@ h1 {
     text-decoration: none;
     transition: background 0.2s;
 }
-.social-tag:hover { background: var(--primary-purple); color: #fff; }
+.social-tag:hover { background: var(--accent-color); color: #000; }
 
-/* Archive List Items */
+/* Status Badges */
+.status-badge { display: inline-block; padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; margin-bottom: 10px; }
+.status-live { background-color: rgba(255, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); animation: pulse 1.5s infinite; }
+.status-upcoming { background-color: rgba(41, 197, 246, 0.2); color: var(--primary-blue); border: 1px solid var(--primary-blue); }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+/* =========================================
+   5. ARCHIVE STYLES
+   ========================================= */
 .set-list { border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: 5px; }
-.set-item { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    padding: 12px 0; 
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
-}
+.set-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .set-item:last-child { border-bottom: none; }
-
 .set-info { text-align: left; }
 .set-title { color: #eee; font-weight: bold; font-size: 0.95rem; }
 .set-date { color: var(--primary-purple); font-size: 0.8rem; margin-top: 2px; }
+.play-btn-small { background: #222; color: #fff; border: 1px solid #444; padding: 5px 12px; border-radius: 5px; font-size: 0.8rem; text-decoration: none; transition: 0.2s; white-space: nowrap; }
+.play-btn-small:hover { background: var(--primary-blue); color: #000; border-color: var(--primary-blue); }
 
-.play-btn-small { 
-    background: #222; 
-    color: #fff; 
-    border: 1px solid #444; 
-    padding: 5px 12px; 
-    border-radius: 5px; 
-    font-size: 0.8rem; 
-    text-decoration: none; 
-    transition: 0.2s; 
-    white-space: nowrap; 
-}
-
-.play-btn-small:hover { 
-    background: var(--primary-blue); 
-    color: #000; 
-    border-color: var(--primary-blue); 
-}
-
-/* =========================================
-   7. UTILITIES
-   ========================================= */
 .hidden { display: none !important; }

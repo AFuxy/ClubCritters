@@ -1,7 +1,7 @@
 /**
  * CLUB CRITTERS - MAIN APPLICATION LOGIC
- * * Handles schedule data fetching, time zone conversion (UTC -> Local),
- * real-time state management (Live/Upcoming/Offline), and UI rendering.
+ * Handles schedule data fetching, time zone conversion (UTC -> Local),
+ * color contrast adjustment, and real-time UI rendering.
  */
 
 // ==========================================
@@ -89,7 +89,7 @@ async function init() {
 }
 
 // ==========================================
-//          DATA FETCHING
+//          DATA FETCHING & PARSING
 // ==========================================
 
 async function fetchAndParseSheet() {
@@ -118,16 +118,25 @@ async function fetchAndParseSheet() {
         // Ensure row has minimum data (DJ Name in Col 4)
         if (cols.length < 4 || !cols[3]) continue; 
 
+        // Process color: ensure contrast against dark background
+        let rawColor = cols[7];
+        let finalColor = null;
+
+        if (rawColor && rawColor.startsWith('#')) {
+            finalColor = ensureReadableColor(rawColor);
+        }
+
         const dj = {
             name: cols[3],
             timeRaw: cols[4], // Raw UTC string (e.g. "16:30 - 17:30")
             genre: cols[5],
             image: cols[6] || "cdn/logos/club/HeadOnly.png",
+            color: finalColor,
             links: {}
         };
 
         // Parse Dynamic Social Links (Cols 8+)
-        for (let x = 7; x < cols.length; x++) {
+        for (let x = 8; x < cols.length; x++) {
             const url = cols[x];
             const label = headers[x]; 
             if (url && url.length > 0 && label) {
@@ -139,7 +148,7 @@ async function fetchAndParseSheet() {
 }
 
 // ==========================================
-//          TIMEZONE CONVERSION HELPER
+//          HELPER FUNCTIONS
 // ==========================================
 
 /**
@@ -181,6 +190,41 @@ function processDjTime(timeStr) {
         endObj: end,
         displayString: localDisplay
     };
+}
+
+/**
+ * Ensures a HEX color is readable on a dark background.
+ * Converts to HSL and boosts Lightness if below 60%.
+ */
+function ensureReadableColor(hex) {
+    hex = hex.replace(/^#/, '');
+    let r = parseInt(hex.substring(0, 2), 16) / 255;
+    let g = parseInt(hex.substring(2, 4), 16) / 255;
+    let b = parseInt(hex.substring(4, 6), 16) / 255;
+
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if (max === min) { h = s = 0; } 
+    else {
+        let d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+
+    // Force brightness (L) to be at least 60%
+    if (l < 0.6) l = 0.6;
+
+    h = Math.round(h * 360);
+    s = Math.round(s * 100);
+    l = Math.round(l * 100);
+
+    return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
 // ==========================================
@@ -276,8 +320,6 @@ function renderEventView(isLive) {
     djSchedule.forEach(dj => {
         // Convert UTC time to Local Time
         const timeData = processDjTime(dj.timeRaw);
-        
-        // Fallback to raw text if parsing fails, otherwise use formatted string
         const displayTime = timeData ? timeData.displayString : dj.timeRaw;
         
         // Determine if this DJ is currently playing
@@ -303,6 +345,12 @@ function renderEventView(isLive) {
 
         const card = document.createElement('div');
         card.className = `dj-card ${activeClass}`; 
+        
+        // Apply Custom Color if available
+        if (dj.color) {
+            card.style.setProperty('--accent-color', dj.color);
+        }
+
         card.innerHTML = `
             <img src="${dj.image}" alt="${dj.name}" class="dj-img">
             <div class="dj-content">
