@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Critters - Meet the Team</title>
+    
+    <link rel="icon" type="image/png" href="../cdn/logos/club/HeadOnly.png">
+    <link rel="stylesheet" href="../cdn/css/main.css">
+
+    <meta name="theme-color" content="#29C5F6">
+    <meta property="og:title" content="Club Critters - Team">
+    <meta property="og:description" content="Meet the staff and resident DJs behind Club Critters.">
+    <meta property="og:image" content="https://club.afuxy.com/cdn/logos/club/HeadOnly.png">
+</head>
+<body>
+
+    <div class="container">
+        <a href="../index.html" class="nav-pill">← Back to Hub</a>
+
+        <div class="logo-container">
+            <img src="../cdn/logos/club/HeadOnly.png" class="logo" style="width: 120px; height: 120px;" alt="Logo">
+        </div>
+
+        <h1>Meet The Team</h1>
+        <p id="status-subtext">The critters running the show</p>
+
+        <div id="loading-view">
+            <div class="spinner"></div>
+            <p>Loading Roster...</p>
+        </div>
+
+        <div id="staff-section" class="hidden">
+            <h2 style="color:var(--primary-blue); border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:20px; font-size:1.2rem;">Event Staff</h2>
+            <div id="staff-list" class="dj-list"></div>
+        </div>
+
+        <div id="resident-section" class="hidden" style="margin-top: 40px;">
+            <h2 style="color:var(--primary-purple); border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:20px; font-size:1.2rem;">Resident DJs</h2>
+            <div id="resident-list" class="dj-list"></div>
+        </div>
+        
+        <p id="empty-msg" class="hidden" style="color:#666; margin-top:20px;">Roster not found.</p>
+    </div>
+
+    <script src="../cdn/js/team.js"></script>
+</body>
+</html>

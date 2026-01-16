@@ -240,7 +240,57 @@ h1 {
 }
 
 /* =========================================
-   6. ARCHIVE STYLES
+   6. SHARE BUTTON
+   ========================================= */
+.share-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    margin-left: 10px;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.share-btn:hover {
+    border-color: var(--primary-blue);
+    color: var(--primary-blue);
+    background: rgba(41, 197, 246, 0.1);
+}
+
+.share-btn:active {
+    transform: scale(0.95);
+}
+
+/* Tooltip "Copied!" animation */
+.share-btn::after {
+    content: "Copied!";
+    position: absolute;
+    background: var(--primary-blue);
+    color: #000;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+/* Class added via JS when clicked */
+.share-btn.copied::after {
+    opacity: 1;
+}
+
+/* =========================================
+   7. ARCHIVE STYLES
    ========================================= */
 .set-list { border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: 5px; }
 .set-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
