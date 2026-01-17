@@ -71,10 +71,8 @@ async function init() {
         userTimezoneCode = "LOC";
     }
 
-    loadingView.classList.remove('hidden');
-    offlineView.classList.add('hidden');
-    eventView.classList.add('hidden');
-    archiveLink.classList.add('hidden');
+    // CLS FIX: We do NOT hide/show views here anymore.
+    // We trust the HTML default (Centered/Offline) to prevent jumping.
 
     try {
         await fetchAndParseSheet();
@@ -82,6 +80,7 @@ async function init() {
     } catch (error) {
         console.log("%c[CRITICAL FAILURE]%c Unable to load schedule.", logStyle.error, "color: #ff4444;");
         console.error(error);
+        // If fetch fails, we stay in the default Offline/Centered state
         showOffline("Community Hub"); 
     }
 
@@ -420,11 +419,15 @@ function renderFeaturedSets(sets) {
 
 function showOffline(message) {
     document.title = "Club Critters - " + message.replace(/<[^>]*>?/gm, '');
+    
+    // CLS FIX: Ensure centering and archive visibility when offline
     document.body.classList.add('body-centered');
     archiveLink.classList.remove('hidden');
+
     loadingView.classList.add('hidden');
     offlineView.classList.remove('hidden');
     eventView.classList.add('hidden');
+    
     badgeContainer.innerHTML = '';
     subtext.innerHTML = message;
     
@@ -433,8 +436,10 @@ function showOffline(message) {
 }
 
 function renderEventView(isLive) {
+    // CLS FIX: Remove centering and hide archive when Event Mode is active
     document.body.classList.remove('body-centered');
     archiveLink.classList.add('hidden');
+
     loadingView.classList.add('hidden');
     offlineView.classList.add('hidden');
     eventView.classList.remove('hidden');
