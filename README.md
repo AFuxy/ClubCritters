@@ -64,7 +64,7 @@ Controls the `/team/` page.
 To change the text that is copied when users click the "Share" button, open `cdn/js/main.js` and edit the template at the top of the file:
 
 ```javascript
-const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: [https://club.afuxy.com](https://club.afuxy.com)";
+const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: [https://critters.club](https://critters.club)";
 ```
 
 ### Changing Sheet URLs

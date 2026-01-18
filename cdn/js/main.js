@@ -11,7 +11,7 @@ const scheduleSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATc
 const rosterSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=1671173789&single=true&output=csv";
 const archiveSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=532548123&single=true&output=csv"; 
 
-const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://club.afuxy.com";
+const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://critters.club";
 
 // Cache Keys
 const CACHE_KEY_ROSTER = 'cc_roster_v1';
