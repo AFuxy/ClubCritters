@@ -1,5 +1,5 @@
 /**
- * CLUB CRITTERS - MAIN APP LOGIC (V1.3 - DEEP LINK, CHAMELEON & CACHE)
+ * CLUB CRITTERS - MAIN APP LOGIC (V1.3 - DEEP LINK, CHAMELEON, FULL CACHE, FEATURED GENRE)
  */
 
 // ==========================================
@@ -15,6 +15,7 @@ const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: h
 // Cache Keys
 const CACHE_KEY_ROSTER = 'cc_roster_v1';
 const CACHE_KEY_SCHEDULE = 'cc_schedule_v1';
+const CACHE_KEY_ARCHIVE = 'cc_archive_v1';
 
 // ==========================================
 //          CONSOLE THEME
@@ -46,6 +47,7 @@ let forceOffline = false;
 let vrcInstanceUrl = ""; 
 let djSchedule = [];
 let rosterMap = {}; 
+let rawArchiveData = ""; 
 let currentState = null; 
 let userTimezoneCode = ""; 
 let countdownInterval = null; 
@@ -56,7 +58,7 @@ let countdownInterval = null;
 
 async function init() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c ROSTER SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB CRITTERS %c SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
 
     try {
         userTimezoneCode = Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
@@ -67,38 +69,46 @@ async function init() {
     // --- PHASE 1: INSTANT LOAD (CACHE) ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
     const cachedSchedule = localStorage.getItem(CACHE_KEY_SCHEDULE);
+    const cachedArchive = localStorage.getItem(CACHE_KEY_ARCHIVE);
 
     if (cachedRoster && cachedSchedule) {
         console.log("%c[CACHE] Loading from local storage...", logStyle.info);
         processRosterData(cachedRoster);
         processScheduleData(cachedSchedule);
-        checkStatus(); // Render immediately!
+        if (cachedArchive) rawArchiveData = cachedArchive; 
+        checkStatus(); 
     } else {
         console.log("%c[CACHE] Miss. Waiting for network...", logStyle.info);
     }
 
     // --- PHASE 2: FRESH FETCH (NETWORK) ---
     try {
-        const [rosterResp, scheduleResp] = await Promise.all([
+        const [rosterResp, scheduleResp, archiveResp] = await Promise.all([
             fetch(rosterSheetUrl),
-            fetch(scheduleSheetUrl)
+            fetch(scheduleSheetUrl),
+            fetch(archiveSheetUrl)
         ]);
 
-        if (rosterResp.ok && scheduleResp.ok) {
+        if (rosterResp.ok && scheduleResp.ok && archiveResp.ok) {
             const rosterText = await rosterResp.text();
             const scheduleText = await scheduleResp.text();
+            const archiveText = await archiveResp.text();
 
             const isRosterNew = rosterText !== cachedRoster;
             const isScheduleNew = scheduleText !== cachedSchedule;
+            const isArchiveNew = archiveText !== cachedArchive;
 
-            if (isRosterNew || isScheduleNew) {
+            if (isRosterNew || isScheduleNew || isArchiveNew) {
                 console.log("%c[NETWORK] New data detected. Updating...", logStyle.success);
                 
                 localStorage.setItem(CACHE_KEY_ROSTER, rosterText);
                 localStorage.setItem(CACHE_KEY_SCHEDULE, scheduleText);
+                localStorage.setItem(CACHE_KEY_ARCHIVE, archiveText);
 
                 processRosterData(rosterText);
                 processScheduleData(scheduleText);
+                rawArchiveData = archiveText; 
+
                 checkStatus();
             } else {
                 console.log("%c[NETWORK] Data is up to date.", logStyle.success);
@@ -338,26 +348,12 @@ function startCountdown(startTime) {
 //          FEATURED SET (OFFLINE)
 // ==========================================
 
-async function fetchAndShowFeaturedSet() {
+function fetchAndShowFeaturedSet() {
     const container = document.getElementById('featured-container');
-    if (!container || container.innerHTML !== "") return;
+    if (!container || container.innerHTML !== "" || !rawArchiveData) return;
 
     try {
-        let archiveText;
-        if (Object.keys(rosterMap).length === 0) {
-            const [rosterRes, archiveRes] = await Promise.all([
-                fetch(rosterSheetUrl),
-                fetch(archiveSheetUrl)
-            ]);
-            const rosterText = await rosterRes.text();
-            archiveText = await archiveRes.text();
-            processRosterData(rosterText);
-        } else {
-            const response = await fetch(archiveSheetUrl);
-            archiveText = await response.text();
-        }
-
-        const rows = archiveText.split(/\r?\n/);
+        const rows = rawArchiveData.split(/\r?\n/);
         let potentialSets = [];
         let latestDateObj = new Date(0);
 
@@ -370,14 +366,17 @@ async function fetchAndShowFeaturedSet() {
             const rosterData = rosterMap[name.toLowerCase()];
             const image = rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png";
 
-            for (let x = 1; x < cols.length; x += 3) {
+            // LOOP GROUPS OF 4 (Title | Date | Genre | Link)
+            for (let x = 1; x < cols.length; x += 4) {
                 const title = cols[x];
                 const dateStr = cols[x+1];
-                const link = cols[x+2];
+                const genre = cols[x+2] || ""; // NEW: Capture Genre
+                const link = cols[x+3];
+                
                 if (title && link && dateStr) {
                     const d = new Date(dateStr);
                     if (!isNaN(d)) {
-                        potentialSets.push({ dj: name, image, title, dateStr, dateObj: d, link });
+                        potentialSets.push({ dj: name, image, title, genre, dateStr, dateObj: d, link });
                         if (d > latestDateObj) latestDateObj = d;
                     }
                 }
@@ -402,7 +401,7 @@ function renderFeaturedSets(sets) {
                     <div class="featured-badge">LATEST SET</div>
                     <img src="${set.image}" alt="${set.dj}" class="featured-img">
                     <div class="featured-info">
-                        <h3>${set.title}</h3>
+                        <h3>${set.title} <span style="font-size:0.7rem; opacity:0.6; border:1px solid #444; padding:2px 5px; border-radius:4px; margin-left:5px; vertical-align:middle;">${set.genre}</span></h3>
                         <p>By <strong>${set.dj}</strong> • ${displayDate}</p>
                     </div>
                     <div style="margin-left:auto; font-size:1.2rem; color:var(--primary-blue);">▶</div>
@@ -482,6 +481,7 @@ function renderEventView(isLive) {
         const isActive = (isLive && timeData && now >= timeData.startObj && now < timeData.endObj);
         
         // --- CHAMELEON TRIGGER ---
+        // FIX: Always trigger the theme update if active.
         if (isActive) {
             updateSiteTheme(dj.color);
         }

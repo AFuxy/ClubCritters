@@ -39,16 +39,23 @@
 
         <h1>Set Archive</h1>
         <p id="status-subtext">Listen back to previous nights</p>
-        <div class="search-container">
-            <input type="text" id="search-input" class="search-bar" placeholder="🔍 Search DJs, Genres, or Dates...">
-        </div>
-
         <div id="loading-view">
             <div class="spinner"></div>
             <p>Loading Archive...</p>
         </div>
 
-        <div id="archive-list" class="dj-list hidden"></div>
+        <div id="archive-view" class="hidden">
+            
+            <div class="genre-filter-container" id="genre-filters"></div>
+
+            <div class="search-container">
+                <input type="text" id="search-input" class="search-bar" placeholder="Search sets...">
+            </div>
+
+            <div id="archive-list" class="set-list">
+                </div>
+
+        </div>
         
         <p id="empty-msg" class="hidden" style="color:#666;">No archives found.</p>
 

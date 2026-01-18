@@ -1,43 +1,66 @@
 /**
- * CLUB CRITTERS - ARCHIVE LOGIC (SMART CACHE)
- * Instant load using shared LocalStorage + background update.
+ * CLUB CRITTERS - ARCHIVE LOGIC (V1.3 - ROBUST CACHE & GENRE PILLS)
+ * Features: LocalStorage Cache, Debug Logging, 4-Column Parsing, Genre Filters
  */
 
-const rosterSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=1671173789&single=true&output=csv";
-const archiveSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=532548123&single=true&output=csv";
+// ==========================================
+//          CONFIGURATION
+// ==========================================
 
-// SHARED CACHE KEYS
+const rosterSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=1671173789&single=true&output=csv";
+const archiveSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=532548123&single=true&output=csv"; 
+
+// Cache Keys (Must match main.js for Roster, unique for Archive)
 const CACHE_KEY_ROSTER = 'cc_roster_v1';
 const CACHE_KEY_ARCHIVE = 'cc_archive_v1';
 
-// Console Theme
-const logStyle = { banner: "background: #B36AF4; color: #fff; font-weight: bold;", tag: "background: #151e29; color: #B36AF4;", success: "color: #00e676;", info: "color: #888;" };
+// ==========================================
+//          CONSOLE THEME
+// ==========================================
+const logStyle = {
+    banner: "background: #B36AF4; color: #fff; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;",
+    tag: "background: #151e29; color: #B36AF4; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;",
+    success: "color: #00e676; font-weight: bold;",
+    info: "color: #888; font-style: italic;",
+    error: "background: #ff4444; color: #fff; padding: 2px 5px; border-radius: 2px;"
+};
 
-const loadingView = document.getElementById('loading-view');
-const archiveList = document.getElementById('archive-list');
-const emptyMsg = document.getElementById('empty-msg');
-const searchInput = document.getElementById('search-input');
+// ==========================================
+//          GLOBAL STATE
+// ==========================================
 
-let fullArchiveData = []; 
+let allSets = [];
 let rosterMap = {};
+let activeGenre = 'ALL';
 
-async function init() {
+// UI Elements
+const loadingView = document.getElementById('loading-view');
+const archiveView = document.getElementById('archive-view'); // Make sure your HTML has this ID wrapping the lists
+const searchInput = document.getElementById('search-input');
+const genreContainer = document.getElementById('genre-filters');
+const listContainer = document.getElementById('archive-list');
+
+// ==========================================
+//          INITIALIZATION
+// ==========================================
+
+async function initArchive() {
     console.clear();
-    console.log("%c ARCHIVE %c ROSTER SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
-    
-    // --- PHASE 1: CACHE LOAD ---
+    console.log("%c CLUB CRITTERS %c ARCHIVE SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
+
+    // --- PHASE 1: INSTANT LOAD (CACHE) ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
     const cachedArchive = localStorage.getItem(CACHE_KEY_ARCHIVE);
 
     if (cachedRoster && cachedArchive) {
         console.log("%c[CACHE] Loading from local storage...", logStyle.info);
-        processRosterData(cachedRoster);
-        processArchiveData(cachedArchive);
+        processData(cachedRoster, cachedArchive);
+        revealContent();
+    } else {
+        console.log("%c[CACHE] Miss. Waiting for network...", logStyle.info);
     }
 
-    if (searchInput) searchInput.addEventListener('input', (e) => filterSets(e.target.value));
-
-    // --- PHASE 2: NETWORK UPDATE ---
+    // --- PHASE 2: FRESH FETCH (NETWORK) ---
     try {
         const [rosterRes, archiveRes] = await Promise.all([
             fetch(rosterSheetUrl),
@@ -48,121 +71,201 @@ async function init() {
             const rosterText = await rosterRes.text();
             const archiveText = await archiveRes.text();
 
-            const isNewRoster = rosterText !== cachedRoster;
-            const isNewArchive = archiveText !== cachedArchive;
+            const isNew = (rosterText !== cachedRoster) || (archiveText !== cachedArchive);
 
-            if (isNewRoster || isNewArchive) {
-                console.log("%c[NETWORK] New data found. Updating...", logStyle.success);
+            if (isNew) {
+                console.log("%c[NETWORK] New data detected. Updating...", logStyle.success);
+                
                 localStorage.setItem(CACHE_KEY_ROSTER, rosterText);
                 localStorage.setItem(CACHE_KEY_ARCHIVE, archiveText);
-                
-                processRosterData(rosterText);
-                processArchiveData(archiveText);
+
+                processData(rosterText, archiveText);
+                revealContent();
+            } else {
+                console.log("%c[NETWORK] Data is up to date.", logStyle.success);
             }
         }
     } catch (error) {
-        console.warn("Network update failed", error);
-        if (!cachedArchive) {
-             loadingView.classList.add('hidden');
-             emptyMsg.classList.remove('hidden');
-        }
+        console.warn("Network update failed.", error);
+    }
+
+    // Setup Listeners
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => renderSets(e.target.value));
     }
 }
 
-function processRosterData(csvText) {
-    const rows = csvText.split(/\r?\n/);
+// ==========================================
+//          DATA PROCESSING
+// ==========================================
+
+function processData(rosterCsv, archiveCsv) {
+    // 1. Parse Roster (Now capturing COLOR)
+    const rRows = rosterCsv.split(/\r?\n/);
     rosterMap = {};
-    for (let i = 1; i < rows.length; i++) {
-        if (!rows[i]) continue;
-        const cols = rows[i].split(',').map(c => c.trim());
-        const name = cols[0];
-        if (name) {
-            rosterMap[name.toLowerCase()] = {
-                image: cols[3] || "../cdn/logos/club/HeadOnly.png"
+    for (let i = 1; i < rRows.length; i++) {
+        const cols = rRows[i].split(',').map(c => c.trim());
+        if (cols[0]) {
+            // Store object with image AND color
+            rosterMap[cols[0].toLowerCase()] = {
+                image: cols[3] || "cdn/logos/club/HeadOnly.png",
+                color: cols[4] || "#29C5F6" // Default blue if missing
             };
         }
     }
-}
 
-function processArchiveData(csvText) {
-    const rows = csvText.split(/\r?\n/);
-    fullArchiveData = [];
+    // 2. Parse Archive
+    const aRows = archiveCsv.split(/\r?\n/);
+    allSets = [];
 
-    // Archive Format: Name(0), Set1 Title(1), Set1 Date(2), Set1 Link(3)...
-    for (let i = 1; i < rows.length; i++) {
-        if (!rows[i]) continue;
-        const cols = rows[i].split(',').map(c => c.trim());
-        const name = cols[0];
-        if (!name) continue;
+    for (let i = 1; i < aRows.length; i++) {
+        const cols = aRows[i].split(',').map(c => c.trim());
+        const djName = cols[0];
+        if (!djName) continue;
 
-        const rosterData = rosterMap[name.toLowerCase()];
-        const image = rosterData ? rosterData.image : "../cdn/logos/club/HeadOnly.png";
+        const rosterData = rosterMap[djName.toLowerCase()];
+        const image = rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png";
+        const color = rosterData ? rosterData.color : "#29C5F6";
 
-        const djEntry = { name, image, sets: [] };
-
-        for (let x = 1; x < cols.length; x += 3) {
+        // READ GROUPS OF 4: Title | Date | Genre | Link
+        for (let x = 1; x < cols.length; x += 4) {
             const title = cols[x];
-            const dateStr = cols[x+1];
-            const link = cols[x+2];
+            const rawDate = cols[x+1];
+            const genre = cols[x+2] || "Other"; 
+            const link = cols[x+3];
 
-            if (title && link) {
-                djEntry.sets.push({ title, date: dateStr, link });
+            if (title && link && rawDate) {
+                let displayDate = rawDate;
+                const d = new Date(rawDate);
+                if (!isNaN(d)) {
+                    displayDate = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+                }
+
+                allSets.push({ dj: djName, image, color, title, date: rawDate, displayDate, genre, link });
             }
         }
-        if (djEntry.sets.length > 0) fullArchiveData.push(djEntry);
     }
-    renderArchive(fullArchiveData);
+    
+    // Sort by Date (Newest First)
+    allSets.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // 3. Build UI
+    buildGenreFilters();
+    renderSets(searchInput ? searchInput.value : "");
 }
 
-function renderArchive(data) {
-    loadingView.classList.add('hidden');
-    archiveList.innerHTML = '';
-    if (data.length === 0) {
-        archiveList.classList.add('hidden');
-        emptyMsg.classList.remove('hidden');
+// ==========================================
+//          UI RENDERING
+// ==========================================
+
+function revealContent() {
+    if (loadingView) loadingView.classList.add('hidden');
+    // We assume the rest of the page is visible, but if you have a wrapper:
+    if (archiveView) archiveView.classList.remove('hidden');
+}
+
+function buildGenreFilters() {
+    if (!genreContainer) return;
+
+    // Extract unique genres
+    const genres = new Set();
+    allSets.forEach(set => {
+        if(set.genre) genres.add(set.genre);
+    });
+
+    // Create "ALL" button
+    let html = `<button class="genre-pill ${activeGenre === 'ALL' ? 'active' : ''}" onclick="filterGenre('ALL', this)">ALL</button>`;
+
+    // Create button for each genre
+    Array.from(genres).sort().forEach(g => {
+        const isActive = activeGenre === g ? 'active' : '';
+        html += `<button class="genre-pill ${isActive}" onclick="filterGenre('${g}', this)">${g}</button>`;
+    });
+
+    genreContainer.innerHTML = html;
+}
+
+window.filterGenre = function(genre, btnElement) {
+    activeGenre = genre;
+    
+    // Update UI (Active State)
+    document.querySelectorAll('.genre-pill').forEach(b => b.classList.remove('active'));
+    if (btnElement) btnElement.classList.add('active');
+
+    // Re-render list
+    const searchTerm = searchInput ? searchInput.value : "";
+    renderSets(searchTerm);
+}
+
+function renderSets(searchTerm = "") {
+    if (!listContainer) return;
+    listContainer.innerHTML = "";
+    
+    const term = searchTerm.toLowerCase();
+
+    // 1. Filter the list
+    const filtered = allSets.filter(set => {
+        const matchesSearch = set.dj.toLowerCase().includes(term) || set.title.toLowerCase().includes(term);
+        const matchesGenre = activeGenre === 'ALL' || set.genre === activeGenre;
+        return matchesSearch && matchesGenre;
+    });
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">No sets found matching criteria.</div>`;
         return;
     }
-    archiveList.classList.remove('hidden');
-    emptyMsg.classList.add('hidden');
 
-    data.forEach(dj => {
-        const card = document.createElement('div');
-        card.className = 'dj-card'; 
-        card.style.display = 'block'; 
-        card.style.borderLeft = '4px solid var(--primary-purple)'; 
+    // 2. GROUP BY DJ (To restore the Card Layout)
+    // We create a Map where the key is "DJName", and value is their sets
+    const grouped = {};
+    
+    filtered.forEach(set => {
+        if (!grouped[set.dj]) {
+            grouped[set.dj] = {
+                image: set.image,
+                color: set.color,
+                sets: []
+            };
+        }
+        grouped[set.dj].sets.push(set);
+    });
 
-        let setsHtml = '<div class="set-list">';
-        dj.sets.forEach(set => {
-            let displayDate = set.date;
-            try {
-                const dateObj = new Date(set.date);
-                if (!isNaN(dateObj)) displayDate = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-            } catch (e) {}
+    // 3. Render the Cards
+    Object.keys(grouped).forEach(djName => {
+        const group = grouped[djName];
+        
+        // Build the HTML for the sets inside the card
+        let setsHtml = '';
+        group.sets.forEach(set => {
             setsHtml += `
-                <div class="set-item">
-                    <div class="set-info"><div class="set-title">${set.title}</div><div class="set-date">${displayDate || ""}</div></div>
-                    <a href="${set.link}" target="_blank" class="play-btn-small">▶ Listen</a>
-                </div>`;
+                <div class="archive-row">
+                    <div class="row-info">
+                        <div class="row-title" style="color:#eee;">
+                            ${set.title} 
+                            <span class="genre-tag">${set.genre}</span>
+                        </div>
+                        <div class="row-date" style="color:${group.color}; opacity:0.8;">${set.displayDate}</div>
+                    </div>
+                    <a href="${set.link}" target="_blank" class="play-btn-card">▶ Listen</a>
+                </div>
+            `;
         });
-        setsHtml += '</div>';
 
-        card.innerHTML = `
-            <div style="display:flex; align-items:center; margin-bottom:15px;">
-                <img src="${dj.image}" alt="${dj.name}" class="dj-img" style="width:50px; height:50px;">
-                <h3 style="margin:0; color:var(--primary-purple);">${dj.name}</h3>
+        const cardHtml = `
+            <div class="dj-archive-card" style="border-left: 4px solid ${group.color};">
+                <div class="card-header">
+                    <img src="${group.image}" alt="${djName}">
+                    <h3 style="color: ${group.color};">${djName}</h3>
+                </div>
+                <div class="card-body">
+                    ${setsHtml}
+                </div>
             </div>
-            ${setsHtml}`;
-        archiveList.appendChild(card);
+        `;
+        
+        listContainer.innerHTML += cardHtml;
     });
 }
 
-function filterSets(query) {
-    const term = query.toLowerCase().trim();
-    if (!term) { renderArchive(fullArchiveData); return; }
-    const filtered = fullArchiveData.filter(dj => {
-        return dj.name.toLowerCase().includes(term) || dj.sets.some(set => set.title.toLowerCase().includes(term) || (set.date && set.date.toLowerCase().includes(term)));
-    });
-    renderArchive(filtered);
-}
-
-init();
+// Start
+initArchive();

@@ -435,3 +435,160 @@ h1 {
 .search-bar::placeholder {
     color: rgba(255, 255, 255, 0.4);
 }
+
+/* =========================================
+   10. GENRE PILLS
+   ========================================= */
+.genre-filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.genre-pill {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.genre-pill:hover {
+    border-color: var(--static-blue);
+    color: var(--static-blue);
+    background: rgba(41, 197, 246, 0.1);
+}
+
+.genre-pill.active {
+    background: linear-gradient(45deg, var(--static-blue), var(--static-purple));
+    color: #fff;
+    border-color: transparent;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(179, 106, 244, 0.4);
+}
+
+/* =========================================
+   11. ARCHIVE CARDS
+   ========================================= */
+
+.dj-archive-card {
+    background: #151e29;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    text-align: left;
+    transition: transform 0.2s ease;
+}
+
+.dj-archive-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+
+.card-body {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.card-body::-webkit-scrollbar {
+    width: 6px;
+}
+.card-body::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+.card-body::-webkit-scrollbar-thumb {
+    background: var(--static-purple);
+    border-radius: 10px;
+}
+.card-body::-webkit-scrollbar-thumb:hover {
+    background: var(--static-blue);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 15px;
+}
+
+.card-header img {
+    width: 50px; 
+    height: 50px; 
+    border-radius: 50%;
+    object-fit: cover;
+    background: #000;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+.archive-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.archive-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.row-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.row-date {
+    font-size: 0.8rem;
+}
+
+.genre-tag {
+    font-size: 0.7rem;
+    background: rgba(255,255,255,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    color: #aaa;
+    font-weight: normal;
+    vertical-align: middle;
+}
+
+.play-btn-card {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.play-btn-card:hover {
+    background: white;
+    color: black;
+    border-color: white;
+}
