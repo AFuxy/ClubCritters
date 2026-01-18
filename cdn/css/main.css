@@ -2,8 +2,14 @@
    1. VARIABLES & RESET
    ========================================= */
 :root {
+    /* DYNAMIC VARIABLES (These change with Chameleon Mode) */
     --primary-blue: #29C5F6;
     --primary-purple: #B36AF4;
+
+    /* STATIC VARIABLES (These ALWAYS stay Club Critters Brand) */
+    --static-blue: #29C5F6;
+    --static-purple: #B36AF4;
+
     --dark-bg: #0b1016;
     --card-bg: #151e29;
     --text-white: #ffffff;
@@ -35,7 +41,7 @@ body.body-centered {
     flex-direction: column;
     padding-bottom: 50px;
     margin-top: 20px;
-    text-align: center; /* Centers headers and loose text */
+    text-align: center; 
 }
 
 /* =========================================
@@ -74,7 +80,7 @@ h1 {
     transition: all 0.2s;
     background: transparent;
     cursor: pointer;
-    align-self: center; /* Prevents button from stretching to full container width */
+    align-self: center;
 }
 .nav-pill:hover { background: var(--primary-blue); color: #000; }
 
@@ -97,7 +103,7 @@ h1 {
 .btn-group { display: flex; flex-direction: column; gap: 15px; margin-top: 10px; width: 100%; }
 
 .btn {
-    background: linear-gradient(45deg, var(--primary-blue), var(--primary-purple));
+    background: linear-gradient(45deg, var(--static-blue), var(--static-purple));
     color: white;
     padding: 15px 20px;
     text-decoration: none;
@@ -110,9 +116,47 @@ h1 {
 }
 .btn:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(179, 106, 244, 0.6); }
 
-.btn-secondary { background: transparent; border: 2px solid var(--primary-purple); }
+.btn-secondary { background: transparent; border: 2px solid var(--static-purple); }
 .btn-small { padding: 10px 15px; font-size: 0.9rem; }
 .grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+
+/* =========================================
+   VRC DEEP LINK BUTTON
+   ========================================= */
+.btn-live-join {
+    background: linear-gradient(135deg, #ff0055 0%, #ff4444 100%);
+    color: white;
+    font-size: 1rem;       
+    padding: 10px 25px;    
+    width: auto;           
+    min-width: 200px;      
+    max-width: 300px;      
+    margin: 0 auto;
+    display: inline-block; 
+    
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-radius: 50px;
+    font-weight: bold;
+    text-decoration: none;
+    
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+    animation: pulse-red 3s infinite;
+    transition: all 0.2s ease;
+}
+
+.btn-live-join:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(255, 0, 85, 0.5);
+    background: linear-gradient(135deg, #ff2266 0%, #ff6666 100%);
+}
+
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(255, 0, 85, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0); }
+}
 
 /* =========================================
    4. EVENT & DJ CARDS
@@ -135,7 +179,7 @@ h1 {
 
 /* Individual DJ Card */
 .dj-card {
-    --accent-color: var(--primary-blue); /* Default variable, overridden by JS */
+    --accent-color: var(--primary-blue); 
     
     background-color: var(--card-bg);
     border-radius: 15px;
@@ -169,7 +213,7 @@ h1 {
 
 .dj-content { flex-grow: 1; }
 
-/* Header layout: Name on Left, Time on Right */
+/* Header layout */
 .dj-header { 
     display: flex; 
     justify-content: space-between; 
@@ -177,7 +221,7 @@ h1 {
 }
 
 .dj-content h3 { margin: 0; color: var(--accent-color); font-size: 1.1rem; }
-.dj-content .time { font-weight: bold; color: var(--primary-purple); font-size: 0.9rem; }
+.dj-content .time { font-weight: bold; color: var(--static-purple); font-size: 0.9rem; }
 .dj-content .genre { font-style: italic; color: #aaa; font-size: 0.85rem; display: block; margin-bottom: 8px;}
 
 /* Social Buttons */
@@ -229,7 +273,6 @@ h1 {
     animation: bounce 0.5s infinite ease-in-out;
 }
 
-/* Staggered animation delays to create random effect */
 .viz-bar:nth-child(1) { height: 6px; animation-delay: 0.1s; }
 .viz-bar:nth-child(2) { height: 10px; animation-delay: 0.2s; }
 .viz-bar:nth-child(3) { height: 4px; animation-delay: 0.3s; }
@@ -267,7 +310,6 @@ h1 {
     transform: scale(0.95);
 }
 
-/* Tooltip "Copied!" animation */
 .share-btn::after {
     content: "Copied!";
     position: absolute;
@@ -284,7 +326,6 @@ h1 {
     transition: opacity 0.3s;
 }
 
-/* Class added via JS when clicked */
 .share-btn.copied::after {
     opacity: 1;
 }
@@ -311,7 +352,7 @@ h1 {
     border: 1px solid var(--primary-purple);
     border-radius: 12px;
     padding: 15px;
-    margin-bottom: 25px; /* Space between card and Discord buttons */
+    margin-bottom: 25px; 
     text-align: left;
     display: flex;
     align-items: center;
@@ -326,7 +367,6 @@ h1 {
     background: linear-gradient(135deg, rgba(41, 197, 246, 0.25), rgba(179, 106, 244, 0.25));
 }
 
-/* "Latest Set" Badge */
 .featured-badge {
     position: absolute;
     top: 0;
@@ -359,7 +399,6 @@ h1 {
     color: #ccc;
 }
 
-/* Mobile: Stack vertically if screen is tight */
 @media (max-width: 400px) {
     .featured-card { flex-direction: column; text-align: center; }
     .featured-badge { right: 50%; transform: translateX(50%); border-radius: 0 0 6px 6px; }
@@ -384,7 +423,7 @@ h1 {
     font-size: 1rem;
     outline: none;
     transition: all 0.3s ease;
-    box-sizing: border-box; /* Ensures padding doesn't break layout */
+    box-sizing: border-box; 
 }
 
 .search-bar:focus {

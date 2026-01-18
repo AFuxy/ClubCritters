@@ -1,6 +1,5 @@
 /**
- * CLUB CRITTERS - MAIN APP LOGIC (SMART CACHE VERSION)
- * Uses LocalStorage to render instantly, then updates from network in background.
+ * CLUB CRITTERS - MAIN APP LOGIC (V1.3 - DEEP LINK, CHAMELEON & CACHE)
  */
 
 // ==========================================
@@ -44,6 +43,7 @@ const archiveLink = document.getElementById('archive-link');
 let eventStartTime = null;
 let eventEndTime = null;
 let forceOffline = false;
+let vrcInstanceUrl = ""; 
 let djSchedule = [];
 let rosterMap = {}; 
 let currentState = null; 
@@ -88,18 +88,15 @@ async function init() {
             const rosterText = await rosterResp.text();
             const scheduleText = await scheduleResp.text();
 
-            // Only re-process if data has changed (simple string comparison)
             const isRosterNew = rosterText !== cachedRoster;
             const isScheduleNew = scheduleText !== cachedSchedule;
 
             if (isRosterNew || isScheduleNew) {
                 console.log("%c[NETWORK] New data detected. Updating...", logStyle.success);
                 
-                // Update Cache
                 localStorage.setItem(CACHE_KEY_ROSTER, rosterText);
                 localStorage.setItem(CACHE_KEY_SCHEDULE, scheduleText);
 
-                // Re-process and Re-render
                 processRosterData(rosterText);
                 processScheduleData(scheduleText);
                 checkStatus();
@@ -109,7 +106,6 @@ async function init() {
         }
     } catch (error) {
         console.warn("Network update failed. Using cache if available.", error);
-        // If we have no cache and network fails, show offline
         if (!cachedRoster) showOffline("Community Hub"); 
     }
 
@@ -151,27 +147,38 @@ function processRosterData(csvText) {
 
 function processScheduleData(csvText) {
     const rows = csvText.split(/\r?\n/);
+    
+    // Row 2 (Index 1) is Settings
     const settingsRow = rows[1].split(',').map(c => c.trim());
     
     eventStartTime = settingsRow[0];
     eventEndTime = settingsRow[1];
     const offlineCell = settingsRow[2] ? settingsRow[2].toUpperCase() : "";
     forceOffline = (offlineCell === "TRUE" || offlineCell === "YES" || offlineCell === "1");
+    
+    // Capture VRC Link from Cell D2 (Index 3)
+    vrcInstanceUrl = settingsRow[3] || "";
 
     djSchedule = [];
 
-    for (let i = 1; i < rows.length; i++) {
+    // Start at i = 2 (Row 3) to skip the Header and Settings rows
+    for (let i = 2; i < rows.length; i++) {
         if (!rows[i]) continue;
         const cols = rows[i].split(',').map(c => c.trim());
-        if (cols.length < 4 || !cols[3]) continue; 
+        
+        // FIX: Check for Name in Column E (Index 4), not D. Need at least 5 cols.
+        if (cols.length < 5 || !cols[4]) continue; 
 
-        const name = cols[3];
+        const name = cols[4];    // Column E
+        const timeRaw = cols[5]; // Column F
+        const genre = cols[6];   // Column G
+
         const rosterData = rosterMap[name.toLowerCase()];
 
         const dj = {
             name: name,
-            timeRaw: cols[4],
-            genre: cols[5],
+            timeRaw: timeRaw,
+            genre: genre,
             image: rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png",
             color: rosterData ? rosterData.color : null,
             links: rosterData ? rosterData.links : {}
@@ -235,6 +242,31 @@ function ensureReadableColor(hex) {
     return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
+// THEME MANAGER (V1.3 - Chameleon Mode)
+function updateSiteTheme(color) {
+    const root = document.documentElement;
+    if (color) {
+        root.style.setProperty('--primary-blue', color);
+        root.style.setProperty('--primary-purple', color);
+    } else {
+        root.style.setProperty('--primary-blue', '#29C5F6');
+        root.style.setProperty('--primary-purple', '#B36AF4');
+    }
+}
+
+// VRC DEEP LINK PARSER (V1.3)
+function generateDeepLink(webUrl) {
+    try {
+        const url = new URL(webUrl);
+        const worldId = url.searchParams.get("worldId");
+        const instanceId = url.searchParams.get("instanceId");
+        if (worldId && instanceId) {
+            return `vrchat://launch?id=${worldId}:${instanceId}`;
+        }
+    } catch (e) { }
+    return null;
+}
+
 // ==========================================
 //          STATE MANAGEMENT
 // ==========================================
@@ -281,7 +313,6 @@ function checkStatus() {
         }
     }
 
-    // Always check for Featured Set if we aren't showing the Live schedule
     if (currentState === 'disabled' || currentState === 'finished' || (!eventStartTime && !forceOffline)) {
          fetchAndShowFeaturedSet();
     }
@@ -314,7 +345,6 @@ async function fetchAndShowFeaturedSet() {
     try {
         let archiveText;
         if (Object.keys(rosterMap).length === 0) {
-            // Fallback if roster empty: fetch both
             const [rosterRes, archiveRes] = await Promise.all([
                 fetch(rosterSheetUrl),
                 fetch(archiveSheetUrl)
@@ -395,6 +425,9 @@ function showOffline(message) {
     eventView.classList.add('hidden');
     badgeContainer.innerHTML = '';
     subtext.innerHTML = message;
+    
+    // Reset theme on offline
+    updateSiteTheme(null);
     fetchAndShowFeaturedSet();
 }
 
@@ -405,15 +438,40 @@ function renderEventView(isLive) {
     offlineView.classList.add('hidden');
     eventView.classList.remove('hidden');
 
+    // Reset Theme initially
+    updateSiteTheme(null); 
+
     if (isLive) {
         document.title = "Club Critters - LIVE NOW";
         badgeContainer.innerHTML = '<div class="status-badge status-live">🔴 EVENT LIVE NOW</div>';
         subtext.innerText = "Tonight's Lineup";
+
+        const deepLink = generateDeepLink(vrcInstanceUrl);
+        let joinContainer = document.getElementById('join-container');
+        if (!joinContainer) {
+            joinContainer = document.createElement('div');
+            joinContainer.id = 'join-container';
+            joinContainer.style.marginBottom = "20px";
+            djContainer.before(joinContainer);
+        }
+
+        if (deepLink) {
+            joinContainer.innerHTML = `
+                <a href="${deepLink}" class="btn btn-live-join">LAUNCH VRCHAT</a>
+                <a href="${vrcInstanceUrl}" target="_blank" style="display:block; margin-top:8px; font-size:0.8rem; color:#666; text-decoration:none;">Open via Website &rarr;</a>
+            `;
+        } else {
+            joinContainer.innerHTML = ''; 
+        }
+
     } else {
         document.title = "Club Critters - UPCOMING";
         const d = new Date(eventStartTime);
         badgeContainer.innerHTML = `<div class="status-badge status-upcoming">📅 STARTING: ${d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})}</div>`;
         subtext.innerText = "Upcoming Schedule";
+
+        const existingContainer = document.getElementById('join-container');
+        if (existingContainer) existingContainer.innerHTML = '';
     }
 
     djContainer.innerHTML = ''; 
@@ -422,6 +480,11 @@ function renderEventView(isLive) {
     djSchedule.forEach(dj => {
         const timeData = processDjTime(dj.timeRaw);
         const isActive = (isLive && timeData && now >= timeData.startObj && now < timeData.endObj);
+        
+        // --- CHAMELEON TRIGGER ---
+        if (isActive) {
+            updateSiteTheme(dj.color);
+        }
         
         let shareButton = '';
         if (isActive) {
@@ -434,6 +497,8 @@ function renderEventView(isLive) {
 
         const card = document.createElement('div');
         card.className = `dj-card ${isActive ? 'dj-active' : ''}`; 
+        
+        // Set accent for the card itself (always active)
         if (dj.color) card.style.setProperty('--accent-color', dj.color);
 
         card.innerHTML = `
