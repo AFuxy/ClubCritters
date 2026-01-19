@@ -78,7 +78,9 @@ function processRosterData(csvText) {
             links: {}
         };
 
-        for (let x = 6; x < cols.length; x++) {
+        // 🛑 UPDATED: Start from Column 7 (H) instead of 6 (G)
+        // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7
+        for (let x = 7; x < cols.length; x++) {
             if (cols[x] && headers[x]) member.links[headers[x]] = cols[x];
         }
 
