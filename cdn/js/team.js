@@ -1,15 +1,30 @@
 /**
- * CLUB CRITTERS - TEAM LOGIC (SMART CACHE)
- * Instant load via shared Roster cache.
+ * CLUB CRITTERS - TEAM LOGIC (V2.0 - GOOGLE API)
+ * Instant loads via Google Sheets API + Smart Caching
  */
 
-const rosterSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=1671173789&single=true&output=csv";
+// ==========================================
+//          CONFIGURATION
+// ==========================================
 
-// SHARED CACHE KEY (Matches Main/Archive)
-const CACHE_KEY_ROSTER = 'cc_roster_v1';
+// 🔴 PASTE YOUR DETAILS HERE
+const SPREADSHEET_ID = "1MXvHh09Bw1yLQk6_YidOJmYrbJydZvdfQCR0kgK_NE4";
+const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
+
+const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values`;
+const ROSTER_URL = `${BASE_URL}/Roster!A:Z?key=${API_KEY}`;
+
+// Shared Cache Keys
+const CACHE_KEY_ROSTER = 'cc_roster_v2';
+const CACHE_KEY_TIMESTAMP = 'cc_roster_ts';
 
 // Console Theme
-const logStyle = { banner: "background: #00e676; color: #000; font-weight: bold;", tag: "background: #151e29; color: #00e676;", info: "color: #888;", success: "color: #00e676;" };
+const logStyle = { 
+    banner: "background: #00e676; color: #000; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;", 
+    tag: "background: #151e29; color: #00e676; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;", 
+    info: "color: #888; font-weight: bold;", 
+    success: "color: #00e676; font-style: italic;" 
+};
 
 const loadingView = document.getElementById('loading-view');
 const staffSection = document.getElementById('staff-section');
@@ -18,27 +33,49 @@ const residentSection = document.getElementById('resident-section');
 const residentList = document.getElementById('resident-list');
 const emptyMsg = document.getElementById('empty-msg');
 
+// ==========================================
+//          INITIALIZATION
+// ==========================================
+
 async function init() {
     console.clear();
-    console.log("%c TEAM %c ROSTER SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB CRITTERS %c TEAM V2 STARTUP ", logStyle.banner, logStyle.tag);
     createBioModal();
 
     // --- PHASE 1: CACHE LOAD ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
+    const lastUpdate = localStorage.getItem(CACHE_KEY_TIMESTAMP);
+
     if (cachedRoster) {
-        console.log("%c[CACHE] Loading from local storage...", logStyle.info);
-        processRosterData(cachedRoster);
+        const timeStr = lastUpdate ? new Date(parseInt(lastUpdate)).toLocaleTimeString() : "Unknown";
+        console.log(`%c[CACHE] Loaded snapshot from ${timeStr}`, logStyle.info);
+        processRosterData(JSON.parse(cachedRoster));
     }
 
     // --- PHASE 2: NETWORK UPDATE ---
     try {
-        const response = await fetch(rosterSheetUrl);
+        const startFetch = performance.now();
+        const response = await fetch(ROSTER_URL);
+        
         if (response.ok) {
-            const text = await response.text();
-            if (text !== cachedRoster) {
-                console.log("%c[NETWORK] New roster data found. Updating...", logStyle.success);
-                localStorage.setItem(CACHE_KEY_ROSTER, text);
-                processRosterData(text);
+            const json = await response.json();
+            const rows = json.values || [];
+            
+            // Smart Check
+            const newRosterStr = JSON.stringify(rows);
+            const hasChanges = (newRosterStr !== cachedRoster);
+            const fetchTime = (performance.now() - startFetch).toFixed(0);
+
+            if (hasChanges) {
+                const now = new Date();
+                console.log(`%c[API] 🟢 New Data Found (${fetchTime}ms)`, logStyle.success);
+                
+                localStorage.setItem(CACHE_KEY_ROSTER, newRosterStr);
+                localStorage.setItem(CACHE_KEY_TIMESTAMP, now.getTime());
+                
+                processRosterData(rows);
+            } else {
+                console.log(`%c[API] ⚪ Data unchanged (${fetchTime}ms)`, "color: #666; font-size: 0.9em;");
             }
         }
     } catch (error) {
@@ -50,24 +87,27 @@ async function init() {
     }
 }
 
-function processRosterData(csvText) {
-    const rows = csvText.split(/\r?\n/);
-    if (rows.length < 2) return;
+// ==========================================
+//          DATA PROCESSING
+// ==========================================
 
-    const headers = rows[0].split(',').map(h => h.trim());
+function processRosterData(rows) {
+    if (!rows || rows.length < 2) return;
+
+    const headers = rows[0].map(h => h.trim());
     const staffMembers = [];
     const residents = [];
 
     for (let i = 1; i < rows.length; i++) {
-        if (!rows[i]) continue;
-        const cols = rows[i].split(',').map(c => c.trim());
-        if (cols.length < 2 || !cols[0]) continue; 
+        const cols = rows[i];
+        if (!cols || !cols[0]) continue; 
 
-        const type = cols[1].toLowerCase();
+        // Safe lowercase check
+        const type = (cols[1] || "").toLowerCase();
         
         if (!type.includes('staff') && !type.includes('resident') && !type.includes('owner') && !type.includes('host') && !type.includes('dj')) continue;
 
-        let finalColor = cols[4] && cols[4].startsWith('#') ? ensureReadableColor(cols[4]) : null;
+        let finalColor = (cols[4] && cols[4].startsWith('#')) ? ensureReadableColor(cols[4]) : null;
 
         const member = {
             name: cols[0],
@@ -78,10 +118,12 @@ function processRosterData(csvText) {
             links: {}
         };
 
-        // 🛑 UPDATED: Start from Column 7 (H) instead of 6 (G)
+        // 🛑 HIDDEN COLUMNS LOGIC (Start at Index 7 / Col H)
         // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7
         for (let x = 7; x < cols.length; x++) {
-            if (cols[x] && headers[x]) member.links[headers[x]] = cols[x];
+            if (cols[x] && headers[x]) {
+                member.links[headers[x]] = cols[x];
+            }
         }
 
         if (type.includes('staff') || type.includes('owner') || type.includes('host')) {
@@ -92,6 +134,10 @@ function processRosterData(csvText) {
     }
     renderRoster(staffMembers, residents);
 }
+
+// ==========================================
+//          UI HELPER FUNCTIONS
+// ==========================================
 
 function renderRoster(staff, residents) {
     loadingView.classList.add('hidden');
@@ -127,7 +173,6 @@ function renderCards(members, container) {
 }
 
 function createBioModal() {
-    // Check if exists first to prevent dupes if function runs twice
     if (document.getElementById('bio-modal-overlay')) return;
     const modalHtml = `<div id="bio-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;"><div id="bio-modal-card" style="background:#151e29; border:1px solid #444; width:90%; max-width:400px; border-radius:15px; padding:20px; position:relative; box-shadow:0 0 20px rgba(0,0,0,0.5);"><button onclick="document.getElementById('bio-modal-overlay').style.display='none'" style="position:absolute; top:10px; right:15px; background:none; border:none; color:#fff; font-size:1.5rem; cursor:pointer;">&times;</button><div style="text-align:center; margin-bottom:15px;"><img id="modal-img" src="" style="width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid #333;"><h2 id="modal-name" style="margin:10px 0 5px 0; color:#fff;"></h2><span id="modal-title" style="color:var(--primary-blue); font-size:0.9rem;"></span></div><p id="modal-bio" style="color:#ddd; line-height:1.5; font-size:0.95rem; white-space: pre-wrap;"></p></div></div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);

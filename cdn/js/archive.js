@@ -1,18 +1,24 @@
 /**
- * CLUB CRITTERS - ARCHIVE LOGIC (V1.3 - ROBUST CACHE & GENRE PILLS)
- * Features: LocalStorage Cache, Debug Logging, 4-Column Parsing, Genre Filters
+ * CLUB CRITTERS - ARCHIVE LOGIC (V2.0 - GOOGLE API)
+ * Instant loads via Google Sheets API + Smart Caching
  */
 
 // ==========================================
 //          CONFIGURATION
 // ==========================================
 
-const rosterSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=1671173789&single=true&output=csv";
-const archiveSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=532548123&single=true&output=csv"; 
+// 🔴 PASTE YOUR DETAILS HERE
+const SPREADSHEET_ID = "1MXvHh09Bw1yLQk6_YidOJmYrbJydZvdfQCR0kgK_NE4";
+const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
+
+const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values`;
+const ROSTER_URL = `${BASE_URL}/Roster!A:Z?key=${API_KEY}`;
+const ARCHIVE_URL = `${BASE_URL}/Archive!A:Z?key=${API_KEY}`;
 
 // Cache Keys (Must match main.js for Roster, unique for Archive)
-const CACHE_KEY_ROSTER = 'cc_roster_v1';
-const CACHE_KEY_ARCHIVE = 'cc_archive_v1';
+const CACHE_KEY_ROSTER = 'cc_roster_v2';
+const CACHE_KEY_ARCHIVE = 'cc_archive_v2';
+const CACHE_KEY_TIMESTAMP = 'cc_archive_ts';
 
 // ==========================================
 //          CONSOLE THEME
@@ -22,7 +28,6 @@ const logStyle = {
     tag: "background: #151e29; color: #B36AF4; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;",
     success: "color: #00e676; font-weight: bold;",
     info: "color: #888; font-style: italic;",
-    error: "background: #ff4444; color: #fff; padding: 2px 5px; border-radius: 2px;"
 };
 
 // ==========================================
@@ -35,7 +40,7 @@ let activeGenre = 'ALL';
 
 // UI Elements
 const loadingView = document.getElementById('loading-view');
-const archiveView = document.getElementById('archive-view'); // Make sure your HTML has this ID wrapping the lists
+const archiveView = document.getElementById('archive-view'); 
 const searchInput = document.getElementById('search-input');
 const genreContainer = document.getElementById('genre-filters');
 const listContainer = document.getElementById('archive-list');
@@ -46,15 +51,18 @@ const listContainer = document.getElementById('archive-list');
 
 async function initArchive() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c ARCHIVE SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB CRITTERS %c ARCHIVE V2 STARTUP ", logStyle.banner, logStyle.tag);
 
     // --- PHASE 1: INSTANT LOAD (CACHE) ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
     const cachedArchive = localStorage.getItem(CACHE_KEY_ARCHIVE);
+    const lastUpdate = localStorage.getItem(CACHE_KEY_TIMESTAMP);
 
     if (cachedRoster && cachedArchive) {
-        console.log("%c[CACHE] Loading from local storage...", logStyle.info);
-        processData(cachedRoster, cachedArchive);
+        const timeStr = lastUpdate ? new Date(parseInt(lastUpdate)).toLocaleTimeString() : "Unknown";
+        console.log(`%c[CACHE] Loaded snapshot from ${timeStr}`, logStyle.info);
+
+        processData(JSON.parse(cachedRoster), JSON.parse(cachedArchive));
         revealContent();
     } else {
         console.log("%c[CACHE] Miss. Waiting for network...", logStyle.info);
@@ -62,27 +70,38 @@ async function initArchive() {
 
     // --- PHASE 2: FRESH FETCH (NETWORK) ---
     try {
+        const startFetch = performance.now();
         const [rosterRes, archiveRes] = await Promise.all([
-            fetch(rosterSheetUrl),
-            fetch(archiveSheetUrl)
+            fetch(ROSTER_URL),
+            fetch(ARCHIVE_URL)
         ]);
 
         if (rosterRes.ok && archiveRes.ok) {
-            const rosterText = await rosterRes.text();
-            const archiveText = await archiveRes.text();
+            const rosterJson = await rosterRes.json();
+            const archiveJson = await archiveRes.json();
 
-            const isNew = (rosterText !== cachedRoster) || (archiveText !== cachedArchive);
+            const rosterRows = rosterJson.values || [];
+            const archiveRows = archiveJson.values || [];
 
-            if (isNew) {
-                console.log("%c[NETWORK] New data detected. Updating...", logStyle.success);
+            // Smart Check (Compare Strings)
+            const newRosterStr = JSON.stringify(rosterRows);
+            const newArchiveStr = JSON.stringify(archiveRows);
+            
+            const hasChanges = (newRosterStr !== cachedRoster) || (newArchiveStr !== cachedArchive);
+            const fetchTime = (performance.now() - startFetch).toFixed(0);
+
+            if (hasChanges) {
+                const now = new Date();
+                console.log(`%c[API] 🟢 New Data Found (${fetchTime}ms)`, logStyle.success);
                 
-                localStorage.setItem(CACHE_KEY_ROSTER, rosterText);
-                localStorage.setItem(CACHE_KEY_ARCHIVE, archiveText);
+                localStorage.setItem(CACHE_KEY_ROSTER, newRosterStr);
+                localStorage.setItem(CACHE_KEY_ARCHIVE, newArchiveStr);
+                localStorage.setItem(CACHE_KEY_TIMESTAMP, now.getTime());
 
-                processData(rosterText, archiveText);
+                processData(rosterRows, archiveRows);
                 revealContent();
             } else {
-                console.log("%c[NETWORK] Data is up to date.", logStyle.success);
+                console.log(`%c[API] ⚪ Data unchanged (${fetchTime}ms)`, "color: #666; font-size: 0.9em;");
             }
         }
     } catch (error) {
@@ -99,49 +118,49 @@ async function initArchive() {
 //          DATA PROCESSING
 // ==========================================
 
-function processData(rosterCsv, archiveCsv) {
-    // 1. Parse Roster (Now capturing COLOR)
-    const rRows = rosterCsv.split(/\r?\n/);
+function processData(rosterRows, archiveRows) {
+    // 1. Parse Roster (Array of Arrays)
     rosterMap = {};
-    for (let i = 1; i < rRows.length; i++) {
-        const cols = rRows[i].split(',').map(c => c.trim());
-        if (cols[0]) {
-            // Store object with image AND color
+    if (rosterRows && rosterRows.length > 1) {
+        for (let i = 1; i < rosterRows.length; i++) {
+            const cols = rosterRows[i];
+            if (!cols || !cols[0]) continue;
+            
             rosterMap[cols[0].toLowerCase()] = {
                 image: cols[3] || "cdn/logos/club/HeadOnly.png",
-                color: cols[4] || "#29C5F6" // Default blue if missing
+                color: (cols[4] && cols[4].startsWith('#')) ? cols[4] : "#29C5F6"
             };
         }
     }
 
     // 2. Parse Archive
-    const aRows = archiveCsv.split(/\r?\n/);
     allSets = [];
+    if (archiveRows && archiveRows.length > 1) {
+        for (let i = 1; i < archiveRows.length; i++) {
+            const cols = archiveRows[i];
+            if (!cols || !cols[0]) continue;
 
-    for (let i = 1; i < aRows.length; i++) {
-        const cols = aRows[i].split(',').map(c => c.trim());
-        const djName = cols[0];
-        if (!djName) continue;
+            const djName = cols[0];
+            const rosterData = rosterMap[djName.toLowerCase()];
+            const image = rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png";
+            const color = rosterData ? rosterData.color : "#29C5F6";
 
-        const rosterData = rosterMap[djName.toLowerCase()];
-        const image = rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png";
-        const color = rosterData ? rosterData.color : "#29C5F6";
+            // READ GROUPS OF 4: Title | Date | Genre | Link
+            // Columns start at Index 1
+            for (let x = 1; x < cols.length; x += 4) {
+                const title = cols[x];
+                const rawDate = cols[x+1];
+                const genre = cols[x+2] || "Other"; 
+                const link = cols[x+3];
 
-        // READ GROUPS OF 4: Title | Date | Genre | Link
-        for (let x = 1; x < cols.length; x += 4) {
-            const title = cols[x];
-            const rawDate = cols[x+1];
-            const genre = cols[x+2] || "Other"; 
-            const link = cols[x+3];
-
-            if (title && link && rawDate) {
-                let displayDate = rawDate;
-                const d = new Date(rawDate);
-                if (!isNaN(d)) {
-                    displayDate = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+                if (title && link && rawDate) {
+                    let displayDate = rawDate;
+                    const d = new Date(rawDate);
+                    if (!isNaN(d)) {
+                        displayDate = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+                    }
+                    allSets.push({ dj: djName, image, color, title, date: rawDate, displayDate, genre, link });
                 }
-
-                allSets.push({ dj: djName, image, color, title, date: rawDate, displayDate, genre, link });
             }
         }
     }
@@ -160,23 +179,19 @@ function processData(rosterCsv, archiveCsv) {
 
 function revealContent() {
     if (loadingView) loadingView.classList.add('hidden');
-    // We assume the rest of the page is visible, but if you have a wrapper:
     if (archiveView) archiveView.classList.remove('hidden');
 }
 
 function buildGenreFilters() {
     if (!genreContainer) return;
 
-    // Extract unique genres
     const genres = new Set();
     allSets.forEach(set => {
         if(set.genre) genres.add(set.genre);
     });
 
-    // Create "ALL" button
     let html = `<button class="genre-pill ${activeGenre === 'ALL' ? 'active' : ''}" onclick="filterGenre('ALL', this)">ALL</button>`;
 
-    // Create button for each genre
     Array.from(genres).sort().forEach(g => {
         const isActive = activeGenre === g ? 'active' : '';
         html += `<button class="genre-pill ${isActive}" onclick="filterGenre('${g}', this)">${g}</button>`;
@@ -187,14 +202,9 @@ function buildGenreFilters() {
 
 window.filterGenre = function(genre, btnElement) {
     activeGenre = genre;
-    
-    // Update UI (Active State)
     document.querySelectorAll('.genre-pill').forEach(b => b.classList.remove('active'));
     if (btnElement) btnElement.classList.add('active');
-
-    // Re-render list
-    const searchTerm = searchInput ? searchInput.value : "";
-    renderSets(searchTerm);
+    renderSets(searchInput ? searchInput.value : "");
 }
 
 function renderSets(searchTerm = "") {
@@ -203,7 +213,6 @@ function renderSets(searchTerm = "") {
     
     const term = searchTerm.toLowerCase();
 
-    // 1. Filter the list
     const filtered = allSets.filter(set => {
         const matchesSearch = set.dj.toLowerCase().includes(term) || set.title.toLowerCase().includes(term);
         const matchesGenre = activeGenre === 'ALL' || set.genre === activeGenre;
@@ -215,10 +224,8 @@ function renderSets(searchTerm = "") {
         return;
     }
 
-    // 2. GROUP BY DJ (To restore the Card Layout)
-    // We create a Map where the key is "DJName", and value is their sets
+    // Group by DJ
     const grouped = {};
-    
     filtered.forEach(set => {
         if (!grouped[set.dj]) {
             grouped[set.dj] = {
@@ -230,11 +237,10 @@ function renderSets(searchTerm = "") {
         grouped[set.dj].sets.push(set);
     });
 
-    // 3. Render the Cards
+    // Render Cards
     Object.keys(grouped).forEach(djName => {
         const group = grouped[djName];
         
-        // Build the HTML for the sets inside the card
         let setsHtml = '';
         group.sets.forEach(set => {
             setsHtml += `
@@ -262,10 +268,8 @@ function renderSets(searchTerm = "") {
                 </div>
             </div>
         `;
-        
         listContainer.innerHTML += cardHtml;
     });
 }
 
-// Start
 initArchive();

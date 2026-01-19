@@ -1,21 +1,30 @@
 /**
- * CLUB CRITTERS - MAIN APP LOGIC (V1.3 - DEEP LINK, CHAMELEON, FULL CACHE, FEATURED GENRE)
+ * CLUB CRITTERS - MAIN APP LOGIC (V2.0 - GOOGLE API)
+ * Direct API fetch for instant updates.
  */
 
 // ==========================================
 //          CONFIGURATION
 // ==========================================
 
-const scheduleSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=0&single=true&output=csv";
-const rosterSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=1671173789&single=true&output=csv";
-const archiveSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAATcNJTOB-CmGzt84jPhdc1UgSFgN8ddz0UNfieGoqsK8FctDeyugziybSlG6sDrIv7saP7mpStHq/pub?gid=532548123&single=true&output=csv"; 
+// 🔴 REPLACE THESE WITH YOUR REAL DETAILS
+const SPREADSHEET_ID = "1MXvHh09Bw1yLQk6_YidOJmYrbJydZvdfQCR0kgK_NE4";
+const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
+
+// API Endpoints
+const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values`;
+// Note: We fetch the ranges directly. 'Schedule' is the tab name, 'Roster' is the tab name.
+const SCHEDULE_URL = `${BASE_URL}/Schedule!A:Z?key=${API_KEY}`;
+const ROSTER_URL = `${BASE_URL}/Roster!A:Z?key=${API_KEY}`;
+const ARCHIVE_URL = `${BASE_URL}/Archive!A:Z?key=${API_KEY}`;
 
 const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://critters.club";
 
 // Cache Keys
-const CACHE_KEY_ROSTER = 'cc_roster_v1';
-const CACHE_KEY_SCHEDULE = 'cc_schedule_v1';
-const CACHE_KEY_ARCHIVE = 'cc_archive_v1';
+const CACHE_KEY_ROSTER = 'cc_roster_v2';
+const CACHE_KEY_SCHEDULE = 'cc_schedule_v2';
+const CACHE_KEY_ARCHIVE = 'cc_archive_v2';
+const CACHE_KEY_TIMESTAMP = 'cc_last_update_ts';
 
 // ==========================================
 //          CONSOLE THEME
@@ -23,10 +32,8 @@ const CACHE_KEY_ARCHIVE = 'cc_archive_v1';
 const logStyle = {
     banner: "background: #29C5F6; color: #000; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;",
     tag: "background: #151e29; color: #29C5F6; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;",
-    success: "color: #00e676; font-weight: bold;",
-    state: "background: #B36AF4; color: #fff; font-weight: bold; padding: 2px 8px; border-radius: 4px;",
     info: "color: #888; font-style: italic;",
-    error: "background: #ff4444; color: #fff; padding: 2px 5px; border-radius: 2px;"
+    success: "color: #00e676; font-weight: bold;",
 };
 
 // ==========================================
@@ -47,18 +54,18 @@ let forceOffline = false;
 let vrcInstanceUrl = ""; 
 let djSchedule = [];
 let rosterMap = {}; 
-let rawArchiveData = ""; 
+let rawArchiveData = []; // Now an Array, not string
 let currentState = null; 
 let userTimezoneCode = ""; 
 let countdownInterval = null; 
 
 // ==========================================
-//          INITIALIZATION (CACHE + NETWORK)
+//          INITIALIZATION
 // ==========================================
 
 async function init() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c SYSTEM STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB CRITTERS %c API V2 STARTUP ", logStyle.banner, logStyle.tag);
 
     try {
         userTimezoneCode = Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
@@ -66,88 +73,106 @@ async function init() {
             .find(part => part.type == 'timeZoneName').value;
     } catch (e) { userTimezoneCode = "LOC"; }
 
-    // --- PHASE 1: INSTANT LOAD (CACHE) ---
+    // --- PHASE 1: LOAD CACHE ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
     const cachedSchedule = localStorage.getItem(CACHE_KEY_SCHEDULE);
     const cachedArchive = localStorage.getItem(CACHE_KEY_ARCHIVE);
+    const lastUpdate = localStorage.getItem(CACHE_KEY_TIMESTAMP);
 
     if (cachedRoster && cachedSchedule) {
-        console.log("%c[CACHE] Loading from local storage...", logStyle.info);
-        processRosterData(cachedRoster);
-        processScheduleData(cachedSchedule);
-        if (cachedArchive) rawArchiveData = cachedArchive; 
+        const timeStr = lastUpdate ? new Date(parseInt(lastUpdate)).toLocaleTimeString() : "Unknown";
+        console.log(`%c[CACHE] Loaded snapshot from ${timeStr}`, logStyle.info);
+        
+        processRosterData(JSON.parse(cachedRoster));
+        processScheduleData(JSON.parse(cachedSchedule));
+        if (cachedArchive) rawArchiveData = JSON.parse(cachedArchive);
         checkStatus(); 
-    } else {
-        console.log("%c[CACHE] Miss. Waiting for network...", logStyle.info);
     }
 
-    // --- PHASE 2: FRESH FETCH (NETWORK) ---
+    // --- PHASE 2: FRESH FETCH (Network) ---
     try {
+        const startFetch = performance.now();
         const [rosterResp, scheduleResp, archiveResp] = await Promise.all([
-            fetch(rosterSheetUrl),
-            fetch(scheduleSheetUrl),
-            fetch(archiveSheetUrl)
+            fetch(ROSTER_URL),
+            fetch(SCHEDULE_URL),
+            fetch(ARCHIVE_URL)
         ]);
 
         if (rosterResp.ok && scheduleResp.ok && archiveResp.ok) {
-            const rosterText = await rosterResp.text();
-            const scheduleText = await scheduleResp.text();
-            const archiveText = await archiveResp.text();
+            const rosterJson = await rosterResp.json();
+            const scheduleJson = await scheduleResp.json();
+            const archiveJson = await archiveResp.json();
 
-            const isRosterNew = rosterText !== cachedRoster;
-            const isScheduleNew = scheduleText !== cachedSchedule;
-            const isArchiveNew = archiveText !== cachedArchive;
+            const rosterRows = rosterJson.values || [];
+            const scheduleRows = scheduleJson.values || [];
+            const archiveRows = archiveJson.values || [];
 
-            if (isRosterNew || isScheduleNew || isArchiveNew) {
-                console.log("%c[NETWORK] New data detected. Updating...", logStyle.success);
+            // 🟢 SMART CHECK: Compare new data vs cached data strings
+            // We stringify to do a quick "Are these identical?" check
+            const newRosterStr = JSON.stringify(rosterRows);
+            const newScheduleStr = JSON.stringify(scheduleRows);
+            const newArchiveStr = JSON.stringify(archiveRows);
+
+            const hasChanges = (newRosterStr !== cachedRoster) || 
+                               (newScheduleStr !== cachedSchedule) || 
+                               (newArchiveStr !== cachedArchive);
+
+            const fetchTime = (performance.now() - startFetch).toFixed(0);
+
+            if (hasChanges) {
+                const now = new Date();
+                console.log(`%c[API] 🟢 New Data Found (${fetchTime}ms) @ ${now.toLocaleTimeString()}`, logStyle.success);
                 
-                localStorage.setItem(CACHE_KEY_ROSTER, rosterText);
-                localStorage.setItem(CACHE_KEY_SCHEDULE, scheduleText);
-                localStorage.setItem(CACHE_KEY_ARCHIVE, archiveText);
+                // Update Storage
+                localStorage.setItem(CACHE_KEY_ROSTER, newRosterStr);
+                localStorage.setItem(CACHE_KEY_SCHEDULE, newScheduleStr);
+                localStorage.setItem(CACHE_KEY_ARCHIVE, newArchiveStr);
+                localStorage.setItem(CACHE_KEY_TIMESTAMP, now.getTime());
 
-                processRosterData(rosterText);
-                processScheduleData(scheduleText);
-                rawArchiveData = archiveText; 
-
+                // Process New Data
+                processRosterData(rosterRows);
+                processScheduleData(scheduleRows);
+                rawArchiveData = archiveRows;
                 checkStatus();
             } else {
-                console.log("%c[NETWORK] Data is up to date.", logStyle.success);
+                console.log(`%c[API] ⚪ Data unchanged (${fetchTime}ms)`, "color: #666; font-size: 0.9em;");
             }
+        } else {
+            console.error("API Error: One or more sheets failed to load.");
         }
     } catch (error) {
-        console.warn("Network update failed. Using cache if available.", error);
-        if (!cachedRoster) showOffline("Community Hub"); 
+        console.warn("Network update failed:", error);
     }
-
+    
     setInterval(checkStatus, 5000);
 }
 
 // ==========================================
-//          DATA PROCESSING
+//          DATA PROCESSING (API VERSION)
 // ==========================================
 
-function processRosterData(csvText) {
-    const rows = csvText.split(/\r?\n/);
-    if (rows.length < 2) return;
+function processRosterData(rows) {
+    // API returns an Array of Arrays. No splitting needed!
+    if (!rows || rows.length < 2) return;
 
-    const headers = rows[0].split(',').map(h => h.trim());
+    const headers = rows[0].map(h => h.trim());
     rosterMap = {};
 
     for (let i = 1; i < rows.length; i++) {
-        if (!rows[i]) continue;
-        const cols = rows[i].split(',').map(c => c.trim());
+        const cols = rows[i];
+        if (!cols || !cols[0]) continue;
+        
         const name = cols[0];
-        if (!name) continue;
 
+        // Safe access (cols[x] might be undefined if empty)
         const entry = {
             name: name,
             image: cols[3] || "cdn/logos/club/HeadOnly.png",
-            color: cols[4] && cols[4].startsWith('#') ? ensureReadableColor(cols[4]) : null,
+            color: (cols[4] && cols[4].startsWith('#')) ? ensureReadableColor(cols[4]) : null,
             links: {}
         };
 
-        // 🛑 UPDATED: Start from Column 7 (H) instead of 6 (G)
-        // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7
+        // 🛑 HIDDEN COLUMNS LOGIC (Start at Index 7 / Col H)
         for (let x = 7; x < cols.length; x++) {
             if (cols[x] && headers[x]) {
                 entry.links[headers[x]] = cols[x];
@@ -157,29 +182,28 @@ function processRosterData(csvText) {
     }
 }
 
-function processScheduleData(csvText) {
-    const rows = csvText.split(/\r?\n/);
-    
+function processScheduleData(rows) {
+    if (!rows || rows.length < 2) return;
+
     // Row 2 (Index 1) is Settings
-    const settingsRow = rows[1].split(',').map(c => c.trim());
-    
+    const settingsRow = rows[1];
+    if (!settingsRow) return;
+
     eventStartTime = settingsRow[0];
     eventEndTime = settingsRow[1];
+    
     const offlineCell = settingsRow[2] ? settingsRow[2].toUpperCase() : "";
     forceOffline = (offlineCell === "TRUE" || offlineCell === "YES" || offlineCell === "1");
     
-    // Capture VRC Link from Cell D2 (Index 3)
     vrcInstanceUrl = settingsRow[3] || "";
 
     djSchedule = [];
 
-    // Start at i = 2 (Row 3) to skip the Header and Settings rows
+    // Start at i = 2 (Row 3)
     for (let i = 2; i < rows.length; i++) {
-        if (!rows[i]) continue;
-        const cols = rows[i].split(',').map(c => c.trim());
-        
-        // FIX: Check for Name in Column E (Index 4), not D. Need at least 5 cols.
-        if (cols.length < 5 || !cols[4]) continue; 
+        const cols = rows[i];
+        // Need at least 5 cols (Index 4 exists)
+        if (!cols || cols.length < 5 || !cols[4]) continue; 
 
         const name = cols[4];    // Column E
         const timeRaw = cols[5]; // Column F
@@ -254,7 +278,6 @@ function ensureReadableColor(hex) {
     return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
-// THEME MANAGER (V1.3 - Chameleon Mode)
 function updateSiteTheme(color) {
     const root = document.documentElement;
     if (color) {
@@ -266,7 +289,6 @@ function updateSiteTheme(color) {
     }
 }
 
-// VRC DEEP LINK PARSER (V1.3)
 function generateDeepLink(webUrl) {
     try {
         const url = new URL(webUrl);
@@ -317,7 +339,7 @@ function checkStatus() {
         currentState = newState;
         if (newState === 'finished') {
             if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-            showOffline("Thanks for partying with us! <br><span style='font-size:0.8rem; color:#888; display:block; margin-top:5px;'>(Archives take a short time to process/upload)</span>"); 
+            showOffline("Thanks for partying with us!"); 
         } 
         else if (newState === 'upcoming') {
             renderEventView(false);
@@ -352,27 +374,27 @@ function startCountdown(startTime) {
 
 function fetchAndShowFeaturedSet() {
     const container = document.getElementById('featured-container');
-    if (!container || container.innerHTML !== "" || !rawArchiveData) return;
+    if (!container || container.innerHTML !== "" || !rawArchiveData || rawArchiveData.length === 0) return;
 
     try {
-        const rows = rawArchiveData.split(/\r?\n/);
+        const rows = rawArchiveData;
         let potentialSets = [];
         let latestDateObj = new Date(0);
 
         for (let i = 1; i < rows.length; i++) {
-            if (!rows[i]) continue;
-            const cols = rows[i].split(',').map(c => c.trim());
+            const cols = rows[i];
+            if (!cols || !cols[0]) continue;
+            
             const name = cols[0];
-            if (!name) continue;
-
             const rosterData = rosterMap[name.toLowerCase()];
             const image = rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png";
 
             // LOOP GROUPS OF 4 (Title | Date | Genre | Link)
+            // Note: API returns array, we iterate by index
             for (let x = 1; x < cols.length; x += 4) {
                 const title = cols[x];
                 const dateStr = cols[x+1];
-                const genre = cols[x+2] || ""; // NEW: Capture Genre
+                const genre = cols[x+2] || ""; 
                 const link = cols[x+3];
                 
                 if (title && link && dateStr) {
@@ -427,7 +449,6 @@ function showOffline(message) {
     badgeContainer.innerHTML = '';
     subtext.innerHTML = message;
     
-    // Reset theme on offline
     updateSiteTheme(null);
     fetchAndShowFeaturedSet();
 }
@@ -439,7 +460,6 @@ function renderEventView(isLive) {
     offlineView.classList.add('hidden');
     eventView.classList.remove('hidden');
 
-    // Reset Theme initially
     updateSiteTheme(null); 
 
     if (isLive) {
@@ -482,8 +502,6 @@ function renderEventView(isLive) {
         const timeData = processDjTime(dj.timeRaw);
         const isActive = (isLive && timeData && now >= timeData.startObj && now < timeData.endObj);
         
-        // --- CHAMELEON TRIGGER ---
-        // FIX: Always trigger the theme update if active.
         if (isActive) {
             updateSiteTheme(dj.color);
         }
@@ -500,7 +518,6 @@ function renderEventView(isLive) {
         const card = document.createElement('div');
         card.className = `dj-card ${isActive ? 'dj-active' : ''}`; 
         
-        // Set accent for the card itself (always active)
         if (dj.color) card.style.setProperty('--accent-color', dj.color);
 
         card.innerHTML = `
