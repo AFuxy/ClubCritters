@@ -703,3 +703,165 @@ h1 {
     border: 1px solid #444;
     box-shadow: none;
 }
+
+/* =========================================
+   13. FLYER GENERATOR (V7 - FLOATING & AUTO-SCALE)
+   ========================================= */
+
+#flyer-canvas {
+    width: 800px;
+    height: 1040px;
+    margin: 0 auto;
+    background-image: url('../logos/club/flyer.png');
+    background-size: cover;
+    position: relative;
+    font-family: 'Segoe UI', sans-serif;
+    color: white;
+    box-shadow: 0 0 50px rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+
+/* --- CONTROLS --- */
+.flyer-controls {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    align-items: center;
+}
+#custom-title {
+    padding: 10px 15px;
+    border-radius: 20px;
+    border: 1px solid #444;
+    background: #151e29;
+    color: white;
+    font-size: 1rem;
+    text-align: center;
+    width: 250px;
+}
+
+/* --- HEADER --- */
+.flyer-header-area {
+    position: absolute;
+    top: 13%; 
+    width: 100%;
+    text-align: center;
+    z-index: 10;
+}
+#flyer-date {
+    font-size: 3.2rem;
+    font-weight: 900;
+    margin: 0;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px #B36AF4;
+}
+#flyer-subtitle {
+    font-size: 1.5rem;
+    color: #29C5F6;
+    letter-spacing: 4px;
+    margin: 5px 0 0 0;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+}
+
+#flyer-box {
+    position: absolute;
+    top: 23%;
+    left: 10%;
+    width: 80%;
+    height: 60%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+#flyer-lines {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    height: 100%; /* Fill the box */
+    padding: 10px 0;
+}
+
+.flyer-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    position: relative;
+    flex: 1 1 calc(100% / 7);
+    min-height: 0;
+}
+
+.logo-is-right { flex-direction: row; }
+.logo-is-right .dj-info-container {
+    flex: 1; display: flex; flex-direction: column; align-items: flex-end;
+    text-align: right; padding-right: 25px;
+}
+.logo-is-right .dj-logo-container {
+    flex: 1; display: flex; justify-content: flex-start; padding-left: 25px;
+}
+
+.logo-is-left { flex-direction: row-reverse; }
+.logo-is-left .dj-info-container {
+    flex: 1; display: flex; flex-direction: column; align-items: flex-start;
+    text-align: left; padding-left: 25px;
+}
+.logo-is-left .dj-logo-container {
+    flex: 1; display: flex; justify-content: flex-end; padding-right: 25px;
+}
+
+.dj-logo-img {
+    width: clamp(60px, 10vh, 90px);
+    height: clamp(60px, 10vh, 90px);
+    object-fit: cover;
+    filter: drop-shadow(0 0 10px rgba(41, 197, 246, 0.5));
+}
+
+.flyer-time {
+    font-size: 1rem;
+    color: #29C5F6;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.flyer-dj {
+    font-size: clamp(1.8rem, 4vh, 2.5rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    line-height: 0.9;
+    color: #fff;
+    text-shadow: 3px 3px 0px #000;
+    margin: 2px 0;
+}
+
+.flyer-genre {
+    font-size: 0.9rem;
+    color: #ddd;
+    font-style: italic;
+    font-weight: 600;
+}
+
+/* --- FOOTER --- */
+.flyer-footer-area {
+    position: absolute;
+    bottom: 2%;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+.footer-icon {
+    width: 45px;
+    height: 45px;
+    filter: drop-shadow(0 0 5px #29C5F6);
+}
+.footer-url {
+    font-size: 1.6rem;
+    letter-spacing: 3px;
+    color: #fff;
+    font-weight: 900;
+    text-shadow: 0 0 10px rgba(41, 197, 246, 0.8);
+}

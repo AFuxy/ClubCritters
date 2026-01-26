@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flyer Generator - Club Critters</title>
+    <link rel="stylesheet" href="cdn/css/main.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="icon" type="image/png" href="cdn/logos/club/HeadOnly.png">
+</head>
+<body class="body-centered">
+
+    <div class="container" style="max-width: 900px;">
+        <h1>Flyer Generator</h1>
+        
+        <div class="flyer-controls">
+            <input type="text" id="custom-title" value="" placeholder="Enter Title..." oninput="updateTitle()">
+            
+            <select id="timezone-select" onchange="initFlyer()" class="btn btn-small btn-secondary" style="background: #151e29; border: 1px solid #444; color: white;">
+                <option value="0" selected>UTC (Default)</option>
+                <option value="-5">EST (New York)</option>
+                <option value="-8">PST (Los Angeles)</option>
+                <option value="1">CET (Berlin)</option>
+                <option value="9">JST (Tokyo)</option>
+            </select>
+            
+            <button onclick="initFlyer()" class="btn btn-small">🔄 Refresh Data</button>
+            <button onclick="downloadFlyer()" class="btn btn-small btn-secondary">⬇️ Download PNG</button>
+        </div>
+
+        <div id="flyer-canvas">
+            
+            <div class="flyer-header-area">
+                <h2 id="flyer-date">LOADING...</h2>
+                <h3 id="flyer-subtitle"></h3>
+            </div>
+
+            <div id="flyer-box">
+                <div id="flyer-lines">
+                    </div>
+            </div>
+
+            <div class="flyer-footer-area">
+                <div class="footer-logos">
+                    <img src="cdn/logos/club/HeadOnly.png" class="footer-icon">
+                </div>
+                <span class="footer-url">critters.club</span>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="cdn/js/flyer.js"></script>
+    
+    <script>
+        function updateTitle() {
+            const input = document.getElementById('custom-title');
+            const display = document.getElementById('flyer-subtitle');
+            display.innerText = input.value.toUpperCase();
+        }
+    </script>
+</body>
+</html>
