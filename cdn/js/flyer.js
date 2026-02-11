@@ -57,7 +57,7 @@ async function initFlyer() {
             const dateStr = shiftedDate.toLocaleDateString('en-GB', { 
                 weekday: 'long', 
                 day: 'numeric', 
-                month: 'short',
+                month: 'long',
                 timeZone: 'UTC'
             });
             
