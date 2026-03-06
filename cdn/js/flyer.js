@@ -126,7 +126,9 @@ function downloadFlyer() {
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }).replace(' ', '');
     const timeStr = now.getHours() + "" + now.getMinutes();
-    const filename = `ClubCritters_Flyer_${dateStr}_${timeStr}.png`;
+    
+    const tzLabel = tzSelect.options[tzSelect.selectedIndex].text.split(' ')[0];
+    const filename = `ClubCritters_Flyer_${dateStr}_${timeStr}_${tzLabel}.png`;
 
     html2canvas(canvasDiv, {
         scale: 2, 
