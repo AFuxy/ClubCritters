@@ -485,6 +485,11 @@ function renderEventView(isLive) {
             joinContainer.innerHTML = ''; 
         }
 
+        // Auto-scroll to lineup if live
+        setTimeout(() => {
+            djContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 500);
+
     } else {
         document.title = "Club Critters - UPCOMING";
         const d = new Date(eventStartTime);
