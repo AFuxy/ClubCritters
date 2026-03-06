@@ -13,9 +13,11 @@ const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
 
 const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values`;
 const ROSTER_URL = `${BASE_URL}/Roster!A:Z?key=${API_KEY}`;
+const SCHEDULE_URL = `${BASE_URL}/Schedule!A:Z?key=${API_KEY}`;
 
 // Shared Cache Keys
 const CACHE_KEY_ROSTER = 'cc_roster_v2';
+const CACHE_KEY_SCHEDULE = 'cc_schedule_v2';
 const CACHE_KEY_TIMESTAMP = 'cc_roster_ts';
 
 // Console Theme
@@ -33,6 +35,9 @@ const residentSection = document.getElementById('resident-section');
 const residentList = document.getElementById('resident-list');
 const emptyMsg = document.getElementById('empty-msg');
 
+let currentActiveDj = null;
+let isEventLive = false;
+
 // ==========================================
 //          INITIALIZATION
 // ==========================================
@@ -44,38 +49,39 @@ async function init() {
 
     // --- PHASE 1: CACHE LOAD ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
+    const cachedSchedule = localStorage.getItem(CACHE_KEY_SCHEDULE);
     const lastUpdate = localStorage.getItem(CACHE_KEY_TIMESTAMP);
 
     if (cachedRoster) {
-        const timeStr = lastUpdate ? new Date(parseInt(lastUpdate)).toLocaleTimeString() : "Unknown";
-        console.log(`%c[CACHE] Loaded snapshot from ${timeStr}`, logStyle.info);
+        if (cachedSchedule) processScheduleStatus(JSON.parse(cachedSchedule));
         processRosterData(JSON.parse(cachedRoster));
     }
 
     // --- PHASE 2: NETWORK UPDATE ---
     try {
-        const startFetch = performance.now();
-        const response = await fetch(ROSTER_URL);
+        const [rosterRes, scheduleRes] = await Promise.all([
+            fetch(ROSTER_URL),
+            fetch(SCHEDULE_URL)
+        ]);
         
-        if (response.ok) {
-            const json = await response.json();
-            const rows = json.values || [];
+        if (rosterRes.ok && scheduleRes.ok) {
+            const rosterJson = await rosterRes.json();
+            const scheduleJson = await scheduleRes.json();
+            
+            const rows = rosterJson.values || [];
+            const scheduleRows = scheduleJson.values || [];
+            
+            processScheduleStatus(scheduleRows);
             
             // Smart Check
             const newRosterStr = JSON.stringify(rows);
             const hasChanges = (newRosterStr !== cachedRoster);
-            const fetchTime = (performance.now() - startFetch).toFixed(0);
-
+            
             if (hasChanges) {
-                const now = new Date();
-                console.log(`%c[API] 🟢 New Data Found (${fetchTime}ms)`, logStyle.success);
-                
                 localStorage.setItem(CACHE_KEY_ROSTER, newRosterStr);
-                localStorage.setItem(CACHE_KEY_TIMESTAMP, now.getTime());
-                
+                localStorage.setItem(CACHE_KEY_SCHEDULE, JSON.stringify(scheduleRows));
+                localStorage.setItem(CACHE_KEY_TIMESTAMP, new Date().getTime());
                 processRosterData(rows);
-            } else {
-                console.log(`%c[API] ⚪ Data unchanged (${fetchTime}ms)`, "color: #666; font-size: 0.9em;");
             }
         }
     } catch (error) {
@@ -87,9 +93,90 @@ async function init() {
     }
 }
 
+function processScheduleStatus(rows) {
+    if (!rows || rows.length < 2) return;
+    const settings = rows[1];
+    const start = new Date(settings[0]);
+    const end = new Date(settings[1]);
+    const now = new Date();
+    
+    isEventLive = (now >= start && now < end && settings[2] !== "TRUE");
+    
+    if (isEventLive) {
+        // Add Live Pulse to Back Link
+        const backLink = document.querySelector('.nav-pill');
+        if (backLink && !backLink.querySelector('.live-dot')) {
+            backLink.insertAdjacentHTML('afterbegin', '<span class="live-dot"></span>');
+        }
+
+        updateSiteTheme(null); // Set to default brand gradient first
+
+        // Find current DJ
+        for (let i = 2; i < rows.length; i++) {
+            const cols = rows[i];
+            if (!cols || !cols[5]) continue;
+            
+            const times = cols[5].match(/(\d{1,2}):(\d{2})/g);
+            if (!times || times.length < 2) continue;
+            
+            const djStart = new Date(start);
+            const [sh, sm] = times[0].split(':').map(Number);
+            djStart.setUTCHours(sh, sm, 0, 0);
+            
+            const djEnd = new Date(start);
+            const [eh, em] = times[1].split(':').map(Number);
+            djEnd.setUTCHours(eh, em, 0, 0);
+            
+            if (sh < start.getUTCHours() - 6) { djStart.setDate(djStart.getDate() + 1); djEnd.setDate(djEnd.getDate() + 1); }
+            else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
+
+            if (now >= djStart && now < djEnd) {
+                currentActiveDj = cols[4].toLowerCase();
+                // If the active DJ has a custom color/gradient, apply it to the whole page
+                const colorValue = cols[4] ? processColorValue(cols[4]) : null;
+                if (colorValue) updateSiteTheme(colorValue);
+                break;
+            }
+        }
+    } else {
+        updateSiteTheme(null);
+    }
+}
+
+function updateSiteTheme(color) {
+    const root = document.documentElement;
+    if (color) {
+        let solidColor = color;
+        let gradientColor = color;
+        if (color.includes('linear-gradient')) {
+            const match = color.match(/hsl\([^)]+\)/);
+            if (match) solidColor = match[0];
+        } else {
+            gradientColor = `linear-gradient(135deg, ${color}, ${color})`;
+        }
+        root.style.setProperty('--primary-blue', solidColor);
+        root.style.setProperty('--primary-purple', solidColor);
+        root.style.setProperty('--primary-gradient', gradientColor);
+    } else {
+        root.style.setProperty('--primary-blue', '#29C5F6');
+        root.style.setProperty('--primary-purple', '#B36AF4');
+        root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-blue), var(--static-purple))');
+    }
+}
+
 // ==========================================
 //          DATA PROCESSING
 // ==========================================
+
+function processColorValue(val) {
+    if (!val) return null;
+    if (val.startsWith('[') && val.endsWith(']')) {
+        const colors = val.slice(1, -1).split(',').map(c => c.trim());
+        const processed = colors.map(c => ensureReadableColor(c));
+        return `linear-gradient(135deg, ${processed.join(', ')})`;
+    }
+    return (val.startsWith('#')) ? ensureReadableColor(val) : val;
+}
 
 function processRosterData(rows) {
     if (!rows || rows.length < 2) return;
@@ -107,7 +194,7 @@ function processRosterData(rows) {
         
         if (!type.includes('staff') && !type.includes('resident') && !type.includes('owner') && !type.includes('host') && !type.includes('dj')) continue;
 
-        let finalColor = (cols[4] && cols[4].startsWith('#')) ? ensureReadableColor(cols[4]) : null;
+        let finalColor = processColorValue(cols[4]);
 
         const member = {
             name: cols[0],
@@ -119,7 +206,6 @@ function processRosterData(rows) {
         };
 
         // 🛑 HIDDEN COLUMNS LOGIC (Start at Index 7 / Col H)
-        // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7
         for (let x = 7; x < cols.length; x++) {
             if (cols[x] && headers[x]) {
                 member.links[headers[x]] = cols[x];
@@ -150,8 +236,12 @@ function renderCards(members, container) {
     container.innerHTML = '';
     members.forEach(member => {
         let linksHtml = Object.keys(member.links).length > 0 ? '<div class="social-tags">' + Object.keys(member.links).map(k => `<a href="${member.links[k]}" target="_blank" class="social-tag" onclick="event.stopPropagation()">${k}</a>`).join('') + '</div>' : '';
+        
+        const isActive = (currentActiveDj && member.name.toLowerCase() === currentActiveDj);
+        const playingBadge = isActive ? '<span class="playing-now-badge">🔴 Playing Now</span>' : '';
+        
         const card = document.createElement('div');
-        card.className = 'dj-card';
+        card.className = `dj-card ${isActive ? 'dj-active' : ''}`;
         if (member.color) card.style.setProperty('--accent-color', member.color);
 
         let bioIndicator = '';
@@ -164,7 +254,7 @@ function renderCards(members, container) {
         card.innerHTML = `
             <img src="${member.image}" alt="${member.name}" class="dj-img">
             <div class="dj-content">
-                <div class="dj-header"><h3>${member.name} ${bioIndicator}</h3></div>
+                <div class="dj-header"><h3>${member.name} ${bioIndicator} ${playingBadge}</h3></div>
                 <span class="genre">${member.title}</span>
                 ${linksHtml}
             </div>`;

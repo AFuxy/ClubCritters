@@ -151,6 +151,16 @@ async function init() {
 //          DATA PROCESSING (API VERSION)
 // ==========================================
 
+function processColorValue(val) {
+    if (!val) return null;
+    if (val.startsWith('[') && val.endsWith(']')) {
+        const colors = val.slice(1, -1).split(',').map(c => c.trim());
+        const processed = colors.map(c => ensureReadableColor(c));
+        return `linear-gradient(135deg, ${processed.join(', ')})`;
+    }
+    return (val.startsWith('#')) ? ensureReadableColor(val) : val;
+}
+
 function processRosterData(rows) {
     // API returns an Array of Arrays. No splitting needed!
     if (!rows || rows.length < 2) return;
@@ -168,7 +178,7 @@ function processRosterData(rows) {
         const entry = {
             name: name,
             image: cols[3] || "cdn/logos/club/HeadOnly.png",
-            color: (cols[4] && cols[4].startsWith('#')) ? ensureReadableColor(cols[4]) : null,
+            color: processColorValue(cols[4]),
             links: {}
         };
 
@@ -257,6 +267,7 @@ function processDjTime(timeStr) {
 
 function ensureReadableColor(hex) {
     hex = hex.replace(/^#/, '');
+    if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
     let r = parseInt(hex.substring(0, 2), 16) / 255;
     let g = parseInt(hex.substring(2, 4), 16) / 255;
     let b = parseInt(hex.substring(4, 6), 16) / 255;
@@ -281,11 +292,26 @@ function ensureReadableColor(hex) {
 function updateSiteTheme(color) {
     const root = document.documentElement;
     if (color) {
-        root.style.setProperty('--primary-blue', color);
-        root.style.setProperty('--primary-purple', color);
+        let solidColor = color;
+        let gradientColor = color;
+
+        // If it's a gradient, extract the first color as a solid fallback for borders/shadows
+        if (color.includes('linear-gradient')) {
+            const match = color.match(/hsl\([^)]+\)/);
+            if (match) solidColor = match[0];
+        } else {
+            // If it's just a solid color, create a simple gradient from it
+            gradientColor = `linear-gradient(135deg, ${color}, ${color})`;
+        }
+
+        root.style.setProperty('--primary-blue', solidColor);
+        root.style.setProperty('--primary-purple', solidColor);
+        root.style.setProperty('--primary-gradient', gradientColor);
     } else {
+        // Reset to Brand Defaults
         root.style.setProperty('--primary-blue', '#29C5F6');
         root.style.setProperty('--primary-purple', '#B36AF4');
+        root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-blue), var(--static-purple))');
     }
 }
 

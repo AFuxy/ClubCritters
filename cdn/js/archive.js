@@ -14,10 +14,12 @@ const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
 const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values`;
 const ROSTER_URL = `${BASE_URL}/Roster!A:Z?key=${API_KEY}`;
 const ARCHIVE_URL = `${BASE_URL}/Archive!A:Z?key=${API_KEY}`;
+const SCHEDULE_URL = `${BASE_URL}/Schedule!A:Z?key=${API_KEY}`;
 
 // Cache Keys (Must match main.js for Roster, unique for Archive)
 const CACHE_KEY_ROSTER = 'cc_roster_v2';
 const CACHE_KEY_ARCHIVE = 'cc_archive_v2';
+const CACHE_KEY_SCHEDULE = 'cc_schedule_v2';
 const CACHE_KEY_TIMESTAMP = 'cc_archive_ts';
 
 // ==========================================
@@ -56,67 +58,151 @@ async function initArchive() {
     // --- PHASE 1: INSTANT LOAD (CACHE) ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
     const cachedArchive = localStorage.getItem(CACHE_KEY_ARCHIVE);
+    const cachedSchedule = localStorage.getItem(CACHE_KEY_SCHEDULE);
     const lastUpdate = localStorage.getItem(CACHE_KEY_TIMESTAMP);
 
     if (cachedRoster && cachedArchive) {
-        const timeStr = lastUpdate ? new Date(parseInt(lastUpdate)).toLocaleTimeString() : "Unknown";
-        console.log(`%c[CACHE] Loaded snapshot from ${timeStr}`, logStyle.info);
-
+        if (cachedSchedule) checkLiveStatus(JSON.parse(cachedSchedule));
         processData(JSON.parse(cachedRoster), JSON.parse(cachedArchive));
         revealContent();
-    } else {
-        console.log("%c[CACHE] Miss. Waiting for network...", logStyle.info);
     }
 
     // --- PHASE 2: FRESH FETCH (NETWORK) ---
     try {
-        const startFetch = performance.now();
-        const [rosterRes, archiveRes] = await Promise.all([
+        const [rosterRes, archiveRes, scheduleRes] = await Promise.all([
             fetch(ROSTER_URL),
-            fetch(ARCHIVE_URL)
+            fetch(ARCHIVE_URL),
+            fetch(SCHEDULE_URL)
         ]);
 
-        if (rosterRes.ok && archiveRes.ok) {
+        if (rosterRes.ok && archiveRes.ok && scheduleRes.ok) {
             const rosterJson = await rosterRes.json();
             const archiveJson = await archiveRes.json();
+            const scheduleJson = await scheduleRes.json();
 
             const rosterRows = rosterJson.values || [];
             const archiveRows = archiveJson.values || [];
+            const scheduleRows = scheduleJson.values || [];
 
-            // Smart Check (Compare Strings)
+            checkLiveStatus(scheduleRows);
+
+            // Smart Check
             const newRosterStr = JSON.stringify(rosterRows);
             const newArchiveStr = JSON.stringify(archiveRows);
             
             const hasChanges = (newRosterStr !== cachedRoster) || (newArchiveStr !== cachedArchive);
-            const fetchTime = (performance.now() - startFetch).toFixed(0);
 
             if (hasChanges) {
-                const now = new Date();
-                console.log(`%c[API] 🟢 New Data Found (${fetchTime}ms)`, logStyle.success);
-                
                 localStorage.setItem(CACHE_KEY_ROSTER, newRosterStr);
                 localStorage.setItem(CACHE_KEY_ARCHIVE, newArchiveStr);
-                localStorage.setItem(CACHE_KEY_TIMESTAMP, now.getTime());
+                localStorage.setItem(CACHE_KEY_SCHEDULE, JSON.stringify(scheduleRows));
+                localStorage.setItem(CACHE_KEY_TIMESTAMP, new Date().getTime());
 
                 processData(rosterRows, archiveRows);
                 revealContent();
-            } else {
-                console.log(`%c[API] ⚪ Data unchanged (${fetchTime}ms)`, "color: #666; font-size: 0.9em;");
             }
         }
     } catch (error) {
         console.warn("Network update failed.", error);
     }
 
-    // Setup Listeners
     if (searchInput) {
         searchInput.addEventListener('input', (e) => renderSets(e.target.value));
+    }
+}
+
+function checkLiveStatus(rows) {
+    if (!rows || rows.length < 2) return;
+    const settings = rows[1];
+    const start = new Date(settings[0]);
+    const end = new Date(settings[1]);
+    const now = new Date();
+    
+    if (now >= start && now < end && settings[2] !== "TRUE") {
+        const backLink = document.querySelector('.nav-pill');
+        if (backLink && !backLink.querySelector('.live-dot')) {
+            backLink.insertAdjacentHTML('afterbegin', '<span class="live-dot"></span>');
+        }
+
+        // Apply theme based on current DJ
+        for (let i = 2; i < rows.length; i++) {
+            const cols = rows[i];
+            if (!cols || !cols[5]) continue;
+            const times = cols[5].match(/(\d{1,2}):(\d{2})/g);
+            if (!times || times.length < 2) continue;
+            
+            const djStart = new Date(start);
+            const [sh, sm] = times[0].split(':').map(Number);
+            djStart.setUTCHours(sh, sm, 0, 0);
+            const djEnd = new Date(start);
+            const [eh, em] = times[1].split(':').map(Number);
+            djEnd.setUTCHours(eh, em, 0, 0);
+            
+            if (sh < start.getUTCHours() - 6) { djStart.setDate(djStart.getDate() + 1); djEnd.setDate(djEnd.getDate() + 1); }
+            else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
+
+            if (now >= djStart && now < djEnd) {
+                const djName = cols[4].toLowerCase();
+                const rosterData = rosterMap[djName];
+                if (rosterData && rosterData.color) {
+                    updateSiteTheme(rosterData.color);
+                }
+                break;
+            }
+        }
+    } else {
+        updateSiteTheme(null);
+    }
+}
+
+function updateSiteTheme(color) {
+    const root = document.documentElement;
+    if (color) {
+        let solidColor = color;
+        let gradientColor = color;
+        if (color.includes('linear-gradient')) {
+            const match = color.match(/hsl\([^)]+\)/);
+            if (match) solidColor = match[0];
+        } else {
+            gradientColor = `linear-gradient(135deg, ${color}, ${color})`;
+        }
+        root.style.setProperty('--primary-blue', solidColor);
+        root.style.setProperty('--primary-purple', solidColor);
+        root.style.setProperty('--primary-gradient', gradientColor);
+    } else {
+        root.style.setProperty('--primary-blue', '#29C5F6');
+        root.style.setProperty('--primary-purple', '#B36AF4');
+        root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-blue), var(--static-purple))');
     }
 }
 
 // ==========================================
 //          DATA PROCESSING
 // ==========================================
+
+function processColorValue(val) {
+    if (!val) return null;
+    if (val && val.startsWith('[') && val.endsWith(']')) {
+        const colors = val.slice(1, -1).split(',').map(c => c.trim());
+        const processed = colors.map(c => ensureReadableColor(c));
+        return `linear-gradient(135deg, ${processed.join(', ')})`;
+    }
+    return (val && val.startsWith('#')) ? ensureReadableColor(val) : val;
+}
+
+function ensureReadableColor(hex) {
+    hex = hex.replace(/^#/, '');
+    if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
+    let r = parseInt(hex.substring(0, 2), 16) / 255;
+    let g = parseInt(hex.substring(2, 4), 16) / 255;
+    let b = parseInt(hex.substring(4, 6), 16) / 255;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) { h = s = 0; } else { let d = max - min; s = l > 0.5 ? d / (2 - max - min) : d / (max + min); switch (max) { case r: h = (g - b) / d + (g < b ? 6 : 0); break; case g: h = (b - r) / d + 2; break; case b: h = (r - g) / d + 4; break; } h /= 6; }
+    if (l < 0.6) l = 0.6;
+    h = Math.round(h * 360); s = Math.round(s * 100); l = Math.round(l * 100);
+    return `hsl(${h}, ${s}%, ${l}%)`;
+}
 
 function processData(rosterRows, archiveRows) {
     // 1. Parse Roster (Array of Arrays)
@@ -128,7 +214,7 @@ function processData(rosterRows, archiveRows) {
             
             rosterMap[cols[0].toLowerCase()] = {
                 image: cols[3] || "cdn/logos/club/HeadOnly.png",
-                color: (cols[4] && cols[4].startsWith('#')) ? cols[4] : "#29C5F6"
+                color: processColorValue(cols[4]) || "#29C5F6"
             };
         }
     }
@@ -146,7 +232,6 @@ function processData(rosterRows, archiveRows) {
             const color = rosterData ? rosterData.color : "#29C5F6";
 
             // READ GROUPS OF 4: Title | Date | Genre | Link
-            // Columns start at Index 1
             for (let x = 1; x < cols.length; x += 4) {
                 const title = cols[x];
                 const rawDate = cols[x+1];
@@ -165,10 +250,7 @@ function processData(rosterRows, archiveRows) {
         }
     }
     
-    // Sort by Date (Newest First)
     allSets.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    // 3. Build UI
     buildGenreFilters();
     renderSets(searchInput ? searchInput.value : "");
 }
@@ -224,7 +306,6 @@ function renderSets(searchTerm = "") {
         return;
     }
 
-    // Group by DJ
     const grouped = {};
     filtered.forEach(set => {
         if (!grouped[set.dj]) {
@@ -237,10 +318,8 @@ function renderSets(searchTerm = "") {
         grouped[set.dj].sets.push(set);
     });
 
-    // Render Cards
     Object.keys(grouped).forEach(djName => {
         const group = grouped[djName];
-        
         let setsHtml = '';
         group.sets.forEach(set => {
             setsHtml += `
@@ -258,7 +337,7 @@ function renderSets(searchTerm = "") {
         });
 
         const cardHtml = `
-            <div class="dj-archive-card" style="border-left: 4px solid ${group.color};">
+            <div class="dj-archive-card" style="--accent-color: ${group.color};">
                 <div class="card-header">
                     <img src="${group.image}" alt="${djName}">
                     <h3 style="color: ${group.color};">${djName}</h3>
