@@ -8,17 +8,17 @@ The system is built on a modern stack designed for high availability and communi
 
 - **Frontend:** Server-side rendered EJS templates and static HTML styled with professional CSS, featuring staggered animations, glassmorphism, and responsive masonry layouts.
 - **Backend:** Node.js (Express) handling OAuth2 flows, RESTful APIs, and high-performance image processing (Sharp/Multer).
-- **Database:** MySQL (Sequelize ORM) managing persistent state for the roster, schedule, set archives, community gallery, and granular tracking.
-- **VRChat Integration:** Real-time instance tracking and community activity monitoring via the VRChat API.
-- **Discord Bot:** A dedicated Discord.js bot that synchronizes the club's live state, manages gallery syncing, and provides administrative slash commands.
+- **Database:** MySQL (Sequelize ORM) managing persistent state for the roster, schedule, set archives, community gallery, and recruitment.
+- **VRChat Integration:** Real-time instance tracking, community pulse monitoring, and an automated "Beacon" presence via the VRChat API.
+- **Discord Bot:** A dedicated Discord.js bot that synchronizes the club's live state, manages gallery syncing, and provides an automated recruitment ticket system.
 
 ## 🛠 Setup & Local Development
 
 ### 1. Prerequisites
 - Node.js (v18 or higher)
 - MySQL Server
-- Discord Developer Application (with **Message Content Intent** enabled)
-- VRChat Account (Bot account recommended, without 2FA for fully headless operation)
+- Discord Developer Application (with **Message Content Intent** and **Server Members Intent** enabled)
+- VRChat Account (Bot account recommended)
 
 ### 2. Configuration
 Create a `.env` file in the root directory based on the following template:
@@ -45,6 +45,7 @@ DISCORD_REDIRECT_URI=http://localhost:3000/auth/discord/callback
 # VRChat Configuration
 VRC_USERNAME="your_vrchat_username"
 VRC_PASSWORD="your_vrchat_password"
+VRC_GROUPID="grp_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
 ### 3. Installation
@@ -52,7 +53,7 @@ VRC_PASSWORD="your_vrchat_password"
 npm install
 ```
 
-### 4. Database Initialization & Migration
+### 4. Database Initialization
 To initialize the schema and import legacy data:
 ```bash
 node migrate-data.js
@@ -63,30 +64,26 @@ node migrate-data.js
 npm start
 ```
 
-## 🌐 Hosting & Deployment
+## 🌐 Features & Workflows
 
-### Recommended Environment: VPS (Linux/Ubuntu)
-For production hosting, a VPS with at least 1GB RAM is recommended.
+### 🎫 Automated Recruitment
+- **Dynamic Forms:** Specialized application forms for DJs, Singers, Musicians, and Staff.
+- **Staff Review Tickets:** Submissions automatically create private Discord channels for review.
+- **Discord Decisions:** Staff can Approve or Deny applicants directly from Discord via interactive buttons.
+- **Identity Verification:** Users must be in the Discord server to apply; the system can automatically force-join them during login.
 
-1. **Process Management:** Use **PM2** to keep the application running.
-   ```bash
-   npm install pm2 -g
-   pm2 start server.js --name "club-critters"
-   ```
-2. **Image Storage:** Ensure the `public/uploads/` directory has write permissions.
-3. **VRChat Auth:** If using an account with 2FA/Email verification, log into the Admin Panel after first launch to enter the verification code.
+### 📸 Smart Gallery
+- **Discord Sync:** Use `/sync-gallery` to pull community photos into the website.
+- **Local Optimization:** Images are downloaded, compressed to WebP, and thumbnailed locally for maximum speed.
+- **Dynamic Identity:** Uploader names and avatars are fetched live from Discord, keeping profiles fresh.
 
-## 🕹 Management Workflow
+### 🦊 VRChat Beacon
+- **Live Tracking:** Real-time player counts and group activity visible on the homepage.
+- **Auto-Beacon:** The bot automatically sets its VRChat status to "Join Me" and points to the active instance during events.
+- **Friend Management:** The bot automatically accepts all incoming friend requests to grow the joinable network.
+- **Cache Shield:** Integrated 60-second caching prevents API rate-limiting.
 
-### Staff Hub
-Accessible to authorized Discord members (Admin/Host/Staff roles):
-- **Event Schedule:** Manage the live lineup and genres.
-- **Roster Management:** Control DJ profiles and roles.
-- **Gallery Sync:** Run `/sync-gallery` in Discord to backfill community photos.
-- **Analytics:** Monitor real-time page views and community engagement.
-
-### Performer Profiles
-DJs can log in to customize their own presence:
-- **Bio & Links:** Update social media links and personal descriptions.
-- **Avatar Upload:** Upload and crop custom profile pictures (supports animated WebP/GIF).
-- **Archives:** Link set recordings directly to their public profile.
+### 🕹 Staff Management
+- **Event Schedule:** Manage the live lineup and genres via the panel.
+- **Roster Control:** Update DJ titles, roles, and colors.
+- **Analytics:** Granular tracking of page views, link clicks, and set archive popularity.

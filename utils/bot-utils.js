@@ -1,5 +1,5 @@
 const { ActivityType, ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getInstanceData, getGroupInstanceData, getGroupStats } = require('./vrc-api');
+const { getInstanceData, getGroupInstanceData, getGroupStats, autoAcceptFriends, updateBotPresence } = require('./vrc-api');
 const fs = require('fs');
 const path = require('path');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
@@ -16,11 +16,18 @@ async function autoUpdateStatus(client) {
         const settings = await Settings.findOne();
         let statusText = '💤 Offline';
         let statusIcon = 'dnd';
+        
+        // VRChat Status components
+        let vrcPresenceStatus = 'active';
+        let vrcPresenceDesc = '💤 Offline';
 
-        // Fetch general group activity
+        // 1. Fetch general group activity
         const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
         const groupData = await getGroupStats(groupId);
         let groupOnlineStr = (groupData && groupData.onlineMembers > 0) ? ` | 🟢 ${groupData.onlineMembers} Online` : "";
+
+        // 2. Handle Friend Requests
+        await autoAcceptFriends();
 
         if (settings && !settings.forceOffline) {
             const now = new Date();
@@ -44,6 +51,8 @@ async function autoUpdateStatus(client) {
             if (now >= start && now < end) {
                 statusText = `🔊 Club is LIVE!${vrcStats}`;
                 statusIcon = 'online';
+                vrcPresenceStatus = 'join me';
+                vrcPresenceDesc = `🔊 Club is LIVE!${vrcStats}`;
             } else if (now < start) {
                 const timeDiff = start - now;
                 const totalMinutes = Math.floor(timeDiff / (1000 * 60));
@@ -51,6 +60,7 @@ async function autoUpdateStatus(client) {
                 const mins = totalMinutes % 60;
 
                 statusIcon = 'online';
+                vrcPresenceStatus = 'active';
                 
                 if (hours > 0) {
                     statusText = `⏳ Starting in ${hours}h ${mins}m${vrcStats}`;
@@ -61,19 +71,28 @@ async function autoUpdateStatus(client) {
                 if (totalMinutes < 1) {
                     statusText = `⏳ Starting imminently!${vrcStats}`;
                 }
+                vrcPresenceDesc = statusText;
             } else {
                 statusText = `🌙 Thanks for coming!${groupOnlineStr}`;
                 statusIcon = 'dnd';
+                vrcPresenceStatus = 'busy';
+                vrcPresenceDesc = '🌙 Thanks for coming!';
             }
         } else {
             statusText = `💤 Offline${groupOnlineStr}`;
             statusIcon = 'dnd';
+            vrcPresenceStatus = 'busy';
+            vrcPresenceDesc = '💤 Offline';
         }
 
+        // Update Discord Presence
         client.user.setPresence({
             activities: [{ name: 'customstatus', type: ActivityType.Custom, state: statusText }],
             status: statusIcon
         });
+
+        // Update VRChat Presence (Beacon)
+        await updateBotPresence(vrcPresenceStatus, vrcPresenceDesc);
 
     } catch (err) {
         console.error("Failed to auto-update bot status:", err);
