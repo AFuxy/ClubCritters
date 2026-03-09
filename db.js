@@ -12,7 +12,8 @@ const Settings = sequelize.define('Settings', {
     eventStartTime: { type: DataTypes.DATE },
     eventEndTime: { type: DataTypes.DATE },
     forceOffline: { type: DataTypes.BOOLEAN, defaultValue: false },
-    instanceUrl: { type: DataTypes.STRING }
+    instanceUrl: { type: DataTypes.STRING },
+    vrcCookie: { type: DataTypes.TEXT } // Persist VRChat session
 });
 
 // 2. Roster (DJs/Staff)
@@ -69,6 +70,18 @@ const AppSlot = sequelize.define('AppSlot', {
     order: { type: DataTypes.INTEGER, defaultValue: 0 }
 });
 
+// 7. Gallery (Discord Synced)
+const Gallery = sequelize.define('Gallery', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    messageId: { type: DataTypes.STRING, allowNull: false },
+    attachmentId: { type: DataTypes.STRING, unique: true },
+    imageUrl: { type: DataTypes.STRING, allowNull: false },
+    thumbnailUrl: { type: DataTypes.STRING },
+    uploaderId: { type: DataTypes.STRING }, // Discord ID to fetch fresh data
+    caption: { type: DataTypes.TEXT },
+    timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+});
+
 // Relationships
 Roster.hasMany(Schedule, { foreignKey: 'performerId' });
 Schedule.belongsTo(Roster, { foreignKey: 'performerId' });
@@ -79,12 +92,12 @@ Archive.belongsTo(Roster, { foreignKey: 'performerId' });
 async function initDB() {
     try {
         await sequelize.authenticate();
-        console.log('Connected to MySQL!');
-        await sequelize.sync({ alter: true }); // Syncs models to DB tables
-        console.log('Database tables synchronized.');
+        console.log('\x1b[32m[DATABASE] ✅ Connected to MySQL successfully!\x1b[0m');
+        await sequelize.sync({ alter: true });
+        console.log('\x1b[36m[DATABASE] 📊 Tables synchronized and ready.\x1b[0m');
     } catch (err) {
-        console.error('Database Connection Error:', err);
+        console.error('\x1b[31m[DATABASE] ❌ Connection Error:\x1b[0m', err);
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, initDB };

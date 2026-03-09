@@ -2,8 +2,9 @@ const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
-const { sequelize, initDB, Roster, Settings, Schedule, Archive, Stats, AppSlot } = require('./db');
+const { sequelize, initDB, Roster, Settings, Schedule, Archive, Stats, AppSlot, Gallery } = require('./db');
 const { getGuildMember, updateBotStatus } = require('./bot');
+const { getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus } = require('./utils/vrc-api');
 const path = require('path');
 require('dotenv').config();
 
@@ -176,6 +177,16 @@ app.get('/api/settings', isStaff, async (req, res) => {
         if (!settings) settings = await Settings.create({});
         res.json(settings);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.get('/api/vrchat/status', isStaff, (req, res) => {
+    res.json({ status: getVrcStatus() });
+});
+
+app.post('/api/vrchat/verify', isStaff, async (req, res) => {
+    const { code } = req.body;
+    const result = await verifyVRC(code);
+    res.json(result);
 });
 
 app.post('/api/settings/update', isStaff, async (req, res) => {
@@ -410,6 +421,58 @@ app.get('/api/public/apps', async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
+app.get('/api/public/vrc-status', async (req, res) => {
+    try {
+        const settings = await Settings.findOne();
+        
+        // Always fetch group stats to show community activity
+        const groupStats = await getGroupStats("CLUBLC.9601");
+        
+        if (!settings || settings.forceOffline) {
+            return res.json({ active: false, count: 0, capacity: 0, groupStats });
+        }
+        
+        let data = null;
+        if (settings.instanceUrl && settings.instanceUrl.includes("worldId=")) {
+            data = await getInstanceData(settings.instanceUrl);
+        } else {
+            // Default to fetching from the Club Critters Group
+            data = await getGroupInstanceData("CLUBLC.9601");
+        }
+        
+        res.json({ ...data, groupStats });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.get('/api/public/gallery', async (req, res) => {
+    try {
+        const photos = await Gallery.findAll({ order: [['timestamp', 'DESC']] });
+        
+        // Fetch fresh member data for each uploader
+        const mapped = await Promise.all(photos.map(async p => {
+            let uploader = { name: "Unknown", avatar: "/cdn/logos/club/HeadOnly.png" };
+            if (p.uploaderId) {
+                const member = await getGuildMember(p.uploaderId);
+                if (member) {
+                    uploader.name = member.nickname;
+                    uploader.avatar = member.avatar;
+                }
+            }
+            return {
+                id: p.id,
+                imageUrl: p.imageUrl,
+                thumbnailUrl: p.thumbnailUrl,
+                uploaderName: uploader.name,
+                uploaderAvatar: uploader.avatar,
+                caption: p.caption,
+                timestamp: p.timestamp
+            };
+        }));
+
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
 app.get('/performer/:id', async (req, res) => {
     try {
         const performer = await Roster.findByPk(req.params.id);
@@ -448,12 +511,15 @@ app.get('/performer/:id', async (req, res) => {
 });
 
 app.get('/apply', (req, res) => { res.render('apply'); });
+app.get('/gallery', (req, res) => { res.render('gallery'); });
 app.get('/flyer', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'flyer.html')); });
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 app.get('/login-error', (req, res) => { res.send('<h1>Login Error</h1><p>You might not be on the authorized roster, or something went wrong.</p><a href="/">Back Home</a>'); });
 
 async function start() {
     await initDB();
-    app.listen(PORT, () => { console.log(`Server running on http://localhost:${PORT}`); });
+    app.listen(PORT, () => { 
+        console.log(`\x1b[34m[SERVER] 🚀 Hub running on http://localhost:${PORT}\x1b[0m`); 
+    });
 }
 start();

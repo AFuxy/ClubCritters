@@ -1,14 +1,16 @@
 const { Client, GatewayIntentBits, Events, REST, Routes, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { autoUpdateStatus, getGuildMember, updateBotStatus } = require('./utils/bot-utils');
+const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile } = require('./utils/bot-utils');
 require('dotenv').config();
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences
+        GatewayIntentBits.GuildPresences,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ]
 });
 
@@ -35,21 +37,21 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
 
 async function registerSlashCommands() {
     try {
-        console.log(`Refreshing ${slashCommands.length} slash commands...`);
+        console.log(`[BOT] 📡 Refreshing ${slashCommands.length} slash commands...`);
         await rest.put(
             Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
             { body: slashCommands },
         );
-        console.log('Slash commands registered successfully.');
+        console.log('\x1b[32m[BOT] ✅ Slash commands registered successfully.\x1b[0m');
     } catch (error) {
-        console.error('Error registering slash commands:', error);
+        console.error('\x1b[31m[BOT] ❌ Error registering slash commands:\x1b[0m', error);
     }
 }
 
 // --- EVENTS ---
 
 client.once(Events.ClientReady, (c) => {
-    console.log(`Discord Bot logged in as ${c.user.tag}`);
+    console.log(`\x1b[35m[BOT] 💜 Discord Bot logged in as ${c.user.tag}\x1b[0m`);
     registerSlashCommands();
     
     // Start automated status loop
@@ -69,6 +71,52 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error(error);
         await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
     }
+});
+
+// Gallery Sync Listener
+client.on(Events.MessageCreate, async message => {
+    if (message.author.bot) return;
+    if (message.channelId !== process.env.DISCORD_GALLERY_CH_ID) return;
+
+    const { Gallery } = require('./db');
+
+    if (message.attachments.size > 0) {
+        for (const attachment of message.attachments.values()) {
+            if (attachment.contentType && attachment.contentType.startsWith('image/')) {
+                try {
+                    const baseName = `${message.id}_${attachment.id}`;
+                    const localFiles = await downloadFile(attachment.url, baseName);
+
+                    await Gallery.upsert({
+                        messageId: message.id,
+                        attachmentId: attachment.id,
+                        imageUrl: localFiles.imageUrl,
+                        thumbnailUrl: localFiles.thumbnailUrl,
+                        uploaderId: message.author.id,
+                        caption: message.content || "",
+                        timestamp: message.createdAt
+                    });
+                    console.log(`\x1b[32m[GALLERY] 📸 Synced & Compressed photo ${attachment.id} from ${message.author.username}\x1b[0m`);
+                } catch (err) {
+                    console.error("[GALLERY] Error syncing photo:", err);
+                }
+            }
+        }
+    }
+});
+
+client.on(Events.MessageDelete, async message => {
+    if (message.channelId !== process.env.DISCORD_GALLERY_CH_ID) return;
+    const { Gallery } = require('./db');
+    try {
+        const records = await Gallery.findAll({ where: { messageId: message.id } });
+        for (const rec of records) {
+            const fullPath = path.join(__dirname, 'public', rec.imageUrl);
+            if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        }
+        await Gallery.destroy({ where: { messageId: message.id } });
+        console.log(`\x1b[33m[GALLERY] 🗑️ Removed all photos and local files from deleted message: ${message.id}\x1b[0m`);
+    } catch (e) {}
 });
 
 client.login(process.env.DISCORD_BOT_TOKEN);

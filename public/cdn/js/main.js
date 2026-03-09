@@ -10,6 +10,7 @@
 const API_SETTINGS = "/api/public/settings";
 const API_SCHEDULE = "/api/public/schedule";
 const API_ARCHIVES = "/api/public/archives";
+const API_VRC = "/api/public/vrc-status";
 const API_TRACK = "/api/stats/track";
 
 const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://critters.club";
@@ -41,6 +42,7 @@ const badgeContainer = document.getElementById('status-badge-container');
 const djContainer = document.getElementById('dj-container');
 const subtext = document.getElementById('status-subtext');
 const archiveLink = document.getElementById('archive-link');
+const galleryLink = document.getElementById('gallery-link');
 
 let eventStartTime = null;
 let eventEndTime = null;
@@ -51,10 +53,41 @@ let rawArchiveData = [];
 let currentState = null; 
 let userTimezoneCode = ""; 
 let countdownInterval = null; 
+let latestVrcData = null; // Global storage for VRC stats
 
 // ==========================================
 //          INITIALIZATION
 // ==========================================
+
+async function fetchVrcStatus() {
+    try {
+        const res = await fetch(API_VRC);
+        if (res.ok) {
+            latestVrcData = await res.json();
+            updateVrcUI();
+        }
+    } catch (e) {}
+}
+
+function updateVrcUI() {
+    if (!latestVrcData) return;
+    const data = latestVrcData;
+    const countSpan = document.getElementById('vrc-player-count');
+    
+    // 1. Update Instance Count (Active Event)
+    if (data.active && countSpan) {
+        countSpan.innerText = ` 🟢 ${data.count}/${data.capacity} PLAYERS`;
+        countSpan.classList.remove('hidden');
+    } else if (countSpan) {
+        countSpan.classList.add('hidden');
+    }
+
+    // 2. Update Group Activity (Offline View)
+    const stats = data.groupStats;
+    if (stats && currentState === 'disabled') {
+        subtext.innerHTML = `Community Hub <br> <span style="font-size:0.8rem; opacity:0.6; margin-top:5px; display:block;">🟢 ${stats.onlineMembers} Members Online Now</span>`;
+    }
+}
 
 async function init() {
     console.clear();
@@ -76,6 +109,10 @@ async function init() {
             .formatToParts(new Date())
             .find(part => part.type == 'timeZoneName').value;
     } catch (e) { userTimezoneCode = "LOC"; }
+
+    // Start VRC Status Loop
+    setInterval(fetchVrcStatus, 30000);
+    fetchVrcStatus();
 
     // --- PHASE 1: LOAD CACHE ---
     const cachedSettings = localStorage.getItem(CACHE_KEY_SETTINGS);
@@ -293,7 +330,10 @@ function startCountdown(startTime) {
             const m = Math.floor((diff / (1000 * 60)) % 60);
             const s = Math.floor((diff / 1000) % 60);
             const badge = document.querySelector('.status-badge');
-            if (badge) badge.innerHTML = `⏱️ STARTING IN: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            if (badge) {
+                badge.innerHTML = `⏱️ STARTING IN: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} <span id="vrc-player-count"></span>`;
+                updateVrcUI(); // Refresh player count inside the new badge
+            }
         }
     }, 1000);
 }
@@ -354,7 +394,8 @@ function trackClick(type, id, label) {
 function showOffline(message) {
     document.title = "Club Critters - " + message.replace(/<[^>]*>?/gm, '');
     document.body.classList.add('body-centered');
-    archiveLink.classList.remove('hidden');
+    if (archiveLink) archiveLink.classList.remove('hidden');
+    if (galleryLink) galleryLink.classList.remove('hidden');
     loadingView.classList.add('hidden');
     offlineView.classList.remove('hidden');
     eventView.classList.add('hidden');
@@ -367,7 +408,8 @@ function showOffline(message) {
 
 function renderEventView(isLive) {
     document.body.classList.remove('body-centered');
-    archiveLink.classList.add('hidden');
+    if (archiveLink) archiveLink.classList.add('hidden');
+    if (galleryLink) galleryLink.classList.add('hidden');
     loadingView.classList.add('hidden');
     offlineView.classList.add('hidden');
     eventView.classList.remove('hidden');
@@ -376,7 +418,7 @@ function renderEventView(isLive) {
 
     if (isLive) {
         document.title = "Club Critters - LIVE NOW";
-        badgeContainer.innerHTML = '<div class="status-badge status-live">🔴 EVENT LIVE NOW</div>';
+        badgeContainer.innerHTML = '<div class="status-badge status-live">🔴 EVENT LIVE NOW <span id="vrc-player-count"></span></div>';
         subtext.innerText = "Tonight's Lineup";
 
         const deepLink = generateDeepLink(vrcInstanceUrl);
@@ -404,13 +446,14 @@ function renderEventView(isLive) {
     } else {
         document.title = "Club Critters - UPCOMING";
         const d = new Date(eventStartTime);
-        badgeContainer.innerHTML = `<div class="status-badge status-upcoming">📅 STARTING: ${d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})}</div>`;
+        badgeContainer.innerHTML = `<div class="status-badge status-upcoming">📅 STARTING: ${d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})} <span id="vrc-player-count"></span></div>`;
         subtext.innerText = "Upcoming Schedule";
 
         const existingContainer = document.getElementById('join-container');
         if (existingContainer) existingContainer.innerHTML = '';
     }
 
+    updateVrcUI(); // Refresh player count immediately after rendering the badge container
     djContainer.innerHTML = ''; 
     const now = new Date();
 
