@@ -1,0 +1,15 @@
+:root {
+    /* DYNAMIC VARIABLES (These change with Chameleon Mode) */
+    --primary-blue: #29C5F6;
+    --primary-purple: #B36AF4;
+    --primary-gradient: linear-gradient(45deg, #29C5F6, #B36AF4);
+
+    /* STATIC VARIABLES (These ALWAYS stay Club Critters Brand) */
+    --static-blue: #29C5F6;
+    --static-purple: #B36AF4;
+
+    --dark-bg: #0b1016;
+    --card-bg: #151e29;
+    --text-white: #ffffff;
+    --accent-red: #ff4444;
+}

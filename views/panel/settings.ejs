@@ -1,0 +1,76 @@
+<%- include('header') %>
+
+<div class="staff-hub" style="margin-top: 0; grid-column: span 2;">
+    <div class="staff-section">
+        <h2>Event Settings</h2>
+        
+        <% const userType = user.type.toLowerCase(); %>
+        <% const canManageAll = userType.includes('host') || userType.includes('owner'); %>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Event Start (UTC)</label>
+                <input type="datetime-local" id="event-start" <%= canManageAll ? '' : 'disabled' %>>
+            </div>
+            <div class="form-group">
+                <label>Event End (UTC)</label>
+                <input type="datetime-local" id="event-end" <%= canManageAll ? '' : 'disabled' %>>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>VRChat Instance URL</label>
+            <input type="text" id="instance-url" placeholder="https://vrchat.com/home/launch?worldId=...">
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" id="force-offline" style="width: auto;" <%= canManageAll ? '' : 'disabled' %>>
+            <label style="margin: 0;">Force Site Offline</label>
+        </div>
+        <button class="btn-cc btn-primary" style="width: 100%;" onclick="saveSettings()">Update Global Settings</button>
+        
+        <% if (!canManageAll) { %>
+            <p style="font-size: 0.75rem; color: #666; margin-top: 15px;">Note: You can only update the VRChat Instance URL. Only Hosts and Owners can change event times.</p>
+        <% } %>
+    </div>
+</div>
+
+<script>
+    const eventStartInput = document.getElementById('event-start');
+    const eventEndInput = document.getElementById('event-end');
+    const instanceUrlInput = document.getElementById('instance-url');
+    const forceOfflineInput = document.getElementById('force-offline');
+
+    async function loadSettings() {
+        const setRes = await fetch('/api/settings');
+        const settings = await setRes.json();
+        if (settings.eventStartTime) eventStartInput.value = settings.eventStartTime.slice(0, 16);
+        if (settings.eventEndTime) eventEndInput.value = settings.eventEndTime.slice(0, 16);
+        instanceUrlInput.value = settings.instanceUrl || '';
+        forceOfflineInput.checked = settings.forceOffline;
+    }
+
+    async function saveSettings() {
+        try {
+            const response = await fetch('/api/settings/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventStartTime: eventStartInput.value,
+                    eventEndTime: eventEndInput.value,
+                    instanceUrl: instanceUrlInput.value,
+                    forceOffline: forceOfflineInput.checked
+                })
+            });
+            if (response.ok) {
+                showNotify('Settings updated successfully!');
+            } else {
+                showNotify('Failed to update settings.', 'error');
+            }
+        } catch (e) {
+            showNotify('Network error occurred.', 'error');
+        }
+    }
+
+    loadSettings();
+</script>
+
+<%- include('footer') %>

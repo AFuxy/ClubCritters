@@ -1,0 +1,155 @@
+/* =========================================
+   REUSABLE UI COMPONENTS
+   ========================================= */
+
+/* --- DJ CARD --- */
+.dj-card {
+    background-color: var(--card-bg);
+    border-radius: 15px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    --accent-color: var(--primary-blue);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.dj-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 5px;
+    background: var(--accent-color);
+    z-index: 2;
+}
+
+.dj-img {
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 15px;
+    background-color: #333;
+    flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.05);
+}
+
+.dj-content { flex-grow: 1; }
+
+.dj-content h3 { 
+    margin: 0; 
+    font-size: 1.1rem; 
+    background: var(--accent-color);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: inline-block;
+    line-height: 1.2;
+}
+
+.dj-content .title, .dj-content .genre { 
+    color: #888; 
+    font-size: 0.85rem; 
+    display: block; 
+}
+
+/* --- UNIFIED BUTTON SYSTEM --- */
+
+/* Base Button */
+.btn-cc {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 25px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    gap: 10px;
+}
+
+.btn-cc:active { transform: scale(0.98); }
+
+/* Primary (Gradient) */
+.btn-primary {
+    background: var(--primary-gradient);
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(41, 197, 246, 0.3);
+}
+.btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(179, 106, 244, 0.5);
+    transform: translateY(-2px);
+}
+
+/* Secondary (Bordered) */
+.btn-secondary {
+    background: transparent;
+    color: var(--primary-blue) !important;
+    border: 2px solid var(--primary-blue);
+}
+.btn-secondary:hover {
+    background: var(--primary-gradient);
+    color: white !important;
+    border-color: transparent;
+    transform: translateY(-2px);
+}
+
+/* Danger (Red) */
+.btn-danger {
+    background: linear-gradient(45deg, #ff5252, #ff1744);
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(255, 23, 68, 0.3);
+}
+.btn-danger:hover {
+    box-shadow: 0 6px 20px rgba(255, 23, 68, 0.5);
+    transform: translateY(-2px);
+}
+
+/* Action (Small/Compact) */
+.btn-small {
+    padding: 8px 18px;
+    font-size: 0.8rem;
+    border-radius: 30px;
+}
+
+/* Dark/Utility */
+.btn-dark {
+    background: #222;
+    color: #eee !important;
+    border: 1px solid #444;
+}
+.btn-dark:hover {
+    background: #333;
+    border-color: #666;
+}
+
+/* Nav Pills */
+.nav-pill-cc {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #ccc !important;
+    padding: 8px 20px;
+    border-radius: 40px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    backdrop-filter: blur(10px);
+}
+.nav-pill-cc:hover {
+    background: rgba(255,255,255,0.15);
+    color: white !important;
+    border-color: var(--primary-blue);
+}
+.nav-pill-cc.active {
+    background: var(--primary-gradient);
+    color: white !important;
+    border-color: transparent;
+}

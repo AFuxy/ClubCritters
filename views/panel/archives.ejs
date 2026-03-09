@@ -1,0 +1,126 @@
+<%- include('header') %>
+
+<div class="staff-hub" style="margin-top: 0; grid-column: span 2;">
+    <div class="staff-section" style="display:flex; justify-content: space-between; align-items: center; background: rgba(179, 106, 244, 0.1); border: 1px solid rgba(179, 106, 244, 0.2);">
+        <div style="flex: 1;">
+            <h2 style="margin:0; font-size: 1.1rem;">Personal Impact</h2>
+            <p style="margin:5px 0 0 0; font-size: 0.8rem; color: #888;">Engagement metrics for your profile and links.</p>
+            <div id="platform-breakdown" style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;"></div>
+        </div>
+        <div style="text-align: right; display: flex; gap: 30px;">
+            <div>
+                <span id="profile-views" style="font-size: 2rem; font-weight: bold; color: var(--primary-blue);">0</span>
+                <span style="display:block; font-size: 0.7rem; text-transform: uppercase; color: #666;">Profile Views</span>
+            </div>
+            <div>
+                <span id="social-clicks" style="font-size: 2rem; font-weight: bold; color: var(--primary-purple);">0</span>
+                <span style="display:block; font-size: 0.7rem; text-transform: uppercase; color: #666;">Social Clicks</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="staff-section">
+        <h2>My Set Archives</h2>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Upload your DJ sets here. These will appear in the public archive page.</p>
+        
+        <div class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
+            <div class="form-group">
+                <label>Set Title</label>
+                <input type="text" id="archive-title" placeholder="Club Critters - March Event">
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="archive-date">
+            </div>
+            <div class="form-group">
+                <label>Genre</label>
+                <input type="text" id="archive-genre" placeholder="House / Techno">
+            </div>
+            <div class="form-group">
+                <label>Listen Link (SoundCloud, Mixcloud, etc.)</label>
+                <input type="text" id="archive-link" placeholder="https://soundcloud.com/...">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+                <button class="btn-cc btn-primary" style="margin: 0; width: 100%;" onclick="uploadArchive()">Upload Set</button>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 30px; font-size: 1rem; color: var(--primary-blue);">Your Uploaded Sets</h3>
+        <ul id="user-archive-list" class="schedule-list">
+            <!-- Archives will appear here -->
+        </ul>
+    </div>
+</div>
+
+<script>
+    const archiveList = document.getElementById('user-archive-list');
+
+    async function loadArchives() {
+        const [archiveRes, statsRes] = await Promise.all([
+            fetch('/api/archives/my'),
+            fetch('/api/stats/my')
+        ]);
+        
+        const archives = await archiveRes.json();
+        const stats = await statsRes.json();
+
+        // Update Stats Counters
+        document.getElementById('social-clicks').innerText = stats.linkClicks || 0;
+        document.getElementById('profile-views').innerText = stats.profileViews || 0;
+        
+        const breakdownEl = document.getElementById('platform-breakdown');
+        if (stats.platformBreakdown && stats.platformBreakdown.length > 0) {
+            breakdownEl.innerHTML = stats.platformBreakdown.map(p => `
+                <div style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 5px; font-size: 0.75rem;">
+                    <strong>${p.label}:</strong> ${p.count}
+                </div>
+            `).join('');
+        } else {
+            breakdownEl.innerHTML = '<span style="font-size:0.7rem; color:#666;">No clicks yet.</span>';
+        }
+
+        archiveList.innerHTML = archives.map(item => `
+            <li class="schedule-item" style="border-left: 4px solid var(--primary-blue);">
+                <span><strong>${item.date}</strong> - ${item.title} (${item.genre})</span>
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <span style="font-size:0.75rem; color:#888;">📊 ${stats.archiveClicks[item.id] || 0} clicks</span>
+                    <a href="${item.linkUrl}" target="_blank" class="btn-cc btn-small btn-secondary">View Link</a>
+                </div>
+            </li>
+        `).join('');
+    }
+
+    async function uploadArchive() {
+        const title = document.getElementById('archive-title').value;
+        const date = document.getElementById('archive-date').value;
+        const genre = document.getElementById('archive-genre').value;
+        const linkUrl = document.getElementById('archive-link').value;
+
+        if (!title || !date || !linkUrl) return showNotify('Fill in all required fields!', 'error');
+
+        try {
+            const response = await fetch('/api/archives/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, date, genre, linkUrl })
+            });
+
+            if (response.ok) {
+                showNotify('Set archived successfully!');
+                document.getElementById('archive-title').value = '';
+                document.getElementById('archive-date').value = '';
+                document.getElementById('archive-genre').value = '';
+                document.getElementById('archive-link').value = '';
+                loadArchives();
+            } else {
+                showNotify('Failed to upload archive.', 'error');
+            }
+        } catch (e) {
+            showNotify('Network error occurred.', 'error');
+        }
+    }
+
+    loadArchives();
+</script>
+
+<%- include('footer') %>

@@ -1,0 +1,146 @@
+<%- include('header') %>
+
+<div class="staff-hub">
+    <div class="staff-section">
+        <h2>Application Manager</h2>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage what roles are open for applications on the public site.</p>
+
+        <div id="add-app-form" class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; margin-bottom: 30px;">
+            <div class="form-group">
+                <label>Role Name</label>
+                <input type="text" id="app-role-name" placeholder="DJ, Staff, etc.">
+            </div>
+            <div class="form-group">
+                <label>Display Deadline</label>
+                <input type="text" id="app-deadline" placeholder="March 15th">
+            </div>
+            <div class="form-group">
+                <label>Auto-Close Date (UTC)</label>
+                <input type="datetime-local" id="app-auto-close">
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="app-status">
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Description</label>
+                <textarea id="app-description" placeholder="Requirements..."></textarea>
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Form URL</label>
+                <input type="text" id="app-form-url" placeholder="https://forms.gle/...">
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px;">
+                <button id="add-app-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addAppSlot()">Create Slot</button>
+                <button id="cancel-app-edit-btn" class="btn-cc btn-dark btn-small" style="margin: 0; display: none;" onclick="cancelAppEdit()">Cancel</button>
+            </div>
+        </div>
+
+        <div id="apps-list" style="display: flex; flex-direction: column; gap: 15px;">
+            <p style="text-align: center; color: #666;">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const appsList = document.getElementById('apps-list');
+    const roleNameInput = document.getElementById('app-role-name');
+    const deadlineInput = document.getElementById('app-deadline');
+    const autoCloseInput = document.getElementById('app-auto-close');
+    const descriptionInput = document.getElementById('app-description');
+    const formUrlInput = document.getElementById('app-form-url');
+    const statusSelect = document.getElementById('app-status');
+    const addAppBtn = document.getElementById('add-app-btn');
+    const cancelAppEditBtn = document.getElementById('cancel-app-edit-btn');
+
+    let editAppId = null;
+
+    async function loadApps() {
+        try {
+            const res = await fetch('/api/apps/all');
+            const slots = await res.json();
+            if (slots.length === 0) {
+                appsList.innerHTML = '<p style="text-align: center; color: #666;">No slots yet.</p>';
+                return;
+            }
+            appsList.innerHTML = slots.map(s => {
+                const isAutoClosed = s.autoCloseAt && new Date(s.autoCloseAt) < new Date();
+                const displayStatus = isAutoClosed ? 'CLOSED (AUTO)' : s.status.toUpperCase();
+                return `
+                <div class="schedule-item" style="border-left: 4px solid ${isAutoClosed || s.status === 'closed' ? '#ff5252' : '#00e676'}; background: #151e29; padding: 15px; border-radius: 12px;">
+                    <div style="flex: 1;">
+                        <strong style="font-size: 1.1rem; color: ${isAutoClosed || s.status === 'closed' ? '#ff5252' : '#00e676'};">${s.roleName} - ${displayStatus}</strong>
+                        <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 5px;">${s.deadline ? 'Display: ' + s.deadline : ''}${s.autoCloseAt ? ' | Auto-Close: ' + new Date(s.autoCloseAt).toLocaleString() : ''}</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-cc btn-small btn-dark" onclick="startAppEdit(${s.id}, '${s.roleName}', '${s.deadline || ''}', \`${s.description || ''}\`, '${s.formUrl || ''}', '${s.status}', '${s.autoCloseAt || ''}')">Edit</button>
+                        <button class="btn-cc btn-small btn-danger" onclick="deleteAppSlot(${s.id})">Delete</button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        } catch (e) { appsList.innerHTML = 'Error loading.'; }
+    }
+
+    async function addAppSlot() {
+        if (editAppId) return finishAppEdit();
+        const roleName = roleNameInput.value.trim();
+        if (!roleName) return showNotify('Name required', 'error');
+        try {
+            const res = await fetch('/api/apps/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roleName, deadline: deadlineInput.value.trim(), autoCloseAt: autoCloseInput.value || null, description: descriptionInput.value.trim(), formUrl: formUrlInput.value.trim(), status: statusSelect.value })
+            });
+            if (res.ok) { showNotify('Created!'); clearForm(); loadApps(); }
+        } catch (e) { showNotify('Error', 'error'); }
+    }
+
+    function startAppEdit(id, name, deadline, desc, url, status, autoClose) {
+        editAppId = id;
+        roleNameInput.value = name;
+        deadlineInput.value = deadline;
+        descriptionInput.value = desc;
+        formUrlInput.value = url;
+        statusSelect.value = status;
+        if (autoClose) autoCloseInput.value = autoClose.slice(0, 16);
+        else autoCloseInput.value = '';
+        addAppBtn.innerText = "Save Changes";
+        cancelAppEditBtn.style.display = "inline-block";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function finishAppEdit() {
+        try {
+            const res = await fetch(`/api/apps/${editAppId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roleName: roleNameInput.value.trim(), deadline: deadlineInput.value.trim(), autoCloseAt: autoCloseInput.value || null, description: descriptionInput.value.trim(), formUrl: formUrlInput.value.trim(), status: statusSelect.value })
+            });
+            if (res.ok) { showNotify('Updated!'); cancelAppEdit(); loadApps(); }
+        } catch (e) { showNotify('Error', 'error'); }
+    }
+
+    function clearForm() {
+        roleNameInput.value = ''; deadlineInput.value = ''; autoCloseInput.value = ''; descriptionInput.value = ''; formUrlInput.value = '';
+    }
+
+    function cancelAppEdit() {
+        editAppId = null; clearForm(); addAppBtn.innerText = "Create Slot"; cancelAppEditBtn.style.display = "none";
+    }
+
+    async function deleteAppSlot(id) {
+        if (!confirm('Delete?')) return;
+        try {
+            const res = await fetch(`/api/apps/${id}`, { method: 'DELETE' });
+            if (res.ok) { showNotify('Deleted.'); loadApps(); }
+        } catch (e) { showNotify('Error', 'error'); }
+    }
+
+    loadApps();
+</script>
+
+<%- include('footer') %>

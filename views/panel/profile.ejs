@@ -1,0 +1,300 @@
+<%- include('header') %>
+
+<!-- Cropper.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+<!-- LEFT: Editor -->
+<div class="editor-section">
+    <h1>Edit Your Profile</h1>
+    
+    <div style="background: rgba(41, 197, 246, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 25px; border: 1px solid rgba(41, 197, 246, 0.2);">
+        <label style="color: var(--primary-blue); font-size: 0.7rem; text-transform: uppercase;">Linked Discord Data</label>
+        <p style="margin: 5px 0; font-weight: bold; font-size: 1.1rem;"><%= user.discordData ? user.discordData.nickname : user.name %></p>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px;">
+            <% if (user.discordData && user.discordData.roles) { %>
+                <% user.discordData.roles.filter(r => r.name !== '@everyone').forEach(role => { %>
+                    <span style="font-size: 0.65rem; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px; color: <%= role.color %>; border: 1px solid <%= role.color %>44;"><%= role.name %></span>
+                <% }) %>
+            <% } %>
+        </div>
+
+        <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+            <input type="checkbox" id="use-discord-name" style="width: auto;" <%= user.useDiscordName ? 'checked' : '' %>>
+            <label style="margin: 0; font-size: 0.8rem; color: #ccc;">Use Discord name on site</label>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label>Display Name (On-Site)</label>
+        <input type="text" id="site-name" value="<%= user.name %>" disabled>
+        <p style="font-size: 0.7rem; color: #666; margin-top: 5px;">This is your registered name. Staff can update this via the Roster page.</p>
+    </div>
+
+    <!-- PFP UPLOAD SECTION -->
+    <div class="form-group">
+        <label>Profile Picture</label>
+        <div style="display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
+            <input type="file" id="pfp-input" accept="image/png, image/jpeg, image/gif, image/webp" 
+                   style="padding: 10px; border: 1px dashed #444; border-radius: 8px; background: transparent; cursor: pointer;"
+                   onchange="handleFileSelect()">
+            <p id="upload-status-text" style="font-size: 0.75rem; color: var(--primary-blue); margin: 0; display: none;">Preparing image...</p>
+        </div>
+        
+        <!-- PROGRESS BAR -->
+        <div id="upload-progress-container" style="display:none; width: 100%; height: 10px; background: #222; border-radius: 5px; margin-top: 10px; overflow: hidden;">
+            <div id="upload-progress-bar" style="width: 0%; height: 100%; background: var(--primary-gradient); transition: width 0.2s;"></div>
+        </div>
+
+        <p style="font-size: 0.7rem; color: #666; margin-top: 5px;">Supports PNG, JPG, GIF, WebP. Max 10MB. Transparency & Animation preserved.</p>
+    </div>
+
+    <div class="form-group">
+        <label>Bio</label>
+        <textarea id="bio-input" placeholder="Tell the critters about yourself..."><%= user.bio %></textarea>
+    </div>
+
+    <div class="form-group">
+        <label>Color Style (Hex or [#Hex, #Hex])</label>
+        <input type="text" id="color-input" placeholder="#29C5F6 or [#29C5F6, #B36AF4]" value="<%= user.colorStyle %>">
+        <p style="font-size: 0.75rem; color: #666; margin-top: 5px;">Use [#Color1, #Color2] for a gradient sidebar.</p>
+    </div>
+
+    <!-- SOCIAL LINKS SECTION -->
+    <div class="form-group">
+        <label>Social Links</label>
+        <div id="links-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+            <% const links = user.links || {}; %>
+            <% Object.keys(links).forEach(key => { %>
+                <div class="link-row" style="display: flex; gap: 10px;">
+                    <input type="text" class="link-key" value="<%= key %>" placeholder="Label (e.g. Mixcloud)" style="flex: 0.4;">
+                    <input type="text" class="link-val" value="<%= links[key] %>" placeholder="URL (https://...)" style="flex: 1;">
+                    <button class="btn-cc btn-small btn-danger" onclick="this.parentElement.remove(); updatePreview();">Remove</button>
+                </div>
+            <% }); %>
+        </div>
+        <button class="btn-cc btn-small btn-dark" style="width: auto;" onclick="addLinkRow()">+ Add Link</button>
+    </div>
+
+    <button class="btn-cc btn-primary" style="width: 100%;" onclick="saveProfile()">Save Changes</button>
+    <p id="status-msg" style="margin-top: 15px; font-size: 0.9rem;"></p>
+</div>
+
+<!-- RIGHT: Live Preview -->
+<div class="preview-section">
+    <label style="display: block; margin-bottom: 10px; text-align: left;">LIVE PREVIEW</label>
+    
+    <div id="preview-card" class="dj-card">
+        <img src="<%= user.imageUrl %>" class="dj-img">
+        <div class="dj-content">
+            <h3 id="preview-name"><%= user.name %></h3>
+            <span class="title"><%= user.title %></span>
+        </div>
+    </div>
+
+    <div class="bio-preview">
+        <label style="font-size: 0.7rem; color: var(--primary-blue); text-transform: uppercase;">Your Bio</label>
+        <p id="preview-bio" style="margin: 5px 0 0 0;"><%= user.bio || 'No bio set yet...' %></p>
+    </div>
+</div>
+
+<!-- CROPPING MODAL -->
+<div id="crop-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10001; justify-content:center; align-items:center; flex-direction: column;">
+    <div style="max-width: 500px; width: 90%; background: #151e29; padding: 20px; border-radius: 20px; text-align: center;">
+        <h2 style="margin-top: 0; color: var(--primary-blue);">Crop Your Profile Picture</h2>
+        <div style="max-height: 400px; margin-bottom: 20px; overflow: hidden;">
+            <img id="crop-image" style="max-width: 100%;">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-save" style="flex: 1;" onclick="performCrop()">Crop & Upload</button>
+            <button class="btn-danger" style="flex: 0.5; background: #444;" onclick="closeCropModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const bioInput = document.getElementById('bio-input');
+    const colorInput = document.getElementById('color-input');
+    const useDiscordName = document.getElementById('use-discord-name');
+    const previewCard = document.getElementById('preview-card');
+    const previewName = document.getElementById('preview-name');
+    const previewBio = document.getElementById('preview-bio');
+    const statusMsg = document.getElementById('status-msg');
+
+    const siteName = "<%= user.name %>";
+    const discordName = "<%= user.discordData ? user.discordData.nickname : user.name %>";
+
+    let cropper = null;
+    let selectedFile = null;
+
+    function updatePreview() {
+        previewName.innerText = useDiscordName.checked ? discordName : siteName;
+        previewBio.innerText = bioInput.value || 'No bio set yet...';
+
+        let val = colorInput.value.trim();
+        let finalColor = val || '#29C5F6';
+
+        if (val.startsWith('[') && val.endsWith(']')) {
+            const colors = val.slice(1, -1).split(',').map(c => c.trim());
+            finalColor = `linear-gradient(135deg, ${colors.join(', ')})`;
+        }
+
+        previewCard.style.setProperty('--accent-color', finalColor);
+        if (val.includes('[')) {
+            previewName.style.color = 'transparent';
+            previewName.style.background = finalColor;
+            previewName.style.webkitBackgroundClip = 'text';
+            previewName.style.backgroundClip = 'text';
+        } else {
+            previewName.style.color = finalColor;
+            previewName.style.background = 'none';
+            previewName.style.webkitBackgroundClip = 'initial';
+            previewName.style.backgroundClip = 'initial';
+        }
+    }
+
+    bioInput.addEventListener('input', updatePreview);
+    colorInput.addEventListener('input', updatePreview);
+    useDiscordName.addEventListener('change', updatePreview);
+
+    function addLinkRow() {
+        const container = document.getElementById('links-container');
+        const div = document.createElement('div');
+        div.className = 'link-row';
+        div.style.display = 'flex';
+        div.style.gap = '10px';
+        div.innerHTML = `
+            <input type="text" class="link-key" placeholder="Label (e.g. Mixcloud)" style="flex: 0.4;">
+            <input type="text" class="link-val" placeholder="URL (https://...)" style="flex: 1;">
+            <button class="btn-danger btn-small" onclick="this.parentElement.remove();">Remove</button>
+        `;
+        container.appendChild(div);
+    }
+
+    // --- PFP & CROPPING LOGIC ---
+
+    function handleFileSelect() {
+        const fileInput = document.getElementById('pfp-input');
+        selectedFile = fileInput.files[0];
+        if (!selectedFile) return showNotify('Please select an image first!', 'error');
+
+        // If it's a GIF or WebP animation, skip cropping to preserve animation
+        if (selectedFile.type === 'image/gif' || selectedFile.type === 'image/webp') {
+            uploadFile(selectedFile);
+            return;
+        }
+
+        // Show Crop Modal for static images
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const cropImg = document.getElementById('crop-image');
+            cropImg.src = e.target.result;
+            document.getElementById('crop-modal').style.display = 'flex';
+            
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(cropImg, {
+                aspectRatio: 1,
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 1,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+            });
+        };
+        reader.readAsDataURL(selectedFile);
+    }
+
+    function closeCropModal() {
+        document.getElementById('crop-modal').style.display = 'none';
+        if (cropper) cropper.destroy();
+    }
+
+    function performCrop() {
+        if (!cropper) return;
+        cropper.getCroppedCanvas({
+            width: 512,
+            height: 512
+        }).toBlob((blob) => {
+            uploadFile(blob);
+            closeCropModal();
+        }, 'image/png');
+    }
+
+    function uploadFile(fileOrBlob) {
+        const progressContainer = document.getElementById('upload-progress-container');
+        const progressBar = document.getElementById('upload-progress-bar');
+        
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+
+        const formData = new FormData();
+        const fileToUpload = fileOrBlob instanceof Blob && !(fileOrBlob instanceof File) 
+            ? new File([fileOrBlob], "avatar.png", { type: "image/png" }) 
+            : fileOrBlob;
+            
+        formData.append('avatar', fileToUpload);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/profile/upload-avatar', true);
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                progressBar.style.width = percent + '%';
+            }
+        };
+
+        xhr.onload = () => {
+            progressContainer.style.display = 'none';
+            if (xhr.status === 200) {
+                const data = JSON.parse(xhr.responseText);
+                showNotify('Profile picture updated!');
+                document.querySelector('.dj-img').src = data.imageUrl;
+                document.getElementById('pfp-input').value = '';
+            } else {
+                showNotify('Upload failed', 'error');
+            }
+        };
+
+        xhr.onerror = () => {
+            progressContainer.style.display = 'none';
+            showNotify('Network error occurred', 'error');
+        };
+
+        xhr.send(formData);
+    }
+
+    async function saveProfile() {
+        const links = {};
+        document.querySelectorAll('.link-row').forEach(row => {
+            const key = row.querySelector('.link-key').value.trim();
+            const val = row.querySelector('.link-val').value.trim();
+            if (key && val) links[key] = val;
+        });
+
+        try {
+            const response = await fetch('/api/profile/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    bio: bioInput.value, 
+                    colorStyle: colorInput.value,
+                    useDiscordName: useDiscordName.checked,
+                    links: links
+                })
+            });
+            const result = await response.json();
+            if (result.success) showNotify("Profile updated successfully!"); 
+            else showNotify("Failed to update profile.", "error");
+        } catch (err) { showNotify("Network error occurred.", "error"); }
+    }
+    updatePreview();
+</script>
+
+<%- include('footer') %>

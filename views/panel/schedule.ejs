@@ -1,0 +1,260 @@
+<%- include('header') %>
+
+<style>
+    /* CUSTOM AUTOCOMPLETE DROPDOWN */
+    .autocomplete-container { position: relative; width: 100%; }
+    .autocomplete-results {
+        position: absolute;
+        top: 100%;
+        left: 0; right: 0;
+        background: #151e29;
+        border: 1px solid #333;
+        border-radius: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .result-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #222;
+        transition: background 0.2s;
+        text-align: left;
+    }
+    .result-item:hover { background: #1c2835; color: var(--primary-blue); }
+    .result-item span { font-size: 0.75rem; color: #666; margin-left: 10px; }
+</style>
+
+<div class="staff-hub">
+    <div class="staff-section">
+        <h2 id="manager-title">Live Lineup Manager</h2>
+        
+        <% const userType = user.type.toLowerCase(); %>
+        <% const canManage = userType.includes('host') || userType.includes('owner'); %>
+
+        <% if (canManage) { %>
+            <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Start typing a name to see suggestions. Both DJs and Staff can be added.</p>
+            
+            <div id="add-form" class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
+                <div class="form-group">
+                    <label>Search Performer Name</label>
+                    <div class="autocomplete-container">
+                        <input type="text" id="dj-search" placeholder="Type name..." autocomplete="off">
+                        <div id="search-results" class="autocomplete-results"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Time Slot (UTC)</label>
+                    <input type="text" id="time-slot" placeholder="20:00 - 21:00">
+                </div>
+                <div class="form-group">
+                    <label>Genre</label>
+                    <input type="text" id="genre-input" placeholder="House / Trance">
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px;">
+                    <button id="add-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addToSchedule()">Add to Lineup</button>
+                    <button id="cancel-edit-btn" class="btn-cc btn-danger btn-small" style="margin: 0; display: none;" onclick="cancelEdit()">Cancel</button>
+                </div>
+            </div>
+        <% } else { %>
+            <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">View-only access. Only Hosts and Owners can manage the lineup.</p>
+        <% } %>
+
+        <ul id="schedule-list" class="schedule-list">
+            <li style="color: #666; text-align: center; padding: 20px;">Loading schedule...</li>
+        </ul>
+
+        <% if (canManage) { %>
+            <button class="btn-cc btn-danger" style="width: 100%; margin-top: 20px;" onclick="clearSchedule()">⚠️ Wipe Entire Lineup</button>
+        <% } %>
+    </div>
+</div>
+
+<script>
+    const djSearch = document.getElementById('dj-search');
+    const searchResults = document.getElementById('search-results');
+    const scheduleList = document.getElementById('schedule-list');
+    const timeInput = document.getElementById('time-slot');
+    const genreInput = document.getElementById('genre-input');
+    const addBtn = document.getElementById('add-btn');
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
+    const managerTitle = document.getElementById('manager-title');
+
+    const canManage = <%= canManage %>;
+
+    let allMembers = [];
+    let selectedMemberId = null;
+    let editModeId = null;
+
+    function parseColor(val) {
+        if (!val) return '#29C5F6';
+        if (val.startsWith('[') && val.endsWith(']')) {
+            const colors = val.slice(1, -1).split(',').map(c => c.trim());
+            return `linear-gradient(135deg, ${colors.join(', ')})`;
+        }
+        return val;
+    }
+
+    async function loadSchedulePage() {
+        try {
+            const res = await fetch('/api/roster/search');
+            allMembers = await res.json();
+            renderSchedule();
+        } catch (e) {
+            showNotify('Failed to load roster', 'error');
+        }
+    }
+
+    if (djSearch) {
+        djSearch.addEventListener('input', () => {
+            const query = djSearch.value.trim().toLowerCase();
+            if (!query) {
+                searchResults.style.display = 'none';
+                return;
+            }
+            const filtered = allMembers.filter(m => m.name.toLowerCase().includes(query));
+            if (filtered.length > 0) {
+                searchResults.innerHTML = filtered.map(m => `
+                    <div class="result-item" onclick="selectMember('${m.discordId}', '${m.name}')">
+                        ${m.name} <span>(${m.type})</span>
+                    </div>
+                `).join('');
+                searchResults.style.display = 'block';
+            } else {
+                searchResults.style.display = 'none';
+            }
+        });
+    }
+
+    function selectMember(id, name) {
+        selectedMemberId = id;
+        djSearch.value = name;
+        searchResults.style.display = 'none';
+    }
+
+    document.addEventListener('click', (e) => {
+        if (searchResults && !e.target.closest('.autocomplete-container')) {
+            searchResults.style.display = 'none';
+        }
+    });
+
+    async function renderSchedule() {
+        try {
+            const res = await fetch('/api/schedule');
+            const schedule = await res.json();
+            
+            if (schedule.length === 0) {
+                scheduleList.innerHTML = '<li style="color: #666; text-align: center; padding: 20px;">No DJs scheduled yet.</li>';
+                return;
+            }
+
+            scheduleList.innerHTML = schedule.map(item => {
+                const accent = parseColor(item.Roster.colorStyle);
+                const isGradient = accent.includes('gradient');
+                
+                let controls = '';
+                if (canManage) {
+                    controls = `
+                    <div style="display: flex; gap: 10px; align-items: center; padding-right: 10px;">
+                        <button class="btn-cc btn-small btn-dark" onclick="startEdit(${item.id}, '${item.timeSlot}', '${item.genre}')">Edit</button>
+                        <button class="btn-cc btn-small btn-danger" onclick="deleteSlot(${item.id})">Remove</button>
+                    </div>`;
+                }
+
+                return `
+                <li class="schedule-item" style="--sidebar-color: ${accent};">
+                    <div style="flex: 1; min-width: 200px; padding-left: 15px;">
+                        <span style="display: block; font-weight: bold; color: var(--primary-blue); font-size: 0.85rem;">${item.timeSlot}</span>
+                        <span style="font-size: 1.2rem; font-weight: 900; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent}; display: inline-block;">${item.Roster.name}</span>
+                        <span style="color: #888; font-size: 0.85rem; display: block;">${item.genre}</span>
+                    </div>
+                    ${controls}
+                </li>
+                `;
+            }).join('');
+        } catch (e) {
+            scheduleList.innerHTML = '<li style="color: #ff4444; text-align: center; padding: 20px;">Error loading schedule.</li>';
+        }
+    }
+
+    async function addToSchedule() {
+        if (!canManage) return;
+        if (editModeId) return finishEdit();
+        if (!selectedMemberId) {
+            const match = allMembers.find(m => m.name.toLowerCase() === djSearch.value.trim().toLowerCase());
+            if (match) selectedMemberId = match.discordId;
+        }
+        if (!selectedMemberId) return showNotify('Please select a valid user from the suggestions!', 'error');
+        if (!timeInput.value.trim()) return showNotify('Please enter a Time Slot!', 'error');
+        try {
+            const res = await fetch('/api/schedule/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ performerId: selectedMemberId, timeSlot: timeInput.value.trim(), genre: genreInput.value.trim() })
+            });
+            if (res.ok) {
+                showNotify(`Added to the lineup!`);
+                djSearch.value = ''; timeInput.value = ''; genreInput.value = ''; selectedMemberId = null;
+                renderSchedule();
+            } else { showNotify('Failed to add DJ to database.', 'error'); }
+        } catch (e) { showNotify('Network error occurred.', 'error'); }
+    }
+
+    async function deleteSlot(id) {
+        if (!canManage) return;
+        if (!confirm('Are you sure you want to remove this slot?')) return;
+        try {
+            const res = await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
+            if (res.ok) { showNotify('Slot removed!'); renderSchedule(); }
+        } catch (e) { showNotify('Error deleting slot', 'error'); }
+    }
+
+    function startEdit(id, time, genre) {
+        if (!canManage) return;
+        editModeId = id;
+        timeInput.value = time;
+        genreInput.value = genre;
+        managerTitle.innerText = "Editing Slot";
+        addBtn.innerText = "Save Changes";
+        cancelEditBtn.style.display = "inline-block";
+        djSearch.disabled = true;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function finishEdit() {
+        if (!canManage) return;
+        if (!timeInput.value.trim()) return showNotify('Time slot cannot be empty!', 'error');
+        try {
+            const res = await fetch(`/api/schedule/${editModeId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timeSlot: timeInput.value.trim(), genre: genreInput.value.trim() })
+            });
+            if (res.ok) { showNotify('Slot updated successfully!'); cancelEdit(); renderSchedule(); }
+        } catch (e) { showNotify('Error updating slot', 'error'); }
+    }
+
+    function cancelEdit() {
+        editModeId = null;
+        timeInput.value = ''; genreInput.value = ''; djSearch.value = ''; djSearch.disabled = false; selectedMemberId = null;
+        managerTitle.innerText = "Live Lineup Manager";
+        addBtn.innerText = "Add to Lineup";
+        cancelEditBtn.style.display = "none";
+    }
+
+    async function clearSchedule() {
+        if (!canManage) return;
+        if (!confirm('⚠️ Are you SURE? This will wipe the ENTIRE lineup for tonight.')) return;
+        try {
+            await fetch('/api/schedule/clear', { method: 'POST' });
+            showNotify('Lineup cleared.');
+            renderSchedule();
+        } catch (e) { showNotify('Error clearing lineup', 'error'); }
+    }
+
+    loadSchedulePage();
+</script>
+
+<%- include('footer') %>

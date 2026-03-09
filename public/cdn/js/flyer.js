@@ -1,89 +1,54 @@
-const SPREADSHEET_ID = "1MXvHh09Bw1yLQk6_YidOJmYrbJydZvdfQCR0kgK_NE4";
-const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
-
-const SCHEDULE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Schedule!A:Z?key=${API_KEY}`;
-const ROSTER_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Roster!A:Z?key=${API_KEY}`;
+const API_SCHEDULE = "/api/public/schedule";
+const API_ROSTER = "/api/public/roster";
+const API_SETTINGS = "/api/public/settings";
+const API_TRACK = "/api/stats/track";
 
 const flyerLines = document.getElementById('flyer-lines');
 const flyerDate = document.getElementById('flyer-date');
 const tzSelect = document.getElementById('timezone-select');
 
 async function initFlyer() {
+    // Track Page View
+    fetch(API_TRACK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'page_view', targetId: 'flyer' })
+    }).catch(() => {});
+
     try {
-        const [scheduleResp, rosterResp] = await Promise.all([
-            fetch(SCHEDULE_URL),
-            fetch(ROSTER_URL)
+        const [schRes, rosRes, setRes] = await Promise.all([
+            fetch(API_SCHEDULE),
+            fetch(API_ROSTER),
+            fetch(API_SETTINGS)
         ]);
 
-        const scheduleJson = await scheduleResp.json();
-        const rosterJson = await rosterResp.json();
+        const schedule = await schRes.json();
+        const roster = await rosRes.json();
+        const settings = await setRes.json();
 
-        const scheduleRows = scheduleJson.values;
-        const rosterRows = rosterJson.values;
-
-        if (!scheduleRows || scheduleRows.length < 2) return;
-
-        let nameIdx = 0; 
-        let imgIdx = 1;  
-        
-        if (rosterRows && rosterRows.length > 0) {
-            const headers = rosterRows[0];
-            const n = headers.findIndex(h => h.toLowerCase() === "name");
-            const i = headers.findIndex(h => h.toLowerCase() === "image");
-            if (n !== -1) nameIdx = n;
-            if (i !== -1) imgIdx = i;
-        }
-
-        const logoMap = {};
-        if (rosterRows) {
-            rosterRows.forEach(row => {
-                const rName = row[nameIdx]; 
-                const rLogo = row[imgIdx]; 
-                if (rName && rLogo) {
-                    logoMap[rName.toLowerCase().trim()] = rLogo;
-                }
-            });
-        }
+        if (!schedule || schedule.length === 0) return;
 
         const offset = parseInt(tzSelect.value); 
         const tzLabel = tzSelect.options[tzSelect.selectedIndex].text.split(' ')[0];
 
-        const dateRaw = scheduleRows[1][0];
-        if (dateRaw) {
-            const d = new Date(dateRaw);
-            
+        if (settings && settings.eventStartTime) {
+            const d = new Date(settings.eventStartTime);
             const shiftedDate = new Date(d.getTime() + (offset * 60 * 60 * 1000));
-
             const dateStr = shiftedDate.toLocaleDateString('en-GB', { 
-                weekday: 'long', 
-                day: 'numeric', 
-                month: 'long',
-                timeZone: 'UTC'
+                weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC'
             });
-            
             flyerDate.innerText = dateStr.toUpperCase();
         }
 
         flyerLines.innerHTML = '';
         
-        for (let i = 2; i < scheduleRows.length; i++) {
-            const cols = scheduleRows[i];
-            if (!cols || !cols[4]) continue;
-
-            const name = cols[4];    
-            const timeRaw = cols[5] || "";
+        schedule.forEach((item, i) => {
+            const name = item.performer.name;
+            const timeRaw = item.timeSlot || "";
             let baseTime = timeRaw.split('-')[0].trim(); 
-            
             const displayTime = applyTimezone(baseTime, offset);
-            
-            const genre = cols[6] || ""; 
-            
-            let imgUrl = "cdn/logos/club/HeadOnly.png";
-            if (logoMap[name.toLowerCase().trim()]) {
-                imgUrl = logoMap[name.toLowerCase().trim()];
-            } else if (cols[7]) {
-                imgUrl = cols[7]; 
-            }
+            const genre = item.genre || ""; 
+            const imgUrl = item.performer.image || "cdn/logos/club/HeadOnly.png";
 
             const alignClass = (i % 2 === 0) ? 'logo-is-right' : 'logo-is-left';
 
@@ -100,7 +65,7 @@ async function initFlyer() {
                 </div>
             `;
             flyerLines.innerHTML += html;
-        }
+        });
 
     } catch (e) {
         console.error("Flyer Error:", e);

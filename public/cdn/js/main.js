@@ -1,29 +1,23 @@
 /**
- * CLUB CRITTERS - MAIN APP LOGIC (V2.0 - GOOGLE API)
- * Direct API fetch for instant updates.
+ * CLUB CRITTERS - MAIN APP LOGIC (V3.0 - MYSQL API)
+ * Fetching from local Node.js backend instead of Google Sheets.
  */
 
 // ==========================================
 //          CONFIGURATION
 // ==========================================
 
-// 🔴 REPLACE THESE WITH YOUR REAL DETAILS
-const SPREADSHEET_ID = "1MXvHh09Bw1yLQk6_YidOJmYrbJydZvdfQCR0kgK_NE4";
-const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
-
-// API Endpoints
-const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values`;
-// Note: We fetch the ranges directly. 'Schedule' is the tab name, 'Roster' is the tab name.
-const SCHEDULE_URL = `${BASE_URL}/Schedule!A:Z?key=${API_KEY}`;
-const ROSTER_URL = `${BASE_URL}/Roster!A:Z?key=${API_KEY}`;
-const ARCHIVE_URL = `${BASE_URL}/Archive!A:Z?key=${API_KEY}`;
+const API_SETTINGS = "/api/public/settings";
+const API_SCHEDULE = "/api/public/schedule";
+const API_ARCHIVES = "/api/public/archives";
+const API_TRACK = "/api/stats/track";
 
 const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://critters.club";
 
 // Cache Keys
-const CACHE_KEY_ROSTER = 'cc_roster_v2';
-const CACHE_KEY_SCHEDULE = 'cc_schedule_v2';
-const CACHE_KEY_ARCHIVE = 'cc_archive_v2';
+const CACHE_KEY_SCHEDULE = 'cc_schedule_v3';
+const CACHE_KEY_SETTINGS = 'cc_settings_v3';
+const CACHE_KEY_ARCHIVE = 'cc_archive_v3';
 const CACHE_KEY_TIMESTAMP = 'cc_last_update_ts';
 
 // ==========================================
@@ -53,8 +47,7 @@ let eventEndTime = null;
 let forceOffline = false;
 let vrcInstanceUrl = ""; 
 let djSchedule = [];
-let rosterMap = {}; 
-let rawArchiveData = []; // Now an Array, not string
+let rawArchiveData = []; 
 let currentState = null; 
 let userTimezoneCode = ""; 
 let countdownInterval = null; 
@@ -65,7 +58,18 @@ let countdownInterval = null;
 
 async function init() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c API V2 STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB CRITTERS %c API V3 STARTUP ", logStyle.banner, logStyle.tag);
+
+    // Track Page View
+    fetch(API_TRACK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            type: 'page_view', 
+            targetId: 'home', 
+            metadata: { page: 'home' } 
+        })
+    }).catch(() => {});
 
     try {
         userTimezoneCode = Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
@@ -74,71 +78,41 @@ async function init() {
     } catch (e) { userTimezoneCode = "LOC"; }
 
     // --- PHASE 1: LOAD CACHE ---
-    const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
+    const cachedSettings = localStorage.getItem(CACHE_KEY_SETTINGS);
     const cachedSchedule = localStorage.getItem(CACHE_KEY_SCHEDULE);
     const cachedArchive = localStorage.getItem(CACHE_KEY_ARCHIVE);
     const lastUpdate = localStorage.getItem(CACHE_KEY_TIMESTAMP);
 
-    if (cachedRoster && cachedSchedule) {
-        const timeStr = lastUpdate ? new Date(parseInt(lastUpdate)).toLocaleTimeString() : "Unknown";
-        console.log(`%c[CACHE] Loaded snapshot from ${timeStr}`, logStyle.info);
-        
-        processRosterData(JSON.parse(cachedRoster));
-        processScheduleData(JSON.parse(cachedSchedule));
+    if (cachedSettings && cachedSchedule) {
+        console.log(`%c[CACHE] Loaded snapshot`, logStyle.info);
+        processSettings(JSON.parse(cachedSettings));
+        djSchedule = JSON.parse(cachedSchedule);
         if (cachedArchive) rawArchiveData = JSON.parse(cachedArchive);
         checkStatus(); 
     }
 
-    // --- PHASE 2: FRESH FETCH (Network) ---
+    // --- PHASE 2: FRESH FETCH ---
     try {
-        const startFetch = performance.now();
-        const [rosterResp, scheduleResp, archiveResp] = await Promise.all([
-            fetch(ROSTER_URL),
-            fetch(SCHEDULE_URL),
-            fetch(ARCHIVE_URL)
+        const [setResp, schResp, arcResp] = await Promise.all([
+            fetch(API_SETTINGS),
+            fetch(API_SCHEDULE),
+            fetch(API_ARCHIVES)
         ]);
 
-        if (rosterResp.ok && scheduleResp.ok && archiveResp.ok) {
-            const rosterJson = await rosterResp.json();
-            const scheduleJson = await scheduleResp.json();
-            const archiveJson = await archiveResp.json();
+        if (setResp.ok && schResp.ok && arcResp.ok) {
+            const settings = await setResp.json();
+            const schedule = await schResp.json();
+            const archives = await arcResp.json();
 
-            const rosterRows = rosterJson.values || [];
-            const scheduleRows = scheduleJson.values || [];
-            const archiveRows = archiveJson.values || [];
+            localStorage.setItem(CACHE_KEY_SETTINGS, JSON.stringify(settings));
+            localStorage.setItem(CACHE_KEY_SCHEDULE, JSON.stringify(schedule));
+            localStorage.setItem(CACHE_KEY_ARCHIVE, JSON.stringify(archives));
+            localStorage.setItem(CACHE_KEY_TIMESTAMP, Date.now());
 
-            // 🟢 SMART CHECK: Compare new data vs cached data strings
-            // We stringify to do a quick "Are these identical?" check
-            const newRosterStr = JSON.stringify(rosterRows);
-            const newScheduleStr = JSON.stringify(scheduleRows);
-            const newArchiveStr = JSON.stringify(archiveRows);
-
-            const hasChanges = (newRosterStr !== cachedRoster) || 
-                               (newScheduleStr !== cachedSchedule) || 
-                               (newArchiveStr !== cachedArchive);
-
-            const fetchTime = (performance.now() - startFetch).toFixed(0);
-
-            if (hasChanges) {
-                const now = new Date();
-                console.log(`%c[API] 🟢 New Data Found (${fetchTime}ms) @ ${now.toLocaleTimeString()}`, logStyle.success);
-                
-                // Update Storage
-                localStorage.setItem(CACHE_KEY_ROSTER, newRosterStr);
-                localStorage.setItem(CACHE_KEY_SCHEDULE, newScheduleStr);
-                localStorage.setItem(CACHE_KEY_ARCHIVE, newArchiveStr);
-                localStorage.setItem(CACHE_KEY_TIMESTAMP, now.getTime());
-
-                // Process New Data
-                processRosterData(rosterRows);
-                processScheduleData(scheduleRows);
-                rawArchiveData = archiveRows;
-                checkStatus();
-            } else {
-                console.log(`%c[API] ⚪ Data unchanged (${fetchTime}ms)`, "color: #666; font-size: 0.9em;");
-            }
-        } else {
-            console.error("API Error: One or more sheets failed to load.");
+            processSettings(settings);
+            djSchedule = schedule;
+            rawArchiveData = archives;
+            checkStatus();
         }
     } catch (error) {
         console.warn("Network update failed:", error);
@@ -147,91 +121,12 @@ async function init() {
     setInterval(checkStatus, 5000);
 }
 
-// ==========================================
-//          DATA PROCESSING (API VERSION)
-// ==========================================
-
-function processColorValue(val) {
-    if (!val) return null;
-    if (val.startsWith('[') && val.endsWith(']')) {
-        const colors = val.slice(1, -1).split(',').map(c => c.trim());
-        const processed = colors.map(c => ensureReadableColor(c));
-        return `linear-gradient(135deg, ${processed.join(', ')})`;
-    }
-    return (val.startsWith('#')) ? ensureReadableColor(val) : val;
-}
-
-function processRosterData(rows) {
-    // API returns an Array of Arrays. No splitting needed!
-    if (!rows || rows.length < 2) return;
-
-    const headers = rows[0].map(h => h.trim());
-    rosterMap = {};
-
-    for (let i = 1; i < rows.length; i++) {
-        const cols = rows[i];
-        if (!cols || !cols[0]) continue;
-        
-        const name = cols[0];
-
-        // Safe access (cols[x] might be undefined if empty)
-        const entry = {
-            name: name,
-            image: cols[3] || "cdn/logos/club/HeadOnly.png",
-            color: processColorValue(cols[4]),
-            links: {}
-        };
-
-        // 🛑 HIDDEN COLUMNS LOGIC (Start at Index 7 / Col H)
-        for (let x = 7; x < cols.length; x++) {
-            if (cols[x] && headers[x]) {
-                entry.links[headers[x]] = cols[x];
-            }
-        }
-        rosterMap[name.toLowerCase()] = entry;
-    }
-}
-
-function processScheduleData(rows) {
-    if (!rows || rows.length < 2) return;
-
-    // Row 2 (Index 1) is Settings
-    const settingsRow = rows[1];
-    if (!settingsRow) return;
-
-    eventStartTime = settingsRow[0];
-    eventEndTime = settingsRow[1];
-    
-    const offlineCell = settingsRow[2] ? settingsRow[2].toUpperCase() : "";
-    forceOffline = (offlineCell === "TRUE" || offlineCell === "YES" || offlineCell === "1");
-    
-    vrcInstanceUrl = settingsRow[3] || "";
-
-    djSchedule = [];
-
-    // Start at i = 2 (Row 3)
-    for (let i = 2; i < rows.length; i++) {
-        const cols = rows[i];
-        // Need at least 5 cols (Index 4 exists)
-        if (!cols || cols.length < 5 || !cols[4]) continue; 
-
-        const name = cols[4];    // Column E
-        const timeRaw = cols[5]; // Column F
-        const genre = cols[6];   // Column G
-
-        const rosterData = rosterMap[name.toLowerCase()];
-
-        const dj = {
-            name: name,
-            timeRaw: timeRaw,
-            genre: genre,
-            image: rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png",
-            color: rosterData ? rosterData.color : null,
-            links: rosterData ? rosterData.links : {}
-        };
-
-        djSchedule.push(dj);
-    }
+function processSettings(data) {
+    if (!data) return;
+    eventStartTime = data.eventStartTime;
+    eventEndTime = data.eventEndTime;
+    forceOffline = data.forceOffline;
+    vrcInstanceUrl = data.instanceUrl || "";
 }
 
 // ==========================================
@@ -252,6 +147,7 @@ function processDjTime(timeStr) {
     const end = new Date(eventDate);
     end.setUTCHours(endH, endM, 0, 0);
 
+    // Roll-over logic for events crossing midnight
     if (startH < eventDate.getUTCHours() - 6) { 
         start.setDate(start.getDate() + 1);
         end.setDate(end.getDate() + 1);
@@ -266,6 +162,7 @@ function processDjTime(timeStr) {
 }
 
 function ensureReadableColor(hex) {
+    if (!hex || !hex.startsWith('#')) return hex;
     hex = hex.replace(/^#/, '');
     if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
     let r = parseInt(hex.substring(0, 2), 16) / 255;
@@ -289,18 +186,26 @@ function ensureReadableColor(hex) {
     return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
+function processColorValue(val) {
+    if (!val) return null;
+    if (val.startsWith('[') && val.endsWith(']')) {
+        const colors = val.slice(1, -1).split(',').map(c => c.trim());
+        const processed = colors.map(c => ensureReadableColor(c));
+        return `linear-gradient(135deg, ${processed.join(', ')})`;
+    }
+    return (val.startsWith('#')) ? ensureReadableColor(val) : val;
+}
+
 function updateSiteTheme(color) {
     const root = document.documentElement;
     if (color) {
         let solidColor = color;
         let gradientColor = color;
 
-        // If it's a gradient, extract the first color as a solid fallback for borders/shadows
         if (color.includes('linear-gradient')) {
             const match = color.match(/hsl\([^)]+\)/);
             if (match) solidColor = match[0];
         } else {
-            // If it's just a solid color, create a simple gradient from it
             gradientColor = `linear-gradient(135deg, ${color}, ${color})`;
         }
 
@@ -308,7 +213,6 @@ function updateSiteTheme(color) {
         root.style.setProperty('--primary-purple', solidColor);
         root.style.setProperty('--primary-gradient', gradientColor);
     } else {
-        // Reset to Brand Defaults
         root.style.setProperty('--primary-blue', '#29C5F6');
         root.style.setProperty('--primary-purple', '#B36AF4');
         root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-blue), var(--static-purple))');
@@ -403,39 +307,8 @@ function fetchAndShowFeaturedSet() {
     if (!container || container.innerHTML !== "" || !rawArchiveData || rawArchiveData.length === 0) return;
 
     try {
-        const rows = rawArchiveData;
-        let potentialSets = [];
-        let latestDateObj = new Date(0);
-
-        for (let i = 1; i < rows.length; i++) {
-            const cols = rows[i];
-            if (!cols || !cols[0]) continue;
-            
-            const name = cols[0];
-            const rosterData = rosterMap[name.toLowerCase()];
-            const image = rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png";
-
-            // LOOP GROUPS OF 4 (Title | Date | Genre | Link)
-            // Note: API returns array, we iterate by index
-            for (let x = 1; x < cols.length; x += 4) {
-                const title = cols[x];
-                const dateStr = cols[x+1];
-                const genre = cols[x+2] || ""; 
-                const link = cols[x+3];
-                
-                if (title && link && dateStr) {
-                    const d = new Date(dateStr);
-                    if (!isNaN(d)) {
-                        potentialSets.push({ dj: name, image, title, genre, dateStr, dateObj: d, link });
-                        if (d > latestDateObj) latestDateObj = d;
-                    }
-                }
-            }
-        }
-
-        const featuredSets = potentialSets.filter(set => set.dateObj.getTime() === latestDateObj.getTime());
-        if (featuredSets.length > 0) renderFeaturedSets(featuredSets);
-
+        const latest = rawArchiveData.slice(0, 3);
+        renderFeaturedSets(latest);
     } catch (e) { console.warn("Featured set error", e); }
 }
 
@@ -443,22 +316,35 @@ function renderFeaturedSets(sets) {
     const container = document.getElementById('featured-container');
     let html = '';
     sets.forEach(set => {
-        let displayDate = set.dateStr;
-        try { displayDate = set.dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch(e){}
+        let displayDate = set.date;
+        try { displayDate = new Date(set.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch(e){}
+        
         html += `
-            <a href="${set.link}" target="_blank" style="text-decoration:none;">
+            <a href="${set.link}" target="_blank" onclick="trackClick('archive_click', '${set.id}', 'featured_set')" style="text-decoration:none;">
                 <div class="featured-card">
                     <div class="featured-badge">LATEST SET</div>
-                    <img src="${set.image}" alt="${set.dj}" class="featured-img">
+                    <img src="${set.djImage || 'cdn/logos/club/HeadOnly.png'}" class="featured-img">
                     <div class="featured-info">
                         <h3>${set.title} <span style="font-size:0.7rem; opacity:0.6; border:1px solid #444; padding:2px 5px; border-radius:4px; margin-left:5px; vertical-align:middle;">${set.genre}</span></h3>
-                        <p>By <strong>${set.dj}</strong> • ${displayDate}</p>
+                        <p>By <strong>${set.djName}</strong> • ${displayDate}</p>
                     </div>
                     <div style="margin-left:auto; font-size:1.2rem; color:var(--primary-blue);">▶</div>
                 </div>
             </a>`;
     });
     container.innerHTML = html;
+}
+
+function trackClick(type, id, label) {
+    fetch(API_TRACK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            type: type, 
+            targetId: id, 
+            metadata: { page: 'home', label: label } 
+        })
+    }).catch(() => {});
 }
 
 // ==========================================
@@ -504,14 +390,13 @@ function renderEventView(isLive) {
 
         if (deepLink) {
             joinContainer.innerHTML = `
-                <a href="${deepLink}" class="btn btn-live-join">LAUNCH VRCHAT</a>
+                <a href="${deepLink}" class="btn-cc btn-primary btn-live-join">LAUNCH VRCHAT</a>
                 <a href="${vrcInstanceUrl}" target="_blank" style="display:block; margin-top:8px; font-size:0.8rem; color:#666; text-decoration:none;">Open via Website &rarr;</a>
             `;
         } else {
             joinContainer.innerHTML = ''; 
         }
 
-        // Auto-scroll to lineup if live
         setTimeout(() => {
             djContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 500);
@@ -529,45 +414,63 @@ function renderEventView(isLive) {
     djContainer.innerHTML = ''; 
     const now = new Date();
 
-    djSchedule.forEach(dj => {
-        const timeData = processDjTime(dj.timeRaw);
+    djSchedule.forEach(item => {
+        const timeData = processDjTime(item.timeSlot);
         const isActive = (isLive && timeData && now >= timeData.startObj && now < timeData.endObj);
         
+        const processedColor = processColorValue(item.performer.color);
+
         if (isActive) {
-            updateSiteTheme(dj.color);
+            updateSiteTheme(processedColor);
         }
         
         let shareButton = '';
         if (isActive) {
-            const safeShareText = shareMessageTemplate.replace("{dj}", dj.name).replace("{genre}", dj.genre).replace(/'/g, "\\'");
-            shareButton = `<button class="share-btn" onclick="copyToClipboard('${safeShareText}', this)">🔗 Share</button>`;
+            const safeShareText = shareMessageTemplate.replace("{dj}", item.performer.name).replace("{genre}", item.genre).replace(/'/g, "\\'");
+            shareButton = `<button class="btn-cc btn-small btn-dark" onclick="copyToClipboard('${safeShareText}', this)">🔗 Share</button>`;
         }
         
         const liveTag = isActive ? `<span class="live-tag">ON AIR <div class="visualizer"><div class="viz-bar"></div><div class="viz-bar"></div><div class="viz-bar"></div></div></span>` : '';
-        let linksHtml = Object.keys(dj.links).length > 0 ? '<div class="social-tags">' + Object.keys(dj.links).map(k => `<a href="${dj.links[k]}" target="_blank" class="social-tag">${k}</a>`).join('') + '</div>' : '';
+        
+        const links = item.performer.links || {};
+        let linksHtml = Object.keys(links).length > 0 ? '<div class="social-tags">' + Object.keys(links).map(k => `<a href="${links[k]}" target="_blank" class="social-tag" onclick="trackSocialClick(event, '${item.performer.discordId}')">${k}</a>`).join('') + '</div>' : '';
 
         const card = document.createElement('div');
         card.className = `dj-card ${isActive ? 'dj-active' : ''}`; 
         
-        if (dj.color) card.style.setProperty('--accent-color', dj.color);
+        if (processedColor) card.style.setProperty('--accent-color', processedColor);
 
         card.innerHTML = `
-            <img src="${dj.image}" alt="${dj.name}" class="dj-img">
+            <img src="${item.performer.image}" alt="${item.performer.name}" class="dj-img">
             <div class="dj-content">
                 <div class="dj-header">
-                    <h3>${dj.name} ${liveTag}</h3>
+                    <h3>${item.performer.name} ${liveTag}</h3>
                     <div style="display:flex; align-items:center; gap:10px;">
                         ${shareButton}
-                        <span class="time">${timeData ? timeData.displayString : dj.timeRaw}</span>
+                        <span class="time">${timeData ? timeData.displayString : item.timeSlot}</span>
                     </div>
                 </div>
-                <span class="genre">${dj.genre}</span>
+                <span class="genre">${item.genre}</span>
                 ${linksHtml}
             </div>
         `;
         djContainer.appendChild(card);
     });
 }
+
+window.trackSocialClick = function(event, discordId) {
+    event.stopPropagation();
+    const label = event.target.innerText || 'social_link';
+    fetch(API_TRACK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            type: 'link_click', 
+            targetId: discordId, 
+            metadata: { page: 'home', label: label } 
+        })
+    }).catch(() => {});
+};
 
 window.copyToClipboard = function(text, btnElement) {
     navigator.clipboard.writeText(text).then(() => {

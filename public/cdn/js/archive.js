@@ -1,25 +1,21 @@
 /**
- * CLUB CRITTERS - ARCHIVE LOGIC (V2.0 - GOOGLE API)
- * Instant loads via Google Sheets API + Smart Caching
+ * CLUB CRITTERS - ARCHIVE LOGIC (V3.0 - MYSQL API)
+ * Fetching from local Node.js backend.
  */
 
 // ==========================================
 //          CONFIGURATION
 // ==========================================
 
-// 🔴 PASTE YOUR DETAILS HERE
-const SPREADSHEET_ID = "1MXvHh09Bw1yLQk6_YidOJmYrbJydZvdfQCR0kgK_NE4";
-const API_KEY = "AIzaSyBE-7WGEdDOlq9SFBKhEfxg_AbP1KZOMUE";
+const API_ARCHIVES = "/api/public/archives";
+const API_ROSTER = "/api/public/roster";
+const API_SCHEDULE = "/api/public/schedule";
+const API_SETTINGS = "/api/public/settings";
+const API_TRACK = "/api/stats/track";
 
-const BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values`;
-const ROSTER_URL = `${BASE_URL}/Roster!A:Z?key=${API_KEY}`;
-const ARCHIVE_URL = `${BASE_URL}/Archive!A:Z?key=${API_KEY}`;
-const SCHEDULE_URL = `${BASE_URL}/Schedule!A:Z?key=${API_KEY}`;
-
-// Cache Keys (Must match main.js for Roster, unique for Archive)
-const CACHE_KEY_ROSTER = 'cc_roster_v2';
-const CACHE_KEY_ARCHIVE = 'cc_archive_v2';
-const CACHE_KEY_SCHEDULE = 'cc_schedule_v2';
+// Cache Keys
+const CACHE_KEY_ARCHIVE = 'cc_archive_v3';
+const CACHE_KEY_ROSTER = 'cc_roster_v3';
 const CACHE_KEY_TIMESTAMP = 'cc_archive_ts';
 
 // ==========================================
@@ -53,54 +49,50 @@ const listContainer = document.getElementById('archive-list');
 
 async function initArchive() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c ARCHIVE V2 STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB CRITTERS %c ARCHIVE V3 STARTUP ", logStyle.banner, logStyle.tag);
 
-    // --- PHASE 1: INSTANT LOAD (CACHE) ---
+    // Track Page View
+    fetch(API_TRACK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            type: 'page_view', 
+            targetId: 'archive', 
+            metadata: { page: 'archive' } 
+        })
+    }).catch(() => {});
+
+    // --- PHASE 1: CACHE LOAD ---
     const cachedRoster = localStorage.getItem(CACHE_KEY_ROSTER);
     const cachedArchive = localStorage.getItem(CACHE_KEY_ARCHIVE);
-    const cachedSchedule = localStorage.getItem(CACHE_KEY_SCHEDULE);
-    const lastUpdate = localStorage.getItem(CACHE_KEY_TIMESTAMP);
 
     if (cachedRoster && cachedArchive) {
-        if (cachedSchedule) checkLiveStatus(JSON.parse(cachedSchedule));
         processData(JSON.parse(cachedRoster), JSON.parse(cachedArchive));
         revealContent();
     }
 
-    // --- PHASE 2: FRESH FETCH (NETWORK) ---
+    // --- PHASE 2: FRESH FETCH ---
     try {
-        const [rosterRes, archiveRes, scheduleRes] = await Promise.all([
-            fetch(ROSTER_URL),
-            fetch(ARCHIVE_URL),
-            fetch(SCHEDULE_URL)
+        const [rosRes, arcRes, schRes, setRes] = await Promise.all([
+            fetch(API_ROSTER),
+            fetch(API_ARCHIVES),
+            fetch(API_SCHEDULE),
+            fetch(API_SETTINGS)
         ]);
 
-        if (rosterRes.ok && archiveRes.ok && scheduleRes.ok) {
-            const rosterJson = await rosterRes.json();
-            const archiveJson = await archiveRes.json();
-            const scheduleJson = await scheduleRes.json();
+        if (rosRes.ok && arcRes.ok && schRes.ok && setRes.ok) {
+            const roster = await rosRes.json();
+            const archives = await arcRes.json();
+            const schedule = await schRes.json();
+            const settings = await setRes.json();
 
-            const rosterRows = rosterJson.values || [];
-            const archiveRows = archiveJson.values || [];
-            const scheduleRows = scheduleJson.values || [];
+            localStorage.setItem(CACHE_KEY_ROSTER, JSON.stringify(roster));
+            localStorage.setItem(CACHE_KEY_ARCHIVE, JSON.stringify(archives));
+            localStorage.setItem(CACHE_KEY_TIMESTAMP, Date.now());
 
-            checkLiveStatus(scheduleRows);
-
-            // Smart Check
-            const newRosterStr = JSON.stringify(rosterRows);
-            const newArchiveStr = JSON.stringify(archiveRows);
-            
-            const hasChanges = (newRosterStr !== cachedRoster) || (newArchiveStr !== cachedArchive);
-
-            if (hasChanges) {
-                localStorage.setItem(CACHE_KEY_ROSTER, newRosterStr);
-                localStorage.setItem(CACHE_KEY_ARCHIVE, newArchiveStr);
-                localStorage.setItem(CACHE_KEY_SCHEDULE, JSON.stringify(scheduleRows));
-                localStorage.setItem(CACHE_KEY_TIMESTAMP, new Date().getTime());
-
-                processData(rosterRows, archiveRows);
-                revealContent();
-            }
+            checkLiveStatus(settings, schedule, roster);
+            processData(roster, archives);
+            revealContent();
         }
     } catch (error) {
         console.warn("Network update failed.", error);
@@ -111,26 +103,22 @@ async function initArchive() {
     }
 }
 
-function checkLiveStatus(rows) {
-    if (!rows || rows.length < 2) return;
-    const settings = rows[1];
-    const start = new Date(settings[0]);
-    const end = new Date(settings[1]);
+function checkLiveStatus(settings, schedule, roster) {
+    if (!settings) return;
+    const start = new Date(settings.eventStartTime);
+    const end = new Date(settings.eventEndTime);
     const now = new Date();
     
-    if (now >= start && now < end && settings[2] !== "TRUE") {
-        const backLink = document.querySelector('.nav-pill');
+    if (now >= start && now < end && !settings.forceOffline) {
+        const backLink = document.querySelector('.nav-pill-cc');
         if (backLink && !backLink.querySelector('.live-dot')) {
             backLink.insertAdjacentHTML('afterbegin', '<span class="live-dot"></span>');
         }
 
-        // Apply theme based on current DJ
-        for (let i = 2; i < rows.length; i++) {
-            const cols = rows[i];
-            if (!cols || !cols[5]) continue;
-            const times = cols[5].match(/(\d{1,2}):(\d{2})/g);
-            if (!times || times.length < 2) continue;
-            
+        // Theme based on current DJ
+        schedule.forEach(item => {
+            const times = item.timeSlot.match(/(\d{1,2}):(\d{2})/g);
+            if (!times || times.length < 2) return;
             const djStart = new Date(start);
             const [sh, sm] = times[0].split(':').map(Number);
             djStart.setUTCHours(sh, sm, 0, 0);
@@ -142,14 +130,12 @@ function checkLiveStatus(rows) {
             else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
 
             if (now >= djStart && now < djEnd) {
-                const djName = cols[4].toLowerCase();
-                const rosterData = rosterMap[djName];
-                if (rosterData && rosterData.color) {
-                    updateSiteTheme(rosterData.color);
+                const dj = roster.find(r => r.name.toLowerCase() === item.performer.name.toLowerCase());
+                if (dj && dj.colorStyle) {
+                    updateSiteTheme(processColorValue(dj.colorStyle));
                 }
-                break;
             }
-        }
+        });
     } else {
         updateSiteTheme(null);
     }
@@ -176,21 +162,18 @@ function updateSiteTheme(color) {
     }
 }
 
-// ==========================================
-//          DATA PROCESSING
-// ==========================================
-
 function processColorValue(val) {
     if (!val) return null;
-    if (val && val.startsWith('[') && val.endsWith(']')) {
+    if (val.startsWith('[') && val.endsWith(']')) {
         const colors = val.slice(1, -1).split(',').map(c => c.trim());
         const processed = colors.map(c => ensureReadableColor(c));
         return `linear-gradient(135deg, ${processed.join(', ')})`;
     }
-    return (val && val.startsWith('#')) ? ensureReadableColor(val) : val;
+    return (val.startsWith('#')) ? ensureReadableColor(val) : val;
 }
 
 function ensureReadableColor(hex) {
+    if (!hex || !hex.startsWith('#')) return hex;
     hex = hex.replace(/^#/, '');
     if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
     let r = parseInt(hex.substring(0, 2), 16) / 255;
@@ -204,60 +187,33 @@ function ensureReadableColor(hex) {
     return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
-function processData(rosterRows, archiveRows) {
-    // 1. Parse Roster (Array of Arrays)
+function processData(roster, archives) {
     rosterMap = {};
-    if (rosterRows && rosterRows.length > 1) {
-        for (let i = 1; i < rosterRows.length; i++) {
-            const cols = rosterRows[i];
-            if (!cols || !cols[0]) continue;
-            
-            rosterMap[cols[0].toLowerCase()] = {
-                image: cols[3] || "cdn/logos/club/HeadOnly.png",
-                color: processColorValue(cols[4]) || "#29C5F6"
-            };
-        }
-    }
+    roster.forEach(m => {
+        rosterMap[m.name.toLowerCase()] = {
+            image: m.imageUrl || "cdn/logos/club/HeadOnly.png",
+            color: processColorValue(m.colorStyle) || "#29C5F6"
+        };
+    });
 
-    // 2. Parse Archive
-    allSets = [];
-    if (archiveRows && archiveRows.length > 1) {
-        for (let i = 1; i < archiveRows.length; i++) {
-            const cols = archiveRows[i];
-            if (!cols || !cols[0]) continue;
-
-            const djName = cols[0];
-            const rosterData = rosterMap[djName.toLowerCase()];
-            const image = rosterData ? rosterData.image : "cdn/logos/club/HeadOnly.png";
-            const color = rosterData ? rosterData.color : "#29C5F6";
-
-            // READ GROUPS OF 4: Title | Date | Genre | Link
-            for (let x = 1; x < cols.length; x += 4) {
-                const title = cols[x];
-                const rawDate = cols[x+1];
-                const genre = cols[x+2] || "Other"; 
-                const link = cols[x+3];
-
-                if (title && link && rawDate) {
-                    let displayDate = rawDate;
-                    const d = new Date(rawDate);
-                    if (!isNaN(d)) {
-                        displayDate = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-                    }
-                    allSets.push({ dj: djName, image, color, title, date: rawDate, displayDate, genre, link });
-                }
-            }
-        }
-    }
+    allSets = archives.map(arc => {
+        const ros = rosterMap[arc.djName.toLowerCase()];
+        return {
+            id: arc.id,
+            dj: arc.djName,
+            image: ros ? ros.image : "cdn/logos/club/HeadOnly.png",
+            color: ros ? ros.color : "#29C5F6",
+            title: arc.title,
+            date: arc.date,
+            displayDate: new Date(arc.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
+            genre: arc.genre,
+            link: arc.link
+        };
+    });
     
-    allSets.sort((a, b) => new Date(b.date) - new Date(a.date));
     buildGenreFilters();
     renderSets(searchInput ? searchInput.value : "");
 }
-
-// ==========================================
-//          UI RENDERING
-// ==========================================
 
 function revealContent() {
     if (loadingView) loadingView.classList.add('hidden');
@@ -266,25 +222,18 @@ function revealContent() {
 
 function buildGenreFilters() {
     if (!genreContainer) return;
-
     const genres = new Set();
-    allSets.forEach(set => {
-        if(set.genre) genres.add(set.genre);
-    });
-
-    let html = `<button class="genre-pill ${activeGenre === 'ALL' ? 'active' : ''}" onclick="filterGenre('ALL', this)">ALL</button>`;
-
+    allSets.forEach(set => { if(set.genre) genres.add(set.genre); });
+    let html = `<button class="btn-cc btn-small nav-pill-cc ${activeGenre === 'ALL' ? 'active' : ''}" onclick="filterGenre('ALL', this)">ALL</button>`;
     Array.from(genres).sort().forEach(g => {
-        const isActive = activeGenre === g ? 'active' : '';
-        html += `<button class="genre-pill ${isActive}" onclick="filterGenre('${g}', this)">${g}</button>`;
+        html += `<button class="btn-cc btn-small nav-pill-cc ${activeGenre === g ? 'active' : ''}" onclick="filterGenre('${g}', this)">${g}</button>`;
     });
-
     genreContainer.innerHTML = html;
 }
 
 window.filterGenre = function(genre, btnElement) {
     activeGenre = genre;
-    document.querySelectorAll('.genre-pill').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-pill-cc').forEach(b => b.classList.remove('active'));
     if (btnElement) btnElement.classList.add('active');
     renderSets(searchInput ? searchInput.value : "");
 }
@@ -292,9 +241,7 @@ window.filterGenre = function(genre, btnElement) {
 function renderSets(searchTerm = "") {
     if (!listContainer) return;
     listContainer.innerHTML = "";
-    
     const term = searchTerm.toLowerCase();
-
     const filtered = allSets.filter(set => {
         const matchesSearch = set.dj.toLowerCase().includes(term) || set.title.toLowerCase().includes(term);
         const matchesGenre = activeGenre === 'ALL' || set.genre === activeGenre;
@@ -309,11 +256,7 @@ function renderSets(searchTerm = "") {
     const grouped = {};
     filtered.forEach(set => {
         if (!grouped[set.dj]) {
-            grouped[set.dj] = {
-                image: set.image,
-                color: set.color,
-                sets: []
-            };
+            grouped[set.dj] = { image: set.image, color: set.color, sets: [] };
         }
         grouped[set.dj].sets.push(set);
     });
@@ -331,7 +274,7 @@ function renderSets(searchTerm = "") {
                         </div>
                         <div class="row-date" style="color:${group.color}; opacity:0.8;">${set.displayDate}</div>
                     </div>
-                    <a href="${set.link}" target="_blank" class="play-btn-card">▶ Listen</a>
+                    <a href="${set.link}" target="_blank" onclick="trackClick('archive_click', '${set.id}', 'archive_list')" class="btn-cc btn-small btn-secondary">▶ Listen</a>
                 </div>
             `;
         });
@@ -349,6 +292,18 @@ function renderSets(searchTerm = "") {
         `;
         listContainer.innerHTML += cardHtml;
     });
+}
+
+function trackClick(type, id, label) {
+    fetch(API_TRACK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            type: type, 
+            targetId: id, 
+            metadata: { page: 'archive', label: label } 
+        })
+    }).catch(() => {});
 }
 
 initArchive();

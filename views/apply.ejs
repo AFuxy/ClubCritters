@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Critters - Join the Team</title>
+    
+    <link rel="icon" type="image/png" href="/cdn/logos/club/HeadOnly.png">
+    <meta name="theme-color" content="#29C5F6">
+
+    <!-- SEO & Embedding -->
+    <meta name="description" content="Join the Club Critters Crew! View our current open applications for DJs, Staff, and more.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Club Critters - Recruitment">
+    <meta property="og:description" content="Explore open roles and apply to join our VRChat community team.">
+    <meta property="og:image" content="https://critters.club/cdn/logos/club/HeadOnly.png">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <link rel="stylesheet" href="/cdn/css/main.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/theme.css">
+
+    <style>
+        body {
+            background: radial-gradient(circle at top, rgba(41, 197, 246, 0.1), transparent 50%), var(--dark-bg);
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+            width: 100%;
+        }
+
+        .app-card {
+            background: rgba(21, 30, 41, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: left;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .app-card.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .app-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            border-color: var(--primary-blue);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px rgba(41, 197, 246, 0.2);
+        }
+
+        .app-image-container {
+            height: 200px;
+            position: relative;
+            background: linear-gradient(to bottom, #000, #0b1016);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .app-image-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 50%;
+            background: linear-gradient(to top, rgba(11, 16, 22, 1), transparent);
+        }
+
+        .app-img {
+            width: 110px;
+            height: 110px;
+            object-fit: cover;
+            filter: drop-shadow(0 0 15px rgba(41, 197, 246, 0.6));
+            z-index: 1;
+            transition: transform 0.5s ease;
+        }
+        .app-card:hover .app-img {
+            transform: rotate(5deg) scale(1.1);
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            z-index: 5;
+        }
+        .status-open { 
+            background: #00e676; 
+            color: black; 
+            box-shadow: 0 0 20px rgba(0, 230, 118, 0.5); 
+        }
+        .status-closed { 
+            background: #ff5252; 
+            color: white; 
+            box-shadow: 0 0 15px rgba(255, 82, 82, 0.3);
+        }
+
+        .deadline-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            backdrop-filter: blur(8px);
+            z-index: 5;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .app-content {
+            padding: 30px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(21, 30, 41, 0.4);
+        }
+        .app-content h2 {
+            margin: 0;
+            font-size: 1.6rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-transform: uppercase;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+        .app-content p {
+            color: #ccc;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            margin: 20px 0 30px 0;
+            flex-grow: 1;
+        }
+
+        .card-closed { 
+            opacity: 0.8; 
+            filter: grayscale(0.3); 
+        }
+        .card-closed:hover {
+            border-color: #ff5252;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px rgba(255, 82, 82, 0.1);
+        }
+
+        #main-title {
+            font-size: 4rem;
+            margin-bottom: 0;
+            font-weight: 900;
+            filter: drop-shadow(0 0 20px rgba(41, 197, 246, 0.3));
+        }
+
+        #status-subtext {
+            font-size: 1.2rem;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            opacity: 0.6;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            #main-title { font-size: 2.5rem; }
+            .app-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" style="max-width: 1100px;">
+        <div class="logo-container" style="margin-top: 30px;">
+            <img class="logo" src="/cdn/logos/club/HeadOnly.png" alt="Little Critters Logo"> 
+        </div>
+
+        <h1 id="main-title">JOIN THE CREW</h1>
+        <p id="status-subtext">Club Critters Recruitment</p>
+
+        <div id="loading-apps" style="margin-top: 80px;">
+            <div class="spinner" style="width: 60px; height: 60px;"></div>
+            <p style="color:#888; font-weight: bold; letter-spacing: 1px;">SCANNING FOR OPENINGS...</p>
+        </div>
+
+        <div id="apps-container" class="app-grid hidden">
+            <!-- Dynamic Apps Here -->
+        </div>
+
+        <p id="empty-msg" class="hidden" style="margin-top: 80px; color: #888; font-size: 1.1rem;">We currently don't have any open roles. Check back soon!</p>
+    </div>
+
+    <script>
+        async function initApply() {
+            fetch("/api/stats/track", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'page_view', targetId: 'apply', metadata: { page: 'apply' } })
+            }).catch(() => {});
+
+            try {
+                const res = await fetch('/api/public/apps');
+                const apps = await res.json();
+
+                const container = document.getElementById('apps-container');
+                const loading = document.getElementById('loading-apps');
+                const empty = document.getElementById('empty-msg');
+
+                loading.classList.add('hidden');
+
+                if (apps.length === 0) {
+                    empty.classList.remove('hidden');
+                    return;
+                }
+
+                container.innerHTML = apps.map((app, index) => {
+                    const isOpen = app.status === 'open';
+                    return `
+                        <div class="app-card ${isOpen ? '' : 'card-closed'}" style="transition-delay: ${index * 100}ms">
+                            <div class="app-image-container">
+                                ${app.deadline ? `<div class="deadline-badge">${app.deadline}</div>` : ''}
+                                <div class="status-badge ${isOpen ? 'status-open' : 'status-closed'}">${app.status}</div>
+                                <img src="/cdn/logos/club/HeadOnly.png" alt="${app.roleName}" class="app-img">
+                            </div>
+                            <div class="app-content">
+                                <h2>${app.roleName}</h2>
+                                <p>${app.description || 'No description provided.'}</p>
+                                ${isOpen ? 
+                                    `<a href="${app.formUrl}" target="_blank" class="btn-cc btn-primary" onclick="trackAppClick('${app.id}', '${app.roleName}')">Apply Now</a>` : 
+                                    `<button class="btn-cc btn-dark" disabled>Applications Closed</button>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                container.classList.remove('hidden');
+                
+                // Trigger reveal animation
+                setTimeout(() => {
+                    document.querySelectorAll('.app-card').forEach(card => card.classList.add('revealed'));
+                }, 50);
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading-apps').innerHTML = '<p style="color:#ff4444;">Failed to load applications.</p>';
+            }
+        }
+
+        function trackAppClick(id, name) {
+            fetch("/api/stats/track", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    type: 'link_click', 
+                    targetId: id, 
+                    metadata: { page: 'apply', label: name, category: 'application' } 
+                })
+            }).catch(() => {});
+        }
+
+        initApply();
+    </script>
+</body>
+</html>

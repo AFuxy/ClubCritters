@@ -1,0 +1,191 @@
+<%- include('header') %>
+
+<style>
+    /* CUSTOM SCROLLBAR FOR STATS */
+    .scrollable-stats {
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: 10px;
+        margin-top: 15px;
+    }
+    .scrollable-stats::-webkit-scrollbar { width: 6px; }
+    .scrollable-stats::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
+    .scrollable-stats::-webkit-scrollbar-thumb { background: currentColor; border-radius: 10px; }
+
+    /* VIBRANT STAT BLOCK STYLES */
+    .stat-block { 
+        position: relative; 
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: 1px solid rgba(255,255,255,0.05);
+        background: linear-gradient(145deg, rgba(21, 30, 41, 0.9), rgba(11, 16, 22, 0.9)) !important;
+        overflow: hidden;
+    }
+    
+    .stat-block:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+    }
+
+    .stat-block::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 4px;
+        background: currentColor;
+        box-shadow: 0 0 15px currentColor;
+    }
+
+    .stat-block h2 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #fff !important;
+        border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+    }
+
+    .stat-block h2::before {
+        content: '';
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 10px currentColor;
+    }
+
+    /* UNIQUE ACCENT COLORS */
+    .accent-blue   { color: #29C5F6 !important; }
+    .accent-green  { color: #00e676 !important; }
+    .accent-purple { color: #B36AF4 !important; }
+    .accent-orange { color: #FF9800 !important; }
+    .accent-pink   { color: #E91E63 !important; }
+
+    .stat-value-highlight {
+        font-weight: 900;
+        font-size: 1.1rem;
+        text-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+
+    .schedule-item {
+        background: rgba(255,255,255,0.03) !important;
+        border: 1px solid rgba(255,255,255,0.05);
+        margin-bottom: 8px;
+        border-left: 4px solid currentColor !important; /* Single thick accent border */
+        padding-left: 15px !important;
+    }
+    .schedule-item::before { display: none !important; } /* Remove the bar from admin.css to prevent double borders */
+</style>
+
+<div class="staff-hub">
+    <h1 style="text-align: center; margin-bottom: 40px; color: #fff; font-weight: 900; letter-spacing: 2px;">GLOBAL SITE ANALYTICS</h1>
+
+    <div class="grid-2">
+        <!-- 1. PAGE VIEW BREAKDOWN (BLUE) -->
+        <div class="staff-section stat-block accent-blue">
+            <h2>Page View Breakdown</h2>
+            <div class="scrollable-stats">
+                <ul id="page-views-list" class="schedule-list" style="margin-top: 0;"></ul>
+            </div>
+        </div>
+
+        <!-- 2. APPLICATION INTEREST (GREEN) -->
+        <div class="staff-section stat-block accent-green">
+            <h2>Application Interest</h2>
+            <div class="scrollable-stats">
+                <ul id="app-interest-list" class="schedule-list" style="margin-top: 0;"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 30px;">
+        <!-- 3. TOP SOCIAL PLATFORMS (PURPLE) -->
+        <div class="staff-section stat-block accent-purple">
+            <h2>Most Popular Platforms</h2>
+            <div class="scrollable-stats">
+                <ul id="top-platforms-list" class="schedule-list" style="margin-top: 0;"></ul>
+            </div>
+        </div>
+
+        <!-- 4. TOP DJ IMPACT (ORANGE) -->
+        <div class="staff-section stat-block accent-orange">
+            <h2>Top DJ Impact</h2>
+            <div class="scrollable-stats">
+                <ul id="top-djs" class="schedule-list" style="margin-top: 0;"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. TOP ARCHIVE SETS (PINK) -->
+    <div class="staff-section stat-block accent-pink" style="margin-top: 30px;">
+        <h2>Top Archive Sets</h2>
+        <div class="scrollable-stats" style="max-height: 400px;">
+            <ul id="top-archives" class="schedule-list" style="margin-top: 0;"></ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function loadGlobalStats() {
+        try {
+            const res = await fetch('/api/stats/global');
+            const data = await res.json();
+
+            // Render Page Views
+            document.getElementById('page-views-list').innerHTML = data.pageViews.map(p => `
+                <li class="schedule-item">
+                    <span style="text-transform: capitalize;">${p.page} Page</span>
+                    <span class="stat-value-highlight" style="color: #29C5F6;">${p.count.toLocaleString()} views</span>
+                </li>
+            `).join('');
+
+            // Render App Interest
+            const appList = document.getElementById('app-interest-list');
+            if (data.appInterest && data.appInterest.length > 0) {
+                appList.innerHTML = data.appInterest.map(a => `
+                    <li class="schedule-item">
+                        <span>${a.label}</span>
+                        <span class="stat-value-highlight" style="color: #00e676;">${a.count.toLocaleString()} clicks</span>
+                    </li>
+                `).join('');
+            } else { appList.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No data yet.</p>'; }
+
+            // Render Top Platforms
+            const topPlatformsList = document.getElementById('top-platforms-list');
+            if (data.topPlatforms.length > 0) {
+                topPlatformsList.innerHTML = data.topPlatforms.map(p => `
+                    <li class="schedule-item">
+                        <span>${p.label}</span>
+                        <span class="stat-value-highlight" style="color: #B36AF4;">${p.count.toLocaleString()} clicks</span>
+                    </li>
+                `).join('');
+            } else { topPlatformsList.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No data yet.</p>'; }
+
+            // Render Top DJs
+            const topDJsList = document.getElementById('top-djs');
+            if (data.topDJs.length > 0) {
+                topDJsList.innerHTML = data.topDJs.map(dj => `
+                    <li class="schedule-item">
+                        <span>${dj.name}</span>
+                        <span class="stat-value-highlight" style="color: #FF9800;">${dj.count.toLocaleString()} clicks</span>
+                    </li>
+                `).join('');
+            } else { topDJsList.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No data yet.</p>'; }
+
+            // Render Top Archives
+            const topArchivesList = document.getElementById('top-archives');
+            if (data.topArchives.length > 0) {
+                topArchivesList.innerHTML = data.topArchives.map(arc => `
+                    <li class="schedule-item">
+                        <div>
+                            <span style="display: block;">${arc.title}</span>
+                            <span style="font-size: 0.75rem; color: #888;">by ${arc.djName}</span>
+                        </div>
+                        <span class="stat-value-highlight" style="color: #E91E63;">${arc.count.toLocaleString()} listens</span>
+                    </li>
+                `).join('');
+            } else { topArchivesList.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No data yet.</p>'; }
+
+        } catch (err) { console.error("Failed to load stats:", err); }
+    }
+    loadGlobalStats();
+</script>
+
+<%- include('footer') %>

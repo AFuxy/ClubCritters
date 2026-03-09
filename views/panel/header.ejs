@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Critters - <%= page.charAt(0).toUpperCase() + page.slice(1) %></title>
+    
+    <link rel="icon" type="image/png" href="/cdn/logos/club/HeadOnly.png">
+    <meta name="theme-color" content="#29C5F6">
+
+    <!-- SEO & Embedding -->
+    <meta name="description" content="Club Critters Secret Panel - DJ and Staff Management Hub.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Club Critters - Panel">
+    <meta property="og:description" content="Manage your DJ profile, archives, and club schedule.">
+    <meta property="og:image" content="https://critters.club/cdn/logos/club/HeadOnly.png">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <style>
+        .nav-bar {
+            width: 100%;
+            background: var(--card-bg);
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+            box-sizing: border-box;
+        }
+        .logout-link { color: #ff4444 !important; border-color: #ff444444 !important; }
+        .logout-link:hover { background: #ff4444 !important; color: white !important; }
+    </style>
+</head>
+<body>
+
+    <div class="nav-bar">
+        <a href="/panel/profile" class="btn-cc nav-pill-cc <%= page === 'profile' ? 'active' : '' %>">👤 Profile</a>
+        <a href="/panel/archives" class="btn-cc nav-pill-cc <%= page === 'archives' ? 'active' : '' %>">📂 My Archives</a>
+        
+        <% const userType = user.type.toLowerCase(); %>
+        <% if (userType.includes('host') || userType.includes('staff') || userType.includes('owner')) { %>
+            <a href="/panel/schedule" class="btn-cc nav-pill-cc <%= page === 'schedule' ? 'active' : '' %>">📅 Schedule</a>
+            <a href="/panel/roster" class="btn-cc nav-pill-cc <%= page === 'roster' ? 'active' : '' %>">👥 Roster</a>
+            <a href="/panel/apps" class="btn-cc nav-pill-cc <%= page === 'apps' ? 'active' : '' %>">📝 Apps</a>
+            <a href="/panel/stats" class="btn-cc nav-pill-cc <%= page === 'stats' ? 'active' : '' %>">📊 Stats</a>
+            <a href="/panel/settings" class="btn-cc nav-pill-cc <%= page === 'settings' ? 'active' : '' %>">⚙️ Settings</a>
+        <% } %>
+
+        <a href="/logout" class="btn-cc nav-pill-cc logout-link">Logout</a>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="notify-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;"></div>
+
+    <script>
+        function showNotify(message, type = 'success') {
+            const container = document.getElementById('notify-container');
+            const toast = document.createElement('div');
+            toast.style.padding = '12px 25px';
+            toast.style.borderRadius = '8px';
+            toast.style.color = 'white';
+            toast.style.fontWeight = 'bold';
+            toast.style.fontSize = '0.9rem';
+            toast.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
+            toast.style.pointerEvents = 'auto';
+            toast.style.transition = 'all 0.3s ease';
+            toast.style.transform = 'translateX(100%)';
+            toast.style.opacity = '0';
+            
+            if (type === 'success') {
+                toast.style.background = 'linear-gradient(45deg, #00e676, #00c853)';
+                toast.innerText = '✅ ' + message;
+            } else {
+                toast.style.background = 'linear-gradient(45deg, #ff5252, #ff1744)';
+                toast.innerText = '⚠️ ' + message;
+            }
+
+            container.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+                toast.style.opacity = '1';
+            }, 10);
+
+            // Auto-remove
+            setTimeout(() => {
+                toast.style.transform = 'translateX(100%)';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+    </script>
+
+    <div class="container">
