@@ -1,5 +1,5 @@
 const { ActivityType, ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getInstanceData, getGroupInstanceData, getGroupStats, autoAcceptFriends, updateBotPresence, connectPipeline } = require('./vrc-api');
+const { getInstanceData, getGroupInstanceData, getGroupStats, autoAcceptFriends, updateBotPresence, connectPipeline, closeGroupInstance } = require('./vrc-api');
 const fs = require('fs');
 const path = require('path');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
@@ -10,7 +10,7 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 async function autoUpdateStatus(client) {
     if (!client || !client.user) return;
 
-    const { Settings, Schedule, Roster } = require('../db');
+    const { Settings, Schedule, Roster, InstanceLog } = require('../db');
 
     try {
         const settings = await Settings.findOne();
@@ -32,6 +32,20 @@ async function autoUpdateStatus(client) {
         // 3. Ensure Pipeline is ALWAYS connected (24/7)
         // We pass the current location (even if null) so the responder knows where to invite people
         let currentLocation = null;
+        let vrcData = null;
+
+        /**
+         * Helper to close an instance via API and clear DB
+         */
+        const closeVrcInstance = async (location, settings, reason) => {
+            if (!location) return;
+            console.log(`[VRC AUTO-CLOSE] ${reason}. Terminating instance...`);
+            
+            // Call universal terminator with full location string
+            await closeGroupInstance(location);
+
+            await settings.update({ instanceUrl: null, instanceEmptySince: null });
+        };
 
         if (settings && !settings.forceOffline) {
             const now = new Date();
@@ -40,7 +54,6 @@ async function autoUpdateStatus(client) {
 
             // Fetch VRChat instance data
             let vrcStats = "";
-            let vrcData = null;
             
             if (settings.instanceUrl && settings.instanceUrl.includes("worldId=")) {
                 vrcData = await getInstanceData(settings.instanceUrl);
@@ -51,6 +64,42 @@ async function autoUpdateStatus(client) {
             if (vrcData && vrcData.active) {
                 vrcStats = ` (${vrcData.count}/${vrcData.capacity})`;
                 currentLocation = vrcData.location || settings.instanceUrl;
+
+                // --- AUTO-CLOSE LOGIC ---
+                // 1. Check if event is over by 30 mins
+                const thirtyMinsAfterEvent = new Date(end.getTime() + 30 * 60000);
+                if (now > thirtyMinsAfterEvent) {
+                    await closeVrcInstance(currentLocation, settings, "Event ended 30+ mins ago");
+                    vrcData.active = false;
+                } 
+                // 2. Check if instance is empty (0 players) for 10 mins
+                else if (vrcData.count === 0) {
+                    if (!settings.instanceEmptySince) {
+                        await settings.update({ instanceEmptySince: now });
+                    } else {
+                        const emptyDuration = now - new Date(settings.instanceEmptySince);
+                        if (emptyDuration > 10 * 60000) { // 10 minutes
+                            await closeVrcInstance(currentLocation, settings, "Instance empty for 10+ mins");
+                            vrcData.active = false;
+                        }
+                    }
+                } else {
+                    // Reset empty tracker if players are present
+                    if (settings.instanceEmptySince) {
+                        await settings.update({ instanceEmptySince: null });
+                    }
+                }
+            } else if (settings.instanceEmptySince) {
+                // Clean up tracker if instance is no longer active anyway
+                await settings.update({ instanceEmptySince: null });
+            }
+
+            if (vrcData && vrcData.active) {
+                vrcStats = ` (${vrcData.count}/${vrcData.capacity})`;
+                currentLocation = vrcData.location || settings.instanceUrl;
+            } else {
+                vrcStats = "";
+                currentLocation = null;
             }
 
             if (now >= start && now < end) {
@@ -87,6 +136,49 @@ async function autoUpdateStatus(client) {
 
         // Maintain Pipeline connection 24/7
         await connectPipeline(currentLocation);
+
+        // --- HISTORICAL INSTANCE ANALYTICS ---
+        if (currentLocation) {
+            const isLive = (new Date() >= new Date(settings.eventStartTime) && new Date() < new Date(settings.eventEndTime));
+            
+            if (!settings.currentInstanceLogId) {
+                // Start a new session log
+                const newLog = await InstanceLog.create({
+                    instanceId: currentLocation,
+                    worldName: (vrcData && vrcData.name) ? vrcData.name : 'Club Critters Hub',
+                    isEventSession: isLive,
+                    startTime: new Date()
+                });
+                await settings.update({ currentInstanceLogId: newLog.id });
+                console.log(`[ANALYTICS] 📈 Started new instance session log: ${newLog.id} (${newLog.worldName})`);
+            } else {
+                // Update existing session
+                const log = await InstanceLog.findByPk(settings.currentInstanceLogId);
+                if (log) {
+                    const currentCount = (vrcData && vrcData.active) ? vrcData.count : 0;
+                    if (currentCount > log.peakCapacity) {
+                        await log.update({ peakCapacity: currentCount });
+                    }
+                    // If it becomes an event while open, mark it
+                    if (isLive && !log.isEventSession) {
+                        await log.update({ isEventSession: true });
+                    }
+                }
+            }
+        } else if (settings.currentInstanceLogId) {
+            // Instance was just cleared, finalize the log
+            const log = await InstanceLog.findByPk(settings.currentInstanceLogId);
+            if (log) {
+                const now = new Date();
+                const durationMins = Math.floor((now - new Date(log.startTime)) / 60000);
+                await log.update({ 
+                    endTime: now,
+                    totalDuration: durationMins
+                });
+                console.log(`[ANALYTICS] 📉 Finalized instance session log: ${log.id} (${durationMins} mins, Peak: ${log.peakCapacity})`);
+            }
+            await settings.update({ currentInstanceLogId: null });
+        }
 
         // Update Discord Presence
         client.user.setPresence({

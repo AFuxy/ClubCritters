@@ -13,7 +13,9 @@ const Settings = sequelize.define('Settings', {
     eventEndTime: { type: DataTypes.DATE },
     forceOffline: { type: DataTypes.BOOLEAN, defaultValue: false },
     instanceUrl: { type: DataTypes.STRING },
-    vrcCookie: { type: DataTypes.TEXT } // Persist VRChat session
+    vrcCookie: { type: DataTypes.TEXT }, // Persist VRChat session
+    instanceEmptySince: { type: DataTypes.DATE }, // Track when instance first hit 0 players
+    currentInstanceLogId: { type: DataTypes.INTEGER }
 });
 
 // 2. Roster (DJs/Staff)
@@ -96,6 +98,18 @@ const ApplicationSubmission = sequelize.define('ApplicationSubmission', {
     timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 });
 
+// 9. Historical Instance Analytics
+const InstanceLog = sequelize.define('InstanceLog', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    instanceId: { type: DataTypes.STRING },
+    worldName: { type: DataTypes.STRING, defaultValue: 'Club Critters Hub' },
+    startTime: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+    endTime: { type: DataTypes.DATE },
+    peakCapacity: { type: DataTypes.INTEGER, defaultValue: 0 },
+    totalDuration: { type: DataTypes.INTEGER }, // Stored in minutes
+    isEventSession: { type: DataTypes.BOOLEAN, defaultValue: false } 
+});
+
 // Relationships
 Roster.hasMany(Schedule, { foreignKey: 'performerId' });
 Schedule.belongsTo(Roster, { foreignKey: 'performerId' });
@@ -117,4 +131,4 @@ async function initDB() {
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, initDB };

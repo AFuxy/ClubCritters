@@ -351,7 +351,17 @@ async function getGroupInstanceData(groupShortName) {
             let result = { active: false, count: 0, capacity: 0, location: null };
             if (instances && instances.length > 0) {
                 const bestInstance = instances.reduce((prev, current) => (prev.n_users > current.n_users) ? prev : current);
-                result = { active: true, count: bestInstance.n_users, capacity: bestInstance.capacity, location: `${bestInstance.worldId}:${bestInstance.instanceId}` };
+                
+                // Use .location if present, otherwise fallback to rebuilding
+                const location = bestInstance.location || `${bestInstance.worldId || bestInstance.world_id}:${bestInstance.instanceId || bestInstance.instance_id}`;
+
+                result = { 
+                    active: true, 
+                    count: (bestInstance.n_users !== undefined) ? bestInstance.n_users : bestInstance.nUsers, 
+                    capacity: bestInstance.capacity, 
+                    location: location,
+                    name: bestInstance.worldName || bestInstance.world?.name || 'Club Critters Hub'
+                };
             }
             cache.groupInstance = { data: result, timestamp: now };
             return result;
@@ -424,4 +434,47 @@ async function autoAcceptFriends() {
     } catch (err) {}
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends };
+/**
+ * Terminate any instance (Group, Public, etc) if permissions allow.
+ */
+async function closeGroupInstance(location) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return false;
+
+    let target = location;
+    // If it's a full URL, extract the worldId:instanceId
+    if (target.includes('worldId=')) {
+        try {
+            const url = new URL(target);
+            const worldId = url.searchParams.get('worldId');
+            const instanceId = url.searchParams.get('instanceId');
+            target = `${worldId}:${instanceId}`;
+        } catch (e) { return false; }
+    }
+
+    try {
+        // Universal VRChat Instance Close endpoint: DELETE /instances/{worldId}:{instanceId}
+        const url = `https://api.vrchat.cloud/api/1/instances/${target}?hardClose=true`;
+        
+        console.log(`[VRC API] 🛑 Attempting to hard-close instance: ${target}`);
+        
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' }
+        });
+
+        if (res.ok) {
+            console.log(`\x1b[32m[VRC API] ✅ Instance ${target} successfully terminated.\x1b[0m`);
+            return true;
+        } else {
+            const err = await res.json().catch(() => ({}));
+            console.error(`\x1b[31m[VRC API] ❌ Failed to close instance: ${res.status} ${err.error?.message || ''}\x1b[0m`);
+            return false;
+        }
+    } catch (e) {
+        console.error("[VRC API] Error closing instance:", e);
+        return false;
+    }
+}
+
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance };

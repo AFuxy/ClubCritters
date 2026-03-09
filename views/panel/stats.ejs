@@ -120,6 +120,27 @@
             <ul id="top-archives" class="schedule-list" style="margin-top: 0;"></ul>
         </div>
     </div>
+
+    <!-- 6. HISTORICAL INSTANCE SESSIONS (CYAN) -->
+    <div class="staff-section stat-block accent-blue" style="margin-top: 30px; color: #00bcd4 !important;">
+        <h2>Historical Instance Sessions</h2>
+        <div class="scrollable-stats" style="max-height: 500px;">
+            <table style="width: 100%; border-collapse: collapse; color: #eee; font-size: 0.9rem;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); color: #888;">
+                        <th style="padding: 10px;">World / ID</th>
+                        <th style="padding: 10px;">Type</th>
+                        <th style="padding: 10px;">Date</th>
+                        <th style="padding: 10px;">Peak</th>
+                        <th style="padding: 10px;">Duration</th>
+                    </tr>
+                </thead>
+                <tbody id="instance-logs-body">
+                    <!-- Logs will be injected here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -182,6 +203,36 @@
                     </li>
                 `).join('');
             } else { topArchivesList.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No data yet.</p>'; }
+
+            // 6. Render Historical Instance Logs
+            const logRes = await fetch('/api/stats/instances');
+            const logs = await logRes.json();
+            const logBody = document.getElementById('instance-logs-body');
+            
+            if (logs.length > 0) {
+                logBody.innerHTML = logs.map(log => {
+                    const date = new Date(log.startTime).toLocaleDateString();
+                    const duration = log.totalDuration ? `${Math.floor(log.totalDuration / 60)}h ${log.totalDuration % 60}m` : 'Active...';
+                    const typeBadge = log.isEventSession 
+                        ? '<span style="color:#ff4444; font-weight:bold;">LIVE</span>' 
+                        : '<span style="color:#00bcd4;">Social</span>';
+                    
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <td style="padding: 10px;">
+                                <div style="font-weight:bold;">${log.worldName}</div>
+                                <div style="font-size:0.7rem; opacity:0.5; font-family:monospace;">${log.instanceId}</div>
+                            </td>
+                            <td style="padding: 10px;">${typeBadge}</td>
+                            <td style="padding: 10px;">${date}</td>
+                            <td style="padding: 10px; color: #00e676; font-weight:bold;">${log.peakCapacity}</td>
+                            <td style="padding: 10px; opacity:0.8;">${duration}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                logBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#666;">No session data recorded yet.</td></tr>';
+            }
 
         } catch (err) { console.error("Failed to load stats:", err); }
     }

@@ -2,7 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
-const { sequelize, initDB, Roster, Settings, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission } = require('./db');
+const { sequelize, initDB, Roster, Settings, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog } = require('./db');
 const { getGuildMember, updateBotStatus, joinGuild } = require('./bot');
 const { getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus } = require('./utils/vrc-api');
 const path = require('path');
@@ -472,6 +472,16 @@ app.get('/api/stats/global', isAuthenticated, isStaff, async (req, res) => {
             topDJs: topDJs.map(d => { const rec = djRecords.find(r => r.discordId === d.targetId); return { name: rec ? rec.name : 'Unknown', count: d.get('count') }; }),
             appInterest: appInterest.map(a => ({ label: a.get('label'), count: a.get('count') }))
         });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.get('/api/stats/instances', isAuthenticated, isStaff, async (req, res) => {
+    try {
+        const logs = await InstanceLog.findAll({
+            order: [['startTime', 'DESC']],
+            limit: 20
+        });
+        res.json(logs);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
