@@ -44,11 +44,19 @@
         
         <% const userType = user.type.toLowerCase(); %>
         <% if (userType.includes('host') || userType.includes('staff') || userType.includes('owner')) { %>
-            <a href="/panel/schedule" class="btn-cc nav-pill-cc <%= page === 'schedule' ? 'active' : '' %>">📅 Schedule</a>
-            <a href="/panel/roster" class="btn-cc nav-pill-cc <%= page === 'roster' ? 'active' : '' %>">👥 Roster</a>
-            <a href="/panel/apps" class="btn-cc nav-pill-cc <%= page === 'apps' ? 'active' : '' %>">📝 Apps</a>
-            <a href="/panel/stats" class="btn-cc nav-pill-cc <%= page === 'stats' ? 'active' : '' %>">📊 Stats</a>
-            <a href="/panel/settings" class="btn-cc nav-pill-cc <%= page === 'settings' ? 'active' : '' %>">⚙️ Settings</a>
+            <div class="dropdown-cc">
+                <button class="btn-cc nav-pill-cc <%= ['schedule', 'roster', 'apps', 'stats', 'links', 'settings'].includes(page) ? 'active' : '' %>">
+                    🛠️ Staff Hub <span style="font-size: 0.6rem; margin-left: 5px; opacity: 0.6;">▼</span>
+                </button>
+                <div class="dropdown-content-cc">
+                    <a href="/panel/links">🔗 Staff Quick Links</a>
+                    <a href="/panel/schedule">📅 Event Schedule</a>
+                    <a href="/panel/roster">👥 Roster Management</a>
+                    <a href="/panel/apps">📝 Application Manager</a>
+                    <a href="/panel/stats">📊 Global Statistics</a>
+                    <a href="/panel/settings">⚙️ System Settings</a>
+                </div>
+            </div>
         <% } %>
 
         <a href="/logout" class="btn-cc nav-pill-cc logout-link">Logout</a>

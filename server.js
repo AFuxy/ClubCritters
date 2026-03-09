@@ -122,6 +122,7 @@ app.get('/panel/roster', isAuthenticated, isStaff, (req, res) => { res.render('p
 app.get('/panel/apps', isAuthenticated, isStaff, (req, res) => { res.render('panel/apps', { user: req.user, page: 'apps' }); });
 app.get('/panel/settings', isAuthenticated, isStaff, (req, res) => { res.render('panel/settings', { user: req.user, page: 'settings' }); });
 app.get('/panel/stats', isAuthenticated, isStaff, (req, res) => { res.render('panel/stats', { user: req.user, page: 'stats' }); });
+app.get('/panel/links', isAuthenticated, isStaff, (req, res) => { res.render('panel/links', { user: req.user, page: 'links' }); });
 app.get('/panel/archives', isAuthenticated, (req, res) => { res.render('panel/archives', { user: req.user, page: 'archives' }); });
 
 // Avatar Upload Route
@@ -429,8 +430,11 @@ app.get('/performer/:id', async (req, res) => {
                     if (sh < start.getUTCHours() - 6) { djStart.setDate(djStart.getDate() + 1); djEnd.setDate(djEnd.getDate() + 1); } else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
                     if (now >= djStart && now < djEnd) liveStatus = 'live'; else liveStatus = 'scheduled';
                 } else liveStatus = 'scheduled';
-            } else if (now < start) liveStatus = 'scheduled';
-            activeSlot = scheduleItem;
+                activeSlot = scheduleItem;
+            } else if (now < start) {
+                liveStatus = 'scheduled';
+                activeSlot = scheduleItem;
+            }
         }
         res.render('performer', { 
             performer, 
