@@ -529,7 +529,6 @@ app.get('/api/public/vrc-status', async (req, res) => {
         }
         
         const finalData = { ...data, groupStats };
-        console.log(`[VRC API] API Response: ${finalData.active ? 'Active' : 'Inactive'} | Online: ${groupStats?.onlineMembers || 0}`);
         res.json(finalData);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });

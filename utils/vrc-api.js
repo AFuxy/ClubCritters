@@ -1,13 +1,22 @@
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const WebSocket = require('ws');
 
 let authCookie = null;
-let pendingCookie = null; // Used for 2FA verification
+let pendingCookie = null; 
 let cachedGroupId = null;
-let botUserId = null; // Store bot's own VRC ID
+let botUserId = null; 
 let lastStatus = "Disconnected";
 let dbCookieLoaded = false;
-let cooldownUntil = 0; // Timestamp when we can try login again
-let lastPresence = { status: null, description: null }; // Cache for presence updates
+let cooldownUntil = 0; 
+let lastPresence = { status: null, description: null }; 
+
+// --- PIPELINE (WEBSOCKET) ---
+let pipeline = null;
+let pipelineConnected = false;
+let pipelineHeartbeat = null;
+
+// PREVENT CONCURRENT LOGINS
+let loginPromise = null;
 
 // --- CACHE CONFIGURATION ---
 const cache = {
@@ -15,12 +24,13 @@ const cache = {
     groupInstance: { data: null, timestamp: 0 },
     specificInstance: new Map() 
 };
-const CACHE_TTL = 60000; // 1 minute cache
+const CACHE_TTL = 60000; 
 
 /**
  * Save cookie to database
  */
 async function saveCookieToDB(cookie) {
+    if (!cookie) return;
     try {
         const { Settings } = require('../db');
         let settings = await Settings.findOne();
@@ -38,16 +48,16 @@ async function fetchBotUserId() {
     if (botUserId || !authCookie) return botUserId;
     try {
         const res = await fetch('https://api.vrchat.cloud/api/1/auth/user', {
-            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersManager/1.0.0' }
+            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' }
         });
         if (res.ok) {
             const data = await res.json();
             botUserId = data.id;
             console.log(`[VRC API] 👤 Identified bot user ID: ${botUserId}`);
+        } else if (res.status === 401) {
+            authCookie = null;
         }
-    } catch (e) {
-        console.error("[VRC API] Failed to fetch bot user ID:", e);
-    }
+    } catch (e) {}
     return botUserId;
 }
 
@@ -55,7 +65,7 @@ async function fetchBotUserId() {
  * Load cookie from database
  */
 async function loadCookieFromDB() {
-    if (dbCookieLoaded) return authCookie;
+    if (dbCookieLoaded && authCookie) return authCookie;
     try {
         const { Settings } = require('../db');
         const settings = await Settings.findOne();
@@ -63,357 +73,355 @@ async function loadCookieFromDB() {
             authCookie = settings.vrcCookie;
             lastStatus = "Connected";
             console.log("\x1b[36m[VRC API] 🍪 Loaded session cookie from database.\x1b[0m");
-            await fetchBotUserId(); // Make sure we have the ID too
+            await fetchBotUserId(); 
         }
         dbCookieLoaded = true;
-    } catch (e) {
-        console.error("[VRC API] Failed to load cookie from DB:", e);
-    }
+    } catch (e) {}
     return authCookie;
 }
 
 /**
- * Log in to VRChat and store the authentication cookie
+ * Log in to VRChat
  */
 async function loginVRC() {
-    // 1. Cooldown Check
-    const nowTs = Date.now();
-    if (nowTs < cooldownUntil) {
-        const remaining = Math.ceil((cooldownUntil - nowTs) / 1000);
-        lastStatus = `Rate Limited (${remaining}s)`;
-        return null;
-    }
+    if (loginPromise) return loginPromise;
 
-    // 2. Load from DB first
-    if (!authCookie && !dbCookieLoaded) {
-        await loadCookieFromDB();
-        if (authCookie) return authCookie;
-    }
+    loginPromise = (async () => {
+        try {
+            const nowTs = Date.now();
+            if (nowTs < cooldownUntil) return authCookie;
 
-    const username = process.env.VRC_USERNAME;
-    const password = process.env.VRC_PASSWORD;
-
-    if (!username || !password) {
-        lastStatus = "Missing Credentials";
-        return null;
-    }
-
-    console.log(`[VRC API] 🔐 Attempting to login as: ${username}...`);
-    const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
-
-    try {
-        const res = await fetch('https://api.vrchat.cloud/api/1/auth/user', {
-            headers: {
-                'Authorization': authHeader,
-                'User-Agent': 'ClubCrittersManager/1.0.0 (contact: site-admin)'
+            if (!authCookie) {
+                await loadCookieFromDB();
+                if (authCookie) return authCookie;
             }
-        });
 
-        // 3. Handle Rate Limiting
-        const retryAfter = res.headers.get('retry-after');
-        if (retryAfter || res.status === 429) {
-            const seconds = parseInt(retryAfter) || 300;
-            cooldownUntil = Date.now() + (seconds * 1000);
-            lastStatus = `Rate Limited (${seconds}s)`;
-            console.error(`\x1b[31m[VRC API] ⛔ RATE LIMITED: Waiting ${seconds}s before next attempt.\x1b[0m`);
-            return null;
-        }
+            const username = process.env.VRC_USERNAME;
+            const password = process.env.VRC_PASSWORD;
+            if (!username || !password) {
+                lastStatus = "Missing Credentials";
+                return null;
+            }
 
-        const data = await res.json().catch(() => ({}));
-        const cookies = res.headers.raw()['set-cookie'];
-        const currentCookie = cookies?.find(c => c.startsWith('auth='))?.split(';')[0];
+            const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
 
-        if (res.status === 200) {
-            if (currentCookie && !data.requiresTwoFactorAuth) {
-                authCookie = currentCookie;
-                botUserId = data.id; // Store our own ID
-                lastStatus = "Connected";
-                await saveCookieToDB(authCookie);
-                console.log(`\x1b[32m[VRC API] ✅ Logged in as: ${data.displayName} (${data.username})\x1b[0m`);
+            const res = await fetch('https://api.vrchat.cloud/api/1/auth/user', {
+                headers: {
+                    'Authorization': authHeader,
+                    'Cookie': authCookie || '', 
+                    'User-Agent': 'ClubCrittersHub/1.0.0'
+                }
+            });
+
+            if (res.status === 429) {
+                const retryAfter = parseInt(res.headers.get('retry-after')) || 300;
+                cooldownUntil = Date.now() + (retryAfter * 1000);
+                lastStatus = `Rate Limited (${retryAfter}s)`;
                 return authCookie;
             }
-            
-            if (data.requiresTwoFactorAuth) {
-                pendingCookie = currentCookie;
-                lastStatus = "2FA Required";
-                console.log("\x1b[33m[VRC API] 🔐 2FA Required. Check your email.\x1b[0m");
+
+            const rawCookies = res.headers.raw()['set-cookie'] || [];
+            const authVal = rawCookies.find(c => c.startsWith('auth='))?.split(';')[0];
+            const tfaVal = rawCookies.find(c => c.startsWith('twoFactorAuth='))?.split(';')[0];
+            const newCombined = [authVal, tfaVal].filter(Boolean).join('; ');
+
+            if (res.status === 200) {
+                const data = await res.json();
+                if (data.requiresTwoFactorAuth) {
+                    if (newCombined) pendingCookie = newCombined;
+                    lastStatus = "2FA Required";
+                    return null;
+                }
+                if (newCombined) {
+                    authCookie = newCombined;
+                    await saveCookieToDB(authCookie);
+                }
+                botUserId = data.id;
+                lastStatus = "Connected";
+                return authCookie;
+            } else if (res.status === 401) {
+                lastStatus = "Invalid Credentials";
+                authCookie = null; 
+                return null;
             }
-        } else if (res.status === 401) {
-            lastStatus = "Invalid Credentials";
-            console.error("\x1b[31m[VRC API] ❌ 401 Unauthorized. Check your Username/Password.\x1b[0m");
-            cooldownUntil = Date.now() + (60 * 1000); 
-        } else {
-            lastStatus = `Error ${res.status}`;
+            return authCookie;
+        } finally {
+            loginPromise = null; 
         }
-    } catch (err) {
-        console.error("[VRC API] Login Error:", err);
-        lastStatus = "Connection Error";
-    }
-    return null;
+    })();
+
+    return loginPromise;
 }
 
 /**
- * Submit an Email OTP code to VRChat
+ * Submit an Email OTP code
  */
 async function verifyVRC(code) {
     if (!code) return { success: false, message: "Code required" };
-    
-    if (!pendingCookie) {
-        await loginVRC();
-        if (!pendingCookie) return { success: false, message: lastStatus.includes("Rate Limited") ? "Account is rate limited. Please wait." : "No active login attempt found." };
-    }
+    if (!pendingCookie) await loginVRC();
+    if (!pendingCookie) return { success: false, message: "No active login attempt." };
 
     try {
         const res = await fetch('https://api.vrchat.cloud/api/1/auth/twofactorauth/emailotp/verify', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cookie': pendingCookie,
-                'User-Agent': 'ClubCrittersManager/1.0.0'
-            },
+            headers: { 'Content-Type': 'application/json', 'Cookie': pendingCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' },
             body: JSON.stringify({ code })
         });
 
         if (res.status === 200) {
-            const cookies = res.headers.raw()['set-cookie'];
-            authCookie = cookies?.find(c => c.startsWith('auth='))?.split(';')[0] || pendingCookie;
+            const rawCookies = res.headers.raw()['set-cookie'] || [];
+            const newAuth = rawCookies.find(c => c.startsWith('auth='))?.split(';')[0];
+            authCookie = newAuth || pendingCookie;
             pendingCookie = null;
             lastStatus = "Connected";
             await saveCookieToDB(authCookie);
-            await fetchBotUserId(); // Get ID after verification
+            await fetchBotUserId();
             console.log("\x1b[32m[VRC API] ✅ 2FA Verified! Connected.\x1b[0m");
             return { success: true };
         }
-        
         const data = await res.json().catch(() => ({}));
         return { success: false, message: data.error?.message || "Verification failed" };
-    } catch (e) {
-        return { success: false, message: "Network error" };
+    } catch (e) { return { success: false, message: "Network error" }; }
+}
+
+function getVrcStatus() { return lastStatus; }
+
+function cleanInstanceId(input) {
+    if (!input) return null;
+    if (input.includes('worldId=')) {
+        try {
+            const url = new URL(input);
+            const worldId = url.searchParams.get('worldId');
+            const instanceId = url.searchParams.get('instanceId');
+            return `${worldId}:${instanceId}`;
+        } catch (e) { return null; }
     }
+    return input;
 }
 
-function getVrcStatus() {
-    return lastStatus;
-}
+// Global variable to store active club location for the Pipeline listener
+let activeInviteLocation = null;
 
-function parseVrcUrl(url) {
-    try {
-        const urlObj = new URL(url);
-        const worldId = urlObj.searchParams.get('worldId');
-        const instanceId = urlObj.searchParams.get('instanceId');
-        return { worldId, instanceId };
-    } catch (e) { return null; }
-}
-
-async function getGroupId(shortName) {
-    if (cachedGroupId) return cachedGroupId;
-    
-    if (shortName.startsWith('grp_')) {
-        cachedGroupId = shortName;
-        return cachedGroupId;
-    }
+/**
+ * Connect to VRChat Notification Pipeline (WebSocket)
+ */
+async function connectPipeline(location) {
+    if (location) activeInviteLocation = location;
+    if (pipelineConnected) return; 
 
     if (!authCookie) await loadCookieFromDB();
     if (!authCookie) await loginVRC();
-    if (!authCookie) return null;
+    if (!authCookie) return;
+
+    let vrcToken = "";
+    const tokenMatch = authCookie.match(/auth=(authcookie_[^;]+)/);
+    if (tokenMatch) {
+        vrcToken = tokenMatch[1];
+    } else if (authCookie.startsWith('authcookie_')) {
+        vrcToken = authCookie.split(';')[0].trim();
+    }
+
+    if (!vrcToken) return;
+
+    console.log("[VRC API] 📡 Connecting to Notification Pipeline...");
+    pipeline = new WebSocket(`wss://pipeline.vrchat.cloud/?authToken=${vrcToken}`, {
+        headers: { 'User-Agent': 'ClubCrittersHub/1.0.0 (contact: site-admin)', 'Origin': 'https://vrchat.com' }
+    });
+
+    pipeline.on('open', () => {
+        pipelineConnected = true;
+        console.log("\x1b[32m[VRC API] ✅ Connected to Pipeline. Bot is now ONLINE (Web).\x1b[0m");
+        
+        if (pipelineHeartbeat) clearInterval(pipelineHeartbeat);
+        pipelineHeartbeat = setInterval(() => {
+            if (pipeline && pipeline.readyState === WebSocket.OPEN) pipeline.ping();
+        }, 30000);
+    });
+
+    pipeline.on('message', async (data) => {
+        try {
+            const msg = JSON.parse(data);
+            if (!msg.type || msg.type !== 'notification') return;
+            const notif = JSON.parse(msg.content);
+            
+            // 1. Friend Request
+            if (notif.type === 'friendRequest') {
+                console.log(`[VRC API] 🤝 Accepting friend request from: ${notif.senderUsername}`);
+                await fetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
+                    method: 'PUT', headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' }
+                });
+            }
+
+            if ((notif.type === 'requestInvite' || notif.type === 'invite') && activeInviteLocation) {
+                const targetLocation = cleanInstanceId(activeInviteLocation);
+                if (!targetLocation) return;
+
+                console.log(`[VRC API] ✨ Received ${notif.type} from ${notif.senderUsername}. Exchanging for Club Invite...`);
+                
+                const inviteRes = await fetch(`https://api.vrchat.cloud/api/1/invite/${notif.senderUserId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' },
+                    body: JSON.stringify({ instanceId: targetLocation })
+                });
+
+                if (inviteRes.ok) {
+                    console.log(`\x1b[32m[VRC API] 📧 Invite successfully sent to ${notif.senderUsername}!\x1b[0m`);
+                } else {
+                    const err = await inviteRes.json().catch(() => ({}));
+                    if (inviteRes.status === 403) {
+                        console.error(`\x1b[31m[VRC API] ❌ Invite Failed (403): Bot lacks permission to invite to this instance. (Ensure bot has 'Can Invite' group role!)\x1b[0m`);
+                    } else {
+                        console.error(`\x1b[31m[VRC API] ❌ Failed to send invite: ${inviteRes.status} ${err.error?.message || ''}\x1b[0m`);
+                    }
+                }
+
+                // Hide the notification
+                await fetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/hide`, {
+                    method: 'PUT', headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' }
+                });
+            }
+        } catch (e) {}
+    });
+
+    pipeline.on('close', () => { 
+        pipelineConnected = false; 
+        clearInterval(pipelineHeartbeat);
+        setTimeout(() => connectPipeline(activeInviteLocation), 10000);
+    });
+    
+    pipeline.on('error', (err) => { 
+        console.error("[VRC API] Pipeline Error:", err.message); 
+        pipelineConnected = false;
+    });
+}
+
+function disconnectPipeline() {}
+
+async function updateBotPresence(status, description) {
+    if (lastPresence.status === status && lastPresence.description === description) return;
+    if (!authCookie) await loadCookieFromDB();
+    if (!authCookie) await loginVRC();
+    if (!authCookie || !botUserId) return;
 
     try {
-        const res = await fetch(`https://api.vrchat.cloud/api/1/users/me/groups`, {
-            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersManager/1.0.0' }
+        const res = await fetch(`https://api.vrchat.cloud/api/1/users/${botUserId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cookie': authCookie,
+                'User-Agent': 'ClubCrittersHub/1.0.0'
+            },
+            body: JSON.stringify({ status: status || 'active', statusDescription: description || '' })
         });
+        if (res.ok) {
+            console.log(`\x1b[36m[VRC API] 📡 Presence updated: ${status} | ${description}\x1b[0m`);
+            lastPresence = { status, description };
+        }
+    } catch (err) {}
+}
 
+async function getGroupId(inputName) {
+    if (cachedGroupId) return cachedGroupId;
+    const shortName = inputName.replace(/['"]+/g, '').trim();
+    if (shortName.startsWith('grp_')) { cachedGroupId = shortName; return cachedGroupId; }
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return null;
+    try {
+        const res = await fetch(`https://api.vrchat.cloud/api/1/users/me/groups`, { headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' } });
         if (res.ok) {
             const groups = await res.json();
             const match = groups.find(g => g.shortCode && g.shortCode.toLowerCase() === shortName.toLowerCase());
-            
-            if (match) {
-                cachedGroupId = match.id;
-                return cachedGroupId;
-            }
+            if (match) { cachedGroupId = match.id; return cachedGroupId; }
         }
     } catch (e) {}
     return null;
 }
 
-/**
- * Update the Bot's presence (Status and Status Description)
- */
-async function updateBotPresence(status, description) {
-    if (lastPresence.status === status && lastPresence.description === description) {
-        return; // Skip if nothing changed
-    }
-
-    if (!authCookie) await loadCookieFromDB();
-    if (!authCookie) await loginVRC();
-    if (!authCookie) return;
-    
-    const userId = await fetchBotUserId();
-    if (!userId) return;
-
-    try {
-        const res = await fetch(`https://api.vrchat.cloud/api/1/users/${userId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cookie': authCookie,
-                'User-Agent': 'ClubCrittersManager/1.0.0'
-            },
-            body: JSON.stringify({
-                status: status || 'active',
-                statusDescription: description || ''
-            })
-        });
-        if (res.ok) {
-            console.log(`\x1b[36m[VRC API] 📡 Presence updated: ${status} | ${description}\x1b[0m`);
-            lastPresence = { status, description };
-        } else {
-            console.error(`\x1b[31m[VRC API] ❌ Failed to update presence: ${res.status}\x1b[0m`);
-        }
-    } catch (err) {
-        console.error("[VRC API] Error updating presence:", err);
-    }
-}
-
-/**
- * Automatically fetch and accept all pending friend requests
- */
-async function autoAcceptFriends() {
-    if (!authCookie) await loadCookieFromDB();
-    if (!authCookie) await loginVRC();
-    if (!authCookie) return;
-
-    try {
-        // console.log("[VRC API] 🤝 Checking for friend requests...");
-        const res = await fetch('https://api.vrchat.cloud/api/1/auth/user/notifications?type=friendRequest', {
-            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersManager/1.0.0' }
-        });
-
-        if (res.ok) {
-            const notifications = await res.json();
-            if (notifications.length > 0) {
-                console.log(`\x1b[32m[VRC API] 🤝 Found ${notifications.length} pending friend requests. Accepting...\x1b[0m`);
-                
-                for (const notif of notifications) {
-                    const acceptRes = await fetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
-                        method: 'PUT',
-                        headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersManager/1.0.0' }
-                    });
-                    if (acceptRes.ok) {
-                        console.log(`\x1b[32m[VRC API] ✅ Accepted friend request from: ${notif.senderUsername}\x1b[0m`);
-                    }
-                }
-            }
-        }
-    } catch (err) {
-        console.error("[VRC API] Error auto-accepting friends:", err);
-    }
-}
-
-/**
- * Fetch group instance data
- */
 async function getGroupInstanceData(groupShortName) {
     const now = Date.now();
     if (cache.groupInstance.data && (now - cache.groupInstance.timestamp < CACHE_TTL)) return cache.groupInstance.data;
-
-    if (!authCookie) await loadCookieFromDB();
     if (!authCookie) await loginVRC();
     if (!authCookie) return { active: false, count: 0, capacity: 0 };
-    
     const groupId = await getGroupId(groupShortName);
     if (!groupId) return { active: false, count: 0, capacity: 0 };
-
     try {
-        const res = await fetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/instances`, {
-            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersManager/1.0.0' }
-        });
-
+        const res = await fetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/instances`, { headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' } });
         if (res.status === 200) {
             const instances = await res.json();
-            let result = { active: false, count: 0, capacity: 0 };
+            let result = { active: false, count: 0, capacity: 0, location: null };
             if (instances && instances.length > 0) {
                 const bestInstance = instances.reduce((prev, current) => (prev.n_users > current.n_users) ? prev : current);
-                result = { active: true, count: bestInstance.n_users, capacity: bestInstance.capacity };
+                result = { active: true, count: bestInstance.n_users, capacity: bestInstance.capacity, location: `${bestInstance.worldId}:${bestInstance.instanceId}` };
             }
             cache.groupInstance = { data: result, timestamp: now };
             return result;
-        } else if (res.status === 401) {
-            authCookie = null;
-            return getGroupInstanceData(groupShortName);
         }
     } catch (err) {}
     return { active: false, count: 0, capacity: 0 };
 }
 
-/**
- * Fetch specific instance
- */
 async function getInstanceData(instanceUrl) {
     const now = Date.now();
     const cached = cache.specificInstance.get(instanceUrl);
     if (cached && (now - cached.timestamp < CACHE_TTL)) return cached.data;
-
     if (!instanceUrl) return null;
     if (!instanceUrl.includes("worldId=")) return getGroupInstanceData(instanceUrl);
-
-    if (!authCookie) await loadCookieFromDB();
     if (!authCookie) await loginVRC();
     if (!authCookie) return { active: false, count: 0, capacity: 0 };
-
-    const parsed = parseVrcUrl(instanceUrl);
-    if (!parsed || !parsed.worldId) return null;
-
+    const url = new URL(instanceUrl);
+    const target = `${url.searchParams.get('worldId')}:${url.searchParams.get('instanceId')}`;
     try {
-        const res = await fetch(`https://api.vrchat.cloud/api/1/instances/${parsed.worldId}:${parsed.instanceId}`, {
-            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersManager/1.0.0' }
-        });
-
+        const res = await fetch(`https://api.vrchat.cloud/api/1/instances/${target}`, { headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' } });
         if (res.status === 200) {
             const data = await res.json();
-            const result = { active: true, count: data.n_users, capacity: data.capacity };
+            const result = { active: true, count: data.n_users, capacity: data.capacity, location: target };
             cache.specificInstance.set(instanceUrl, { data: result, timestamp: now });
             return result;
-        } else if (res.status === 401) {
-            authCookie = null;
-            return getInstanceData(instanceUrl);
         }
     } catch (err) {}
     return { active: false, count: 0, capacity: 0 };
 }
 
-/**
- * Fetch general statistics for the group
- */
 async function getGroupStats(groupShortName) {
     const now = Date.now();
     if (cache.groupStats.data && (now - cache.groupStats.timestamp < CACHE_TTL)) return cache.groupStats.data;
-
-    if (!authCookie) await loadCookieFromDB();
     if (!authCookie) await loginVRC();
     if (!authCookie) return null;
-
     const groupId = await getGroupId(groupShortName);
     if (!groupId) return null;
-
     try {
-        const res = await fetch(`https://api.vrchat.cloud/api/1/groups/${groupId}`, {
-            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersManager/1.0.0' }
-        });
-
+        const res = await fetch(`https://api.vrchat.cloud/api/1/groups/${groupId}`, { headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' } });
         if (res.ok) {
             const data = await res.json();
             const result = { totalMembers: data.memberCount || 0, onlineMembers: data.onlineMemberCount || 0 };
-            console.log(`[VRC API] 📈 Group Stats for ${groupShortName}: ${result.onlineMembers} online / ${result.totalMembers} total`);
+            console.log(`[VRC API] 📈 Group Stats for ${groupShortName}: ${result.onlineMembers} online`);
             cache.groupStats = { data: result, timestamp: now };
             return result;
-        } else if (res.status === 401) {
-            authCookie = null;
-            return getGroupStats(groupShortName);
         }
-    } catch (e) {
-        console.error("[VRC API] Error fetching group stats:", e);
-    }
+    } catch (e) {}
     return null;
 }
 
-module.exports = { getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, autoAcceptFriends, updateBotPresence };
+async function autoAcceptFriends() {
+    if (!authCookie) await loadCookieFromDB();
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return;
+    try {
+        const res = await fetch('https://api.vrchat.cloud/api/1/auth/user/notifications?type=friendRequest', {
+            headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' }
+        });
+        if (res.ok) {
+            const notifications = await res.json();
+            if (notifications.length > 0) {
+                console.log(`\x1b[32m[VRC API] 🤝 Found ${notifications.length} friend requests. Accepting...\x1b[0m`);
+                for (const notif of notifications) {
+                    await fetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
+                        method: 'PUT', headers: { 'Cookie': authCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' }
+                    });
+                }
+            }
+        }
+    } catch (err) {}
+}
+
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends };

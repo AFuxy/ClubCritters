@@ -9,7 +9,7 @@ The system is built on a modern stack designed for high availability and communi
 - **Frontend:** Server-side rendered EJS templates and static HTML styled with professional CSS, featuring staggered animations, glassmorphism, and responsive masonry layouts.
 - **Backend:** Node.js (Express) handling OAuth2 flows, RESTful APIs, and high-performance image processing (Sharp/Multer).
 - **Database:** MySQL (Sequelize ORM) managing persistent state for the roster, schedule, set archives, community gallery, and recruitment.
-- **VRChat Integration:** Real-time instance tracking, community pulse monitoring, and an automated "Beacon" presence via the VRChat API.
+- **VRChat Integration:** Real-time instance tracking, community pulse monitoring, and a permanent "Pipeline" WebSocket connection for 24/7 presence and automated auto-invites.
 - **Discord Bot:** A dedicated Discord.js bot that synchronizes the club's live state, manages gallery syncing, and provides an automated recruitment ticket system.
 
 ## 🛠 Setup & Local Development
@@ -67,7 +67,7 @@ npm start
 ## 🌐 Features & Workflows
 
 ### 🎫 Automated Recruitment
-- **Dynamic Forms:** Specialized application forms for DJs, Singers, Musicians, and Staff.
+- **Dynamic Forms:** Specialized application forms for DJs, Singers, Musician/Bands, and Event Staff.
 - **Staff Review Tickets:** Submissions automatically create private Discord channels for review.
 - **Discord Decisions:** Staff can Approve or Deny applicants directly from Discord via interactive buttons.
 - **Identity Verification:** Users must be in the Discord server to apply; the system can automatically force-join them during login.
@@ -79,7 +79,8 @@ npm start
 
 ### 🦊 VRChat Beacon
 - **Live Tracking:** Real-time player counts and group activity visible on the homepage.
-- **Auto-Beacon:** The bot automatically sets its VRChat status to "Join Me" and points to the active instance during events.
+- **Always Online:** The bot maintains a 24/7 WebSocket connection to VRChat's Notification Pipeline, appearing "Online (Web)" at all times.
+- **Auto-Invites:** Bot automatically responds to "Request Invite" notifications in-game when the club is active.
 - **Friend Management:** The bot automatically accepts all incoming friend requests to grow the joinable network.
 - **Cache Shield:** Integrated 60-second caching prevents API rate-limiting.
 
