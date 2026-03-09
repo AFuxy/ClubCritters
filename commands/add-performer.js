@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { Roster } = require('../db');
 
 module.exports = {
@@ -34,10 +34,10 @@ module.exports = {
                 imageUrl: "", 
                 links: {}
             });
-            await interaction.reply({ content: `✅ Successfully registered **${name}** (ID: ${user.id})!`, ephemeral: true });
+            await interaction.reply({ content: `✅ Successfully registered **${name}** (ID: ${user.id})!`, flags: MessageFlags.Ephemeral });
         } catch (err) {
             console.error(err);
-            await interaction.reply({ content: '❌ Failed to register performer.', ephemeral: true });
+            await interaction.reply({ content: '❌ Failed to register performer.', flags: MessageFlags.Ephemeral });
         }
     },
 };

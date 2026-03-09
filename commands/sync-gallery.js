@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { Gallery } = require('../db');
 const { downloadFile } = require('../utils/bot-utils');
 
@@ -8,7 +8,7 @@ module.exports = {
         .setDescription('Scan the gallery channel and sync all existing photos to the website (Oldest First)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const channelId = process.env.DISCORD_GALLERY_CH_ID;
         if (!channelId) return interaction.editReply("❌ Gallery Channel ID not set in .env");

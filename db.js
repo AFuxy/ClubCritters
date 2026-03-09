@@ -62,8 +62,10 @@ const Stats = sequelize.define('Stats', {
 // 6. Application Slots
 const AppSlot = sequelize.define('AppSlot', {
     roleName: { type: DataTypes.STRING, allowNull: false },
+    roleType: { type: DataTypes.ENUM('DJ', 'Singer', 'Musician/Band', 'Event Staff', 'Other'), defaultValue: 'DJ' },
     description: { type: DataTypes.TEXT },
     formUrl: { type: DataTypes.STRING },
+    isInternal: { type: DataTypes.BOOLEAN, defaultValue: false },
     status: { type: DataTypes.ENUM('open', 'closed'), defaultValue: 'closed' },
     deadline: { type: DataTypes.STRING }, // Display string
     autoCloseAt: { type: DataTypes.DATE }, // Machine readable date for auto-close
@@ -82,12 +84,27 @@ const Gallery = sequelize.define('Gallery', {
     timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 });
 
+// 8. Application Submissions (Internal)
+const ApplicationSubmission = sequelize.define('ApplicationSubmission', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    slotId: { type: DataTypes.INTEGER },
+    discordId: { type: DataTypes.STRING },
+    discordTag: { type: DataTypes.STRING },
+    status: { type: DataTypes.ENUM('pending', 'reviewed', 'accepted', 'declined'), defaultValue: 'pending' },
+    answers: { type: DataTypes.JSON }, // Store all form fields here
+    channelId: { type: DataTypes.STRING }, // The private Discord channel created for this app
+    timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+});
+
 // Relationships
 Roster.hasMany(Schedule, { foreignKey: 'performerId' });
 Schedule.belongsTo(Roster, { foreignKey: 'performerId' });
 
 Roster.hasMany(Archive, { foreignKey: 'performerId' });
 Archive.belongsTo(Roster, { foreignKey: 'performerId' });
+
+AppSlot.hasMany(ApplicationSubmission, { foreignKey: 'slotId' });
+ApplicationSubmission.belongsTo(AppSlot, { foreignKey: 'slotId' });
 
 async function initDB() {
     try {
@@ -100,4 +117,4 @@ async function initDB() {
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, initDB };

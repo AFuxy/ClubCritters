@@ -46,10 +46,7 @@
             opacity: 0;
             transform: translateY(20px);
         }
-        .app-card.revealed {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        .app-card.revealed { opacity: 1; transform: translateY(0); }
         .app-card:hover {
             transform: translateY(-10px) scale(1.02);
             border-color: var(--primary-blue);
@@ -68,115 +65,125 @@
         
         .app-image-container::after {
             content: '';
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            height: 50%;
+            position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
             background: linear-gradient(to top, rgba(11, 16, 22, 1), transparent);
         }
 
         .app-img {
-            width: 110px;
-            height: 110px;
+            width: 110px; height: 110px;
             object-fit: cover;
             filter: drop-shadow(0 0 15px rgba(41, 197, 246, 0.6));
             z-index: 1;
             transition: transform 0.5s ease;
         }
-        .app-card:hover .app-img {
-            transform: rotate(5deg) scale(1.1);
-        }
+        .app-card:hover .app-img { transform: rotate(5deg) scale(1.1); }
 
         .status-badge {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            padding: 6px 14px;
-            border-radius: 30px;
-            font-size: 0.75rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            z-index: 5;
+            position: absolute; top: 20px; right: 20px;
+            padding: 6px 14px; border-radius: 30px;
+            font-size: 0.75rem; font-weight: 900;
+            text-transform: uppercase; letter-spacing: 1.5px; z-index: 5;
         }
-        .status-open { 
-            background: #00e676; 
-            color: black; 
-            box-shadow: 0 0 20px rgba(0, 230, 118, 0.5); 
-        }
-        .status-closed { 
-            background: #ff5252; 
-            color: white; 
-            box-shadow: 0 0 15px rgba(255, 82, 82, 0.3);
-        }
+        .status-open { background: #00e676; color: black; box-shadow: 0 0 20px rgba(0, 230, 118, 0.5); }
+        .status-closed { background: #ff5252; color: white; box-shadow: 0 0 15px rgba(255, 82, 82, 0.3); }
 
         .deadline-badge {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.7);
-            color: #fff;
-            padding: 6px 14px;
-            border-radius: 30px;
-            font-size: 0.7rem;
-            font-weight: 800;
-            backdrop-filter: blur(8px);
-            z-index: 5;
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0,0,0,0.7); color: #fff;
+            padding: 6px 14px; border-radius: 30px;
+            font-size: 0.7rem; font-weight: 800;
+            backdrop-filter: blur(8px); z-index: 5;
             border: 1px solid rgba(255,255,255,0.1);
         }
 
         .app-content {
-            padding: 30px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
+            padding: 30px; flex-grow: 1;
+            display: flex; flex-direction: column;
             background: rgba(21, 30, 41, 0.4);
         }
         .app-content h2 {
-            margin: 0;
-            font-size: 1.6rem;
+            margin: 0; font-size: 1.6rem;
             background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            text-transform: uppercase;
-            font-weight: 900;
-            letter-spacing: 1px;
+            -webkit-background-clip: text; background-clip: text;
+            color: transparent; text-transform: uppercase;
+            font-weight: 900; letter-spacing: 1px;
         }
         .app-content p {
-            color: #ccc;
-            font-size: 0.95rem;
-            line-height: 1.7;
-            margin: 20px 0 30px 0;
+            color: #ccc; font-size: 0.95rem;
+            line-height: 1.7; margin: 20px 0 30px 0;
             flex-grow: 1;
         }
 
-        .card-closed { 
-            opacity: 0.8; 
-            filter: grayscale(0.3); 
-        }
-        .card-closed:hover {
-            border-color: #ff5252;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px rgba(255, 82, 82, 0.1);
-        }
-
         #main-title {
-            font-size: 4rem;
-            margin-bottom: 0;
-            font-weight: 900;
+            font-size: 4rem; text-align: center;
+            margin-bottom: 0; font-weight: 900;
             filter: drop-shadow(0 0 20px rgba(41, 197, 246, 0.3));
         }
 
         #status-subtext {
-            font-size: 1.2rem;
-            letter-spacing: 5px;
-            text-transform: uppercase;
-            opacity: 0.6;
-            margin-top: 10px;
+            text-align: center; font-size: 1.2rem;
+            letter-spacing: 5px; text-transform: uppercase;
+            opacity: 0.6; margin-top: 10px;
         }
+
+        /* INTERNAL FORM STYLES */
+        .internal-form-container {
+            max-width: 800px; margin: 50px auto;
+            background: var(--card-bg); padding: 40px;
+            border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .form-header {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 20px; margin-bottom: 30px;
+        }
+        .form-header h2 { margin: 0; color: var(--primary-blue); font-size: 2rem; font-weight: 900; }
+
+        .form-group { margin-bottom: 25px; }
+        .form-group label {
+            display: block; margin-bottom: 10px;
+            font-weight: 600; color: #fff;
+            font-size: 0.9rem; text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1); padding: 15px;
+            border-radius: 12px; color: #fff;
+            font-family: inherit; font-size: 1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-sizing: border-box;
+        }
+        
+        .form-group select {
+            appearance: none; cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2329C5F6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 20px center;
+            background-size: 16px; padding-right: 45px;
+        }
+
+        .form-group select option { background-color: #151e29; color: #fff; padding: 10px; }
+
+        .form-group input:hover, .form-group textarea:hover, .form-group select:hover {
+            border-color: rgba(41, 197, 246, 0.4);
+            background: rgba(41, 197, 246, 0.05);
+        }
+
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none; border-color: var(--primary-blue);
+            background: rgba(0,0,0,0.6);
+            box-shadow: 0 0 20px rgba(41, 197, 246, 0.2), inset 0 0 10px rgba(41, 197, 246, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
         @media (max-width: 768px) {
             #main-title { font-size: 2.5rem; }
             .app-grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .internal-form-container { padding: 25px; border-radius: 20px; }
         }
     </style>
 </head>
@@ -185,49 +192,133 @@
     <div class="container" style="max-width: 1100px;">
         <a href="/" class="btn-cc nav-pill-cc">← Back to Hub</a>
 
-        <div class="logo-container" style="margin-top: 30px;">
-            <img class="logo" src="/cdn/logos/club/HeadOnly.png" alt="Little Critters Logo"> 
+        <div id="selection-view">
+            <div class="logo-container" style="margin-top: 30px;">
+                <img class="logo" src="/cdn/logos/club/HeadOnly.png" alt="Little Critters Logo"> 
+            </div>
+
+            <h1 id="main-title">JOIN THE CREW</h1>
+            <p id="status-subtext">Club Critters Recruitment</p>
+
+            <div id="loading-apps" style="margin-top: 80px; text-align: center;">
+                <div class="spinner" style="width: 60px; height: 60px;"></div>
+                <p style="color:#888; font-weight: bold; letter-spacing: 1px;">SCANNING FOR OPENINGS...</p>
+            </div>
+
+            <div id="apps-container" class="app-grid hidden">
+                <!-- Dynamic Apps Here -->
+            </div>
+
+            <p id="empty-msg" class="hidden" style="margin-top: 80px; color: #888; font-size: 1.1rem; text-align: center;">We currently don't have any open roles. Check back soon!</p>
         </div>
 
-        <h1 id="main-title">JOIN THE CREW</h1>
-        <p id="status-subtext">Club Critters Recruitment</p>
+        <div id="form-view" class="hidden">
+            <div class="internal-form-container">
+                <div class="form-header">
+                    <button class="btn-cc btn-small btn-dark" onclick="showSelection()" style="margin-bottom: 20px;">&larr; Cancel</button>
+                    <h2 id="form-role-title">APPLICATION</h2>
+                    <p id="form-role-desc" style="color: #888; margin-top: 10px; font-size: 0.9rem;"></p>
+                </div>
 
-        <div id="loading-apps" style="margin-top: 80px;">
-            <div class="spinner" style="width: 60px; height: 60px;"></div>
-            <p style="color:#888; font-weight: bold; letter-spacing: 1px;">SCANNING FOR OPENINGS...</p>
+                <% if (user) { %>
+                    <form id="dynamic-application-form">
+                        <input type="hidden" id="field-slot-id">
+                        
+                        <div id="dynamic-fields-container">
+                            <!-- JS will inject fields here -->
+                        </div>
+
+                        <div class="form-group" style="display: flex; align-items: flex-start; gap: 10px; margin-top: 40px; background: rgba(41, 197, 246, 0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(41, 197, 246, 0.1);">
+                            <input type="checkbox" id="field-agree" required style="width: auto; margin-top: 5px;">
+                            <label style="margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.85rem; cursor: pointer;" for="field-agree">
+                                I confirm that I have read and agree to the <strong>Club Critters Performer/Staff Code of Conduct</strong>.
+                            </label>
+                        </div>
+
+                        <button type="submit" id="submit-btn" class="btn-cc btn-primary" style="width: 100%; margin-top: 20px; height: 60px; font-size: 1.2rem;">Submit Application</button>
+                    </form>
+                <% } else { %>
+                    <div style="text-align: center; padding: 40px 0;">
+                        <p style="color: #888; margin-bottom: 30px;">You must be logged in with Discord to apply.</p>
+                        <a id="login-redirect-btn" href="/auth/discord" class="btn-cc btn-primary">Login with Discord</a>
+                    </div>
+                <% } %>
+            </div>
         </div>
-
-        <div id="apps-container" class="app-grid hidden">
-            <!-- Dynamic Apps Here -->
-        </div>
-
-        <p id="empty-msg" class="hidden" style="margin-top: 80px; color: #888; font-size: 1.1rem;">We currently don't have any open roles. Check back soon!</p>
     </div>
 
     <script>
-        async function initApply() {
-            fetch("/api/stats/track", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'page_view', targetId: 'apply', metadata: { page: 'apply' } })
-            }).catch(() => {});
+        const selectionView = document.getElementById('selection-view');
+        const formView = document.getElementById('form-view');
+        const appsContainer = document.getElementById('apps-container');
+        const loadingApps = document.getElementById('loading-apps');
+        const emptyMsg = document.getElementById('empty-msg');
+        const fieldsContainer = document.getElementById('dynamic-fields-container');
 
+        const FORM_DEFINITIONS = {
+            'DJ': [
+                { label: 'DJ Name / Stage Name', key: 'DJ Name', type: 'text', required: true, placeholder: 'What do we call you?' },
+                { label: 'DJ Logo / Font Link', key: 'Logo Link', type: 'url', placeholder: 'https://imgur.com/...' },
+                { label: 'Performance Type', key: 'Performance Type', type: 'select', options: ['Individual DJ', 'B2B (Back to Back)'] },
+                { label: 'Stage Name(s)', key: 'Stage Names', type: 'text', placeholder: 'Names for the pair' },
+                { label: 'Social Media', key: 'Socials', type: 'text', required: true, placeholder: '@yourhandle' },
+                { label: 'DJ Experience', key: 'Experience', type: 'text', placeholder: 'e.g. 2 Years' },
+                { label: 'Primary Genre Family', key: 'Genre Family', type: 'select', options: ['House', 'Techno', 'Bass', 'Trance', 'Hardstyle', 'Multi-Genre', 'Other'] },
+                { label: 'Top 2 Main Genres', key: 'Genres', type: 'text', required: true, placeholder: 'e.g. Big Room & Future House' },
+                { label: 'Preferred Set Length', key: 'Set Length', type: 'select', options: ['1 Hour', '30 Minutes', 'Either / Both'] },
+                { label: 'Own Visuals?', key: 'Visuals', type: 'select', options: ['No', 'Yes'] },
+                { label: 'Demo Submission Link', key: 'Demo Link', type: 'url', required: true, placeholder: 'SoundCloud / Mixcloud link' },
+                { label: 'Additional Comments', key: 'Comments', type: 'textarea' }
+            ],
+            'Singer': [
+                { label: 'Singer/Stage Name', key: 'Stage Name', type: 'text', required: true, placeholder: 'Your stage name' },
+                { label: 'Logo/Font Link', key: 'Logo Link', type: 'url', placeholder: 'https://imgur.com/...' },
+                { label: 'Genre Family', key: 'Genre Family', type: 'select', options: ['Pop', 'Rock', 'Jazz', 'EDM Vocalist', 'Other'] },
+                { label: 'Social Media', key: 'Socials', type: 'text', required: true, placeholder: '@yourhandle' },
+                { label: 'Previous Performances', key: 'Experience', type: 'textarea', placeholder: 'Tell us about your history' },
+                { label: 'Mic/Gear Setup', key: 'Gear', type: 'text', placeholder: 'e.g. Shure SM7B' },
+                { label: 'Demo Submission Link', key: 'Demo Link', type: 'url', required: true, placeholder: 'SoundCloud / YouTube link' },
+                { label: 'Additional Comments', key: 'Comments', type: 'textarea' }
+            ],
+            'Musician/Band': [
+                { label: 'Musician / Band Name', key: 'Band Name', type: 'text', required: true },
+                { label: 'Members Count', key: 'Members', type: 'text', placeholder: 'e.g. Solo, Duo, 4 Piece' },
+                { label: 'Instruments Used', key: 'Instruments', type: 'text', placeholder: 'e.g. Guitar, Drums, Synth' },
+                { label: 'Social Media', key: 'Socials', type: 'text', required: true },
+                { label: 'Demo / Performance Video', key: 'Demo Link', type: 'url', required: true },
+                { label: 'VRChat Performance History', key: 'Experience', type: 'textarea' },
+                { label: 'Additional Comments', key: 'Comments', type: 'textarea' }
+            ],
+            'Event Staff': [
+                { label: 'Real Name / Preferred Name', key: 'Name', type: 'text', required: true },
+                { label: 'Role Applying For', key: 'Role', type: 'select', options: ['Moderator', 'Event Host', 'Visual Artist', 'General Help'] },
+                { label: 'Timezone', key: 'Timezone', type: 'text', required: true, placeholder: 'e.g. GMT+1 / EST' },
+                { label: 'VRChat Experience', key: 'Experience', type: 'textarea', placeholder: 'Describe your history in VRChat communities' },
+                { label: 'Why join Club Critters?', key: 'Motivation', type: 'textarea', required: true, placeholder: 'What draws you to our team?' },
+                { label: 'Availability', key: 'Availability', type: 'text', required: true, placeholder: 'e.g. 5-10 hours per week' },
+                { label: 'Additional Comments', key: 'Comments', type: 'textarea' }
+            ],
+            'Other': [
+                { label: 'Name', key: 'Name', type: 'text', required: true },
+                { label: 'Reason for Applying', key: 'Reason', type: 'textarea', required: true },
+                { label: 'Experience / Background', key: 'Experience', type: 'textarea' },
+                { label: 'Portfolio / Links', key: 'Links', type: 'text' },
+                { label: 'Additional Comments', key: 'Comments', type: 'textarea' }
+            ]
+        };
+
+        async function initApply() {
             try {
                 const res = await fetch('/api/public/apps');
                 const apps = await res.json();
-
-                const container = document.getElementById('apps-container');
-                const loading = document.getElementById('loading-apps');
-                const empty = document.getElementById('empty-msg');
-
-                loading.classList.add('hidden');
+                loadingApps.classList.add('hidden');
 
                 if (apps.length === 0) {
-                    empty.classList.remove('hidden');
+                    emptyMsg.classList.remove('hidden');
                     return;
                 }
 
-                container.innerHTML = apps.map((app, index) => {
+                appsContainer.innerHTML = apps.map((app, index) => {
                     const isOpen = app.status === 'open';
                     return `
                         <div class="app-card ${isOpen ? '' : 'card-closed'}" style="transition-delay: ${index * 100}ms">
@@ -240,7 +331,10 @@
                                 <h2>${app.roleName}</h2>
                                 <p>${app.description || 'No description provided.'}</p>
                                 ${isOpen ? 
-                                    `<a href="${app.formUrl}" target="_blank" class="btn-cc btn-primary" onclick="trackAppClick('${app.id}', '${app.roleName}')">Apply Now</a>` : 
+                                    (app.isInternal ? 
+                                        `<button onclick="handleInternalApply('${app.id}', '${app.roleName}', \`${app.description || ''}\`, '${app.roleType}')" class="btn-cc btn-primary">Apply Now</button>` :
+                                        `<a href="${app.formUrl}" target="_blank" class="btn-cc btn-primary" onclick="trackAppClick('${app.id}', '${app.roleName}')">Apply Now</a>`
+                                    ) : 
                                     `<button class="btn-cc btn-dark" disabled>Applications Closed</button>`
                                 }
                             </div>
@@ -248,29 +342,102 @@
                     `;
                 }).join('');
 
-                container.classList.remove('hidden');
-                
-                // Trigger reveal animation
-                setTimeout(() => {
-                    document.querySelectorAll('.app-card').forEach(card => card.classList.add('revealed'));
-                }, 50);
+                appsContainer.classList.remove('hidden');
+                setTimeout(() => { document.querySelectorAll('.app-card').forEach(card => card.classList.add('revealed')); }, 50);
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const autoSlotId = urlParams.get('slotId');
+                if (autoSlotId) {
+                    const slot = apps.find(a => a.id.toString() === autoSlotId);
+                    if (slot) openInternalForm(slot.id, slot.roleName, slot.description, slot.roleType);
+                }
 
             } catch (e) {
                 console.error(e);
-                document.getElementById('loading-apps').innerHTML = '<p style="color:#ff4444;">Failed to load applications.</p>';
+                loadingApps.innerHTML = '<p style="color:#ff4444;">Failed to load applications.</p>';
             }
         }
 
-        function trackAppClick(id, name) {
-            fetch("/api/stats/track", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    type: 'link_click', 
-                    targetId: id, 
-                    metadata: { page: 'apply', label: name, category: 'application' } 
-                })
-            }).catch(() => {});
+        function handleInternalApply(id, name, desc, type) {
+            <% if (user) { %>
+                openInternalForm(id, name, desc, type);
+            <% } else { %>
+                window.location.href = `/auth/discord?returnTo=/apply?slotId=${id}`;
+            <% } %>
+        }
+
+        function openInternalForm(id, name, desc, type) {
+            selectionView.classList.add('hidden');
+            formView.classList.remove('hidden');
+            document.getElementById('form-role-title').innerText = name.toUpperCase() + " APPLICATION";
+            document.getElementById('form-role-desc').innerText = desc;
+            document.getElementById('field-slot-id').value = id;
+            
+            // Build dynamic fields
+            const fields = FORM_DEFINITIONS[type] || FORM_DEFINITIONS['Other'];
+            fieldsContainer.innerHTML = fields.map(f => {
+                let input = '';
+                if (f.type === 'select') {
+                    input = `<select id="f-${f.key}" ${f.required ? 'required' : ''}>
+                        ${f.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                    </select>`;
+                } else if (f.type === 'textarea') {
+                    input = `<textarea id="f-${f.key}" rows="4" ${f.required ? 'required' : ''} placeholder="${f.placeholder || ''}"></textarea>`;
+                } else {
+                    input = `<input type="${f.type}" id="f-${f.key}" ${f.required ? 'required' : ''} placeholder="${f.placeholder || ''}">`;
+                }
+                return `<div class="form-group"><label>${f.label}</label>${input}</div>`;
+            }).join('');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showSelection() {
+            formView.classList.add('hidden');
+            selectionView.classList.remove('hidden');
+        }
+
+        const appForm = document.getElementById('dynamic-application-form');
+        if (appForm) {
+            appForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = document.getElementById('submit-btn');
+                submitBtn.disabled = true;
+                submitBtn.innerText = "Submitting...";
+
+                const slotId = document.getElementById('field-slot-id').value;
+                const answers = {};
+                
+                // Collect all dynamic values
+                document.querySelectorAll('[id^="f-"]').forEach(input => {
+                    const key = input.id.replace('f-', '');
+                    answers[key] = input.value;
+                });
+
+                try {
+                    const res = await fetch('/api/public/apps/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            slotId,
+                            discordId: '<%= user ? user.discordId : "" %>',
+                            discordTag: '<%= user ? (user.discordData?.nickname || user.name) : "" %>',
+                            answers
+                        })
+                    });
+
+                    if (res.ok) {
+                        formView.innerHTML = `<div class="internal-form-container" style="text-align: center; padding: 60px 40px;"><div style="font-size: 4rem; margin-bottom: 20px;">✅</div><h2 style="color: #00e676; margin-bottom: 10px;">Submitted!</h2><p style="color: #ccc;">Your application for ${document.getElementById('form-role-title').innerText} has been received.</p><a href="/" class="btn-cc btn-primary" style="margin-top: 30px;">Return Home</a></div>`;
+                    } else {
+                        alert("Submission failed.");
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "Submit Application";
+                    }
+                } catch (err) {
+                    alert("Network error.");
+                    submitBtn.disabled = false;
+                }
+            });
         }
 
         initApply();

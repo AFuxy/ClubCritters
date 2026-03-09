@@ -82,10 +82,14 @@ function updateVrcUI() {
         countSpan.classList.add('hidden');
     }
 
-    // 2. Update Group Activity (Offline View)
+    // 2. Update Group Activity (Offline/Upcoming View)
     const stats = data.groupStats;
-    if (stats && currentState === 'disabled') {
-        subtext.innerHTML = `Community Hub <br> <span style="font-size:0.8rem; opacity:0.6; margin-top:5px; display:block;">🟢 ${stats.onlineMembers} Members Online Now</span>`;
+    if (stats && (currentState === 'disabled' || currentState === 'finished' || currentState === 'upcoming')) {
+        let msg = "Community Hub";
+        if (currentState === 'finished') msg = "Thanks for partying with us!";
+        if (currentState === 'upcoming') msg = subtext.innerText.split('\n')[0]; // Preserve "Upcoming Schedule" or similar
+
+        subtext.innerHTML = `${msg} <br> <span style="font-size:0.8rem; opacity:0.6; margin-top:5px; display:block;">🟢 ${stats.onlineMembers} Members Online Now</span>`;
     }
 }
 

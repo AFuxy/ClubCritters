@@ -45,9 +45,9 @@
             </div>
         </div>
         <div class="form-group">
-            <label>VRChat Instance URL / Group Name</label>
-            <input type="text" id="instance-url" placeholder="https://vrchat.com/... OR CLUBLC.9601">
-            <p style="font-size: 0.7rem; color: #666; margin-top: 5px;">Tip: Leave empty or use "CLUBLC.9601" to auto-track the group's active instance.</p>
+            <label>VRChat Instance URL / Override</label>
+            <input type="text" id="instance-url" placeholder="https://vrchat.com/home/launch?worldId=...">
+            <p style="font-size: 0.7rem; color: #666; margin-top: 5px;">Tip: Leave empty to auto-track the group's active instance (set in .env).</p>
         </div>
         <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
             <input type="checkbox" id="force-offline" style="width: auto;" <%= canManageAll ? '' : 'disabled' %>>
@@ -89,16 +89,16 @@
         
         if (status === 'Connected') {
             text.style.color = '#00e676';
-            verifyBox.style.display = 'none';
-            connectedMsg.style.display = 'block';
+            verifyBox.classList.add('hidden');
+            connectedMsg.classList.remove('hidden');
         } else if (status === '2FA Required') {
             text.style.color = '#FF9800';
-            verifyBox.style.display = 'block';
-            connectedMsg.style.display = 'none';
+            verifyBox.classList.remove('hidden');
+            connectedMsg.classList.add('hidden');
         } else {
             text.style.color = '#ff5252';
-            verifyBox.style.display = 'none';
-            connectedMsg.style.display = 'none';
+            verifyBox.classList.add('hidden');
+            connectedMsg.classList.add('hidden');
         }
     }
 

@@ -2,8 +2,8 @@ const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
-const { sequelize, initDB, Roster, Settings, Schedule, Archive, Stats, AppSlot, Gallery } = require('./db');
-const { getGuildMember, updateBotStatus } = require('./bot');
+const { sequelize, initDB, Roster, Settings, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission } = require('./db');
+const { getGuildMember, updateBotStatus, joinGuild } = require('./bot');
 const { getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus } = require('./utils/vrc-api');
 const path = require('path');
 require('dotenv').config();
@@ -25,12 +25,22 @@ const PORT = process.env.PORT || 3000;
 passport.serializeUser((user, done) => done(null, user.discordId));
 passport.deserializeUser(async (id, done) => {
     try {
-        const user = await Roster.findByPk(id);
-        if (user) {
-            const guildMember = await getGuildMember(user.discordId);
-            if (guildMember) {
-                user.discordData = guildMember;
-            }
+        let user = await Roster.findByPk(id);
+        const guildMember = await getGuildMember(id);
+        
+        // If not on roster, create a basic user object for applicants
+        if (!user) {
+            user = { 
+                discordId: id, 
+                name: guildMember?.nickname || "Applicant", 
+                type: "Public", 
+                links: {},
+                isPublic: true 
+            };
+        }
+
+        if (guildMember) {
+            user.discordData = guildMember;
         }
         done(null, user);
     } catch (err) {
@@ -43,17 +53,25 @@ passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID,
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL: process.env.DISCORD_REDIRECT_URI,
-    scope: ['identify']
+    scope: ['identify', 'guilds.join']
 }, async (accessToken, refreshToken, profile, done) => {
     try {
-        let user = await Roster.findByPk(profile.id);
-        if (!user) {
-            return done(null, false, { message: 'You are not on the authorized roster.' });
-        }
+        // 1. Try to join the user to the guild automatically
+        await joinGuild(profile.id, accessToken);
+
+        // 2. Check if they are now in the guild
         const guildMember = await getGuildMember(profile.id);
         if (!guildMember) {
             return done(null, false, { message: 'You must be in the Club Critters Discord to login.' });
         }
+
+        // 3. Find or identify user
+        let user = await Roster.findByPk(profile.id);
+        if (!user) {
+            // For applicants, we return a virtual user object
+            return done(null, { discordId: profile.id, name: profile.username, type: "Public", isPublic: true });
+        }
+
         return done(null, user);
     } catch (err) {
         return done(err, null);
@@ -64,6 +82,8 @@ passport.use(new DiscordStrategy({
 
 const isAuthenticated = (req, res, next) => {
     if (req.isAuthenticated()) return next();
+    // Save the intended destination to session
+    req.session.returnTo = req.originalUrl;
     res.redirect('/auth/discord');
 };
 
@@ -106,9 +126,51 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Auth Routes
-app.get('/auth/discord', passport.authenticate('discord'));
-app.get('/auth/discord/callback', passport.authenticate('discord', { failureRedirect: '/login-error' }), (req, res) => {
-    res.redirect('/panel');
+app.get('/auth/discord', (req, res, next) => {
+    let returnTo = req.query.returnTo || req.get('Referer') || req.get('Referrer') || '/';
+    
+    // Clean returnTo if it's a full URL
+    if (returnTo.includes(req.get('host'))) {
+        try {
+            const url = new URL(returnTo, `http://${req.get('host')}`);
+            returnTo = url.pathname + url.search;
+        } catch (e) { returnTo = '/'; }
+    } else if (returnTo.startsWith('http')) {
+        returnTo = '/'; // Don't redirect to external sites
+    }
+
+    console.log(`[AUTH] Initiating login. State (returnTo): ${returnTo}`);
+    
+    // Pass returnTo as the 'state' parameter to Discord
+    // Base64 encode it just to be safe with special characters
+    const state = Buffer.from(returnTo).toString('base64');
+    
+    passport.authenticate('discord', { state })(req, res, next);
+});
+
+app.get('/auth/discord/callback', (req, res, next) => {
+    // Determine the return path from the 'state' parameter returned by Discord
+    let returnTo = '/';
+    if (req.query.state) {
+        try {
+            returnTo = Buffer.from(req.query.state, 'base64').toString('ascii');
+        } catch (e) { console.error("[AUTH] Failed to decode state", e); }
+    }
+
+    passport.authenticate('discord', { failureRedirect: '/login-error' })(req, res, async (err) => {
+        if (err) return next(err);
+        if (!req.user) return res.redirect('/login-error');
+
+        console.log(`[AUTH] Callback for ${req.user.name}. Redirecting to: ${returnTo}`);
+
+        // If they are on the roster (Team member) and tried to go to '/', send to panel
+        // If they are an applicant, always respect the returnTo (e.g. /apply)
+        if (!req.user.isPublic && returnTo === '/') {
+            return res.redirect('/panel');
+        }
+
+        res.redirect(returnTo);
+    });
 });
 app.get('/logout', (req, res) => {
     req.logout(() => { res.redirect('/'); });
@@ -287,8 +349,8 @@ app.get('/api/apps/all', isStaff, async (req, res) => {
 
 app.post('/api/apps/add', isHostOrOwner, async (req, res) => {
     try {
-        const { roleName, description, formUrl, status, deadline, autoCloseAt } = req.body;
-        await AppSlot.create({ roleName, description, formUrl, status, deadline, autoCloseAt });
+        const { roleName, roleType, description, formUrl, isInternal, status, deadline, autoCloseAt } = req.body;
+        await AppSlot.create({ roleName, roleType, description, formUrl, isInternal, status, deadline, autoCloseAt });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
@@ -298,6 +360,31 @@ app.patch('/api/apps/:id', isHostOrOwner, async (req, res) => {
         await AppSlot.update(req.body, { where: { id: req.params.id } });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// --- SUBMIT APPLICATION ---
+app.post('/api/public/apps/submit', async (req, res) => {
+    try {
+        const { slotId, answers, discordId, discordTag } = req.body;
+        const slot = await AppSlot.findByPk(slotId);
+        if (!slot || slot.status !== 'open') return res.status(400).json({ error: 'Slot is closed or invalid.' });
+
+        const submission = await ApplicationSubmission.create({
+            slotId,
+            discordId,
+            discordTag,
+            answers
+        });
+
+        // Trigger Discord Bot to create channel
+        const { createApplicationTicket } = require('./utils/bot-utils');
+        await createApplicationTicket(submission, slot);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Submission Error:", err);
+        res.status(500).json({ error: 'Failed to submit application.' });
+    }
 });
 
 app.delete('/api/apps/:id', isHostOrOwner, async (req, res) => {
@@ -415,7 +502,7 @@ app.get('/api/public/apps', async (req, res) => {
         const mapped = slots.map(s => {
             let status = s.status;
             if (s.autoCloseAt && new Date(s.autoCloseAt) < now) status = 'closed';
-            return { id: s.id, roleName: s.roleName, description: s.description, formUrl: s.formUrl, status: status, deadline: s.deadline };
+            return { id: s.id, roleName: s.roleName, roleType: s.roleType, description: s.description, formUrl: s.formUrl, isInternal: s.isInternal, status: status, deadline: s.deadline };
         });
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
@@ -424,9 +511,10 @@ app.get('/api/public/apps', async (req, res) => {
 app.get('/api/public/vrc-status', async (req, res) => {
     try {
         const settings = await Settings.findOne();
+        const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
         
         // Always fetch group stats to show community activity
-        const groupStats = await getGroupStats("CLUBLC.9601");
+        const groupStats = await getGroupStats(groupId);
         
         if (!settings || settings.forceOffline) {
             return res.json({ active: false, count: 0, capacity: 0, groupStats });
@@ -437,10 +525,12 @@ app.get('/api/public/vrc-status', async (req, res) => {
             data = await getInstanceData(settings.instanceUrl);
         } else {
             // Default to fetching from the Club Critters Group
-            data = await getGroupInstanceData("CLUBLC.9601");
+            data = await getGroupInstanceData(groupId);
         }
         
-        res.json({ ...data, groupStats });
+        const finalData = { ...data, groupStats };
+        console.log(`[VRC API] API Response: ${finalData.active ? 'Active' : 'Inactive'} | Online: ${groupStats?.onlineMembers || 0}`);
+        res.json(finalData);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
@@ -510,7 +600,7 @@ app.get('/performer/:id', async (req, res) => {
     } catch (err) { res.status(500).send('Error'); }
 });
 
-app.get('/apply', (req, res) => { res.render('apply'); });
+app.get('/apply', (req, res) => { res.render('apply', { user: req.user || null }); });
 app.get('/gallery', (req, res) => { res.render('gallery'); });
 app.get('/flyer', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'flyer.html')); });
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });

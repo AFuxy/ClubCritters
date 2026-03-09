@@ -1,7 +1,7 @@
-const { Client, GatewayIntentBits, Events, REST, Routes, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Events, REST, Routes, Collection, EmbedBuilder, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile } = require('./utils/bot-utils');
+const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild } = require('./utils/bot-utils');
 require('dotenv').config();
 
 const client = new Client({
@@ -60,16 +60,50 @@ client.once(Events.ClientReady, (c) => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+    // 1. Handle Slash Commands
+    if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandName);
+        if (!command) return;
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error(error);
+            await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+        }
+    }
 
-    const command = client.commands.get(interaction.commandName);
-    if (!command) return;
+    // 2. Handle Application Buttons
+    if (interaction.isButton()) {
+        if (interaction.customId.startsWith('app_')) {
+            const { ApplicationSubmission } = require('./db');
+            const parts = interaction.customId.split('_');
+            const action = parts[1]; // 'approve' or 'deny'
+            const submissionId = parts[2];
 
-    try {
-        await command.execute(interaction);
-    } catch (error) {
-        console.error(error);
-        await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+            try {
+                const status = action === 'approve' ? 'accepted' : 'declined';
+                await ApplicationSubmission.update({ status }, { where: { id: submissionId } });
+
+                // Disable buttons on the original message
+                const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
+                originalEmbed.addFields({ name: 'Decision', value: `${status.toUpperCase()} by <@${interaction.user.id}>` });
+                
+                if (action === 'approve') originalEmbed.setColor('#00e676');
+                else originalEmbed.setColor('#ff5252');
+
+                await interaction.update({ 
+                    content: `📢 **Application Processed: ${status.toUpperCase()}**`,
+                    embeds: [originalEmbed],
+                    components: [] // Remove buttons
+                });
+
+                console.log(`\x1b[32m[BOT] 🎫 Application #${submissionId} ${status} by ${interaction.user.username}\x1b[0m`);
+
+            } catch (err) {
+                console.error("[BOT] Failed to process application button:", err);
+                await interaction.reply({ content: "❌ Failed to update application status.", flags: MessageFlags.Ephemeral });
+            }
+        }
     }
 });
 
@@ -125,5 +159,6 @@ client.login(process.env.DISCORD_BOT_TOKEN);
 module.exports = { 
     client, 
     getGuildMember: (userId) => getGuildMember(client, userId), 
-    updateBotStatus: (statusText) => updateBotStatus(client, statusText) 
+    updateBotStatus: (statusText) => updateBotStatus(client, statusText),
+    joinGuild: (userId, accessToken) => joinGuild(client, userId, accessToken)
 };

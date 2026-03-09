@@ -11,6 +11,16 @@
                 <input type="text" id="app-role-name" placeholder="DJ, Staff, etc.">
             </div>
             <div class="form-group">
+                <label>Role Type (Form Style)</label>
+                <select id="app-role-type">
+                    <option value="DJ">DJ Application</option>
+                    <option value="Singer">Singer Application</option>
+                    <option value="Musician/Band">Musician/Band Application</option>
+                    <option value="Event Staff">Event Staff Application</option>
+                    <option value="Other">Other / General</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>Display Deadline</label>
                 <input type="text" id="app-deadline" placeholder="March 15th">
             </div>
@@ -25,15 +35,19 @@
                     <option value="closed">Closed</option>
                 </select>
             </div>
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="app-is-internal" style="width: auto;" onchange="toggleFormUrl()">
+                <label style="margin: 0;">Use Internal Form</label>
+            </div>
+            <div class="form-group" id="form-url-group">
+                <label>External Form URL</label>
+                <input type="text" id="app-form-url" placeholder="https://forms.gle/...">
+            </div>
             <div class="form-group" style="grid-column: span 2;">
                 <label>Description</label>
                 <textarea id="app-description" placeholder="Requirements..."></textarea>
             </div>
-            <div class="form-group" style="grid-column: span 2;">
-                <label>Form URL</label>
-                <input type="text" id="app-form-url" placeholder="https://forms.gle/...">
-            </div>
-            <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px;">
+            <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px; grid-column: span 2;">
                 <button id="add-app-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addAppSlot()">Create Slot</button>
                 <button id="cancel-app-edit-btn" class="btn-cc btn-dark btn-small" style="margin: 0; display: none;" onclick="cancelAppEdit()">Cancel</button>
             </div>
@@ -48,15 +62,26 @@
 <script>
     const appsList = document.getElementById('apps-list');
     const roleNameInput = document.getElementById('app-role-name');
+    const roleTypeSelect = document.getElementById('app-role-type');
     const deadlineInput = document.getElementById('app-deadline');
     const autoCloseInput = document.getElementById('app-auto-close');
     const descriptionInput = document.getElementById('app-description');
     const formUrlInput = document.getElementById('app-form-url');
+    const isInternalInput = document.getElementById('app-is-internal');
+    const formUrlGroup = document.getElementById('form-url-group');
     const statusSelect = document.getElementById('app-status');
     const addAppBtn = document.getElementById('add-app-btn');
     const cancelAppEditBtn = document.getElementById('cancel-app-edit-btn');
 
     let editAppId = null;
+
+    function toggleFormUrl() {
+        if (isInternalInput.checked) {
+            formUrlGroup.classList.add('hidden');
+        } else {
+            formUrlGroup.classList.remove('hidden');
+        }
+    }
 
     async function loadApps() {
         try {
@@ -69,14 +94,15 @@
             appsList.innerHTML = slots.map(s => {
                 const isAutoClosed = s.autoCloseAt && new Date(s.autoCloseAt) < new Date();
                 const displayStatus = isAutoClosed ? 'CLOSED (AUTO)' : s.status.toUpperCase();
+                const typeLabel = s.isInternal ? `<span style="font-size:0.7rem; background:#29C5F6; color:#000; padding:2px 6px; border-radius:4px; margin-left:10px;">INTERNAL: ${s.roleType}</span>` : '';
                 return `
                 <div class="schedule-item" style="border-left: 4px solid ${isAutoClosed || s.status === 'closed' ? '#ff5252' : '#00e676'}; background: #151e29; padding: 15px; border-radius: 12px;">
                     <div style="flex: 1;">
-                        <strong style="font-size: 1.1rem; color: ${isAutoClosed || s.status === 'closed' ? '#ff5252' : '#00e676'};">${s.roleName} - ${displayStatus}</strong>
+                        <strong style="font-size: 1.1rem; color: ${isAutoClosed || s.status === 'closed' ? '#ff5252' : '#00e676'};">${s.roleName}${typeLabel} - ${displayStatus}</strong>
                         <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 5px;">${s.deadline ? 'Display: ' + s.deadline : ''}${s.autoCloseAt ? ' | Auto-Close: ' + new Date(s.autoCloseAt).toLocaleString() : ''}</span>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button class="btn-cc btn-small btn-dark" onclick="startAppEdit(${s.id}, '${s.roleName}', '${s.deadline || ''}', \`${s.description || ''}\`, '${s.formUrl || ''}', '${s.status}', '${s.autoCloseAt || ''}')">Edit</button>
+                        <button class="btn-cc btn-small btn-dark" onclick="startAppEdit(${s.id}, '${s.roleName}', '${s.roleType}', '${s.deadline || ''}', \`${s.description || ''}\`, '${s.formUrl || ''}', '${s.status}', '${s.autoCloseAt || ''}', ${s.isInternal})">Edit</button>
                         <button class="btn-cc btn-small btn-danger" onclick="deleteAppSlot(${s.id})">Delete</button>
                     </div>
                 </div>
@@ -93,19 +119,31 @@
             const res = await fetch('/api/apps/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roleName, deadline: deadlineInput.value.trim(), autoCloseAt: autoCloseInput.value || null, description: descriptionInput.value.trim(), formUrl: formUrlInput.value.trim(), status: statusSelect.value })
+                body: JSON.stringify({ 
+                    roleName, 
+                    roleType: roleTypeSelect.value,
+                    deadline: deadlineInput.value.trim(), 
+                    autoCloseAt: autoCloseInput.value || null, 
+                    description: descriptionInput.value.trim(), 
+                    formUrl: isInternalInput.checked ? '' : formUrlInput.value.trim(), 
+                    isInternal: isInternalInput.checked,
+                    status: statusSelect.value 
+                })
             });
             if (res.ok) { showNotify('Created!'); clearForm(); loadApps(); }
         } catch (e) { showNotify('Error', 'error'); }
     }
 
-    function startAppEdit(id, name, deadline, desc, url, status, autoClose) {
+    function startAppEdit(id, name, type, deadline, desc, url, status, autoClose, isInternal) {
         editAppId = id;
         roleNameInput.value = name;
+        roleTypeSelect.value = type;
         deadlineInput.value = deadline;
         descriptionInput.value = desc;
         formUrlInput.value = url;
         statusSelect.value = status;
+        isInternalInput.checked = isInternal;
+        toggleFormUrl();
         if (autoClose) autoCloseInput.value = autoClose.slice(0, 16);
         else autoCloseInput.value = '';
         addAppBtn.innerText = "Save Changes";
@@ -118,7 +156,16 @@
             const res = await fetch(`/api/apps/${editAppId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roleName: roleNameInput.value.trim(), deadline: deadlineInput.value.trim(), autoCloseAt: autoCloseInput.value || null, description: descriptionInput.value.trim(), formUrl: formUrlInput.value.trim(), status: statusSelect.value })
+                body: JSON.stringify({ 
+                    roleName: roleNameInput.value.trim(), 
+                    roleType: roleTypeSelect.value,
+                    deadline: deadlineInput.value.trim(), 
+                    autoCloseAt: autoCloseInput.value || null, 
+                    description: descriptionInput.value.trim(), 
+                    formUrl: isInternalInput.checked ? '' : formUrlInput.value.trim(), 
+                    isInternal: isInternalInput.checked,
+                    status: statusSelect.value 
+                })
             });
             if (res.ok) { showNotify('Updated!'); cancelAppEdit(); loadApps(); }
         } catch (e) { showNotify('Error', 'error'); }
@@ -126,6 +173,8 @@
 
     function clearForm() {
         roleNameInput.value = ''; deadlineInput.value = ''; autoCloseInput.value = ''; descriptionInput.value = ''; formUrlInput.value = '';
+        isInternalInput.checked = false;
+        toggleFormUrl();
     }
 
     function cancelAppEdit() {
