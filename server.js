@@ -21,11 +21,26 @@ const upload = multer({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Helper to handle Sequelize/MySQL/MariaDB JSON parsing inconsistencies
+const safeParseJSON = (data) => {
+    if (typeof data === 'string') {
+        try { return JSON.parse(data); } 
+        catch (e) { return {}; }
+    }
+    return data || {};
+};
+
 // Passport Serialization
 passport.serializeUser((user, done) => done(null, user.discordId));
 passport.deserializeUser(async (id, done) => {
     try {
         let user = await Roster.findByPk(id);
+        
+        if (user) {
+            // Fix JSON parsing for Linux/MariaDB
+            user.links = safeParseJSON(user.links);
+        }
+
         const guildMember = await getGuildMember(id);
         
         // If not on roster, create a basic user object for applicants
@@ -502,8 +517,58 @@ app.get('/api/stats/my', isAuthenticated, async (req, res) => {
 
 // --- PUBLIC API ROUTES ---
 app.get('/api/public/settings', async (req, res) => { try { const settings = await Settings.findOne(); res.json(settings); } catch (err) { res.status(500).json({ error: 'Failed' }); } });
-app.get('/api/public/schedule', async (req, res) => { try { const schedule = await Schedule.findAll({ include: [{ model: Roster, attributes: ['name', 'useDiscordName', 'colorStyle', 'imageUrl', 'links', 'discordId'] }], order: [['createdAt', 'ASC']] }); const mapped = await Promise.all(schedule.map(async item => { let displayName = item.Roster.name; if (item.Roster.useDiscordName) { const member = await getGuildMember(item.performerId); if (member) displayName = member.nickname; } return { id: item.id, timeSlot: item.timeSlot, genre: item.genre, performer: { discordId: item.Roster.discordId, name: displayName, color: item.Roster.colorStyle, image: item.Roster.imageUrl, links: item.Roster.links } }; })); res.json(mapped); } catch (err) { res.status(500).json({ error: 'Failed' }); } });
-app.get('/api/public/roster', async (req, res) => { try { const roster = await Roster.findAll({ order: [['name', 'ASC']] }); const mapped = await Promise.all(roster.map(async user => { let displayName = user.name; if (user.useDiscordName) { const member = await getGuildMember(user.discordId); if (member) displayName = member.nickname; } return { discordId: user.discordId, name: displayName, type: user.type, title: user.title, imageUrl: user.imageUrl, colorStyle: user.colorStyle, bio: user.bio, links: user.links }; })); res.json(mapped); } catch (err) { res.status(500).json({ error: 'Failed' }); } });
+app.get('/api/public/schedule', async (req, res) => { 
+    try { 
+        const schedule = await Schedule.findAll({ 
+            include: [{ model: Roster, attributes: ['name', 'useDiscordName', 'colorStyle', 'imageUrl', 'links', 'discordId'] }], 
+            order: [['createdAt', 'ASC']] 
+        }); 
+        const mapped = await Promise.all(schedule.map(async item => { 
+            let displayName = item.Roster.name; 
+            if (item.Roster.useDiscordName) { 
+                const member = await getGuildMember(item.performerId); 
+                if (member) displayName = member.nickname; 
+            } 
+            return { 
+                id: item.id, 
+                timeSlot: item.timeSlot, 
+                genre: item.genre, 
+                performer: { 
+                    discordId: item.Roster.discordId, 
+                    name: displayName, 
+                    color: item.Roster.colorStyle, 
+                    image: item.Roster.imageUrl, 
+                    links: safeParseJSON(item.Roster.links) 
+                } 
+            }; 
+        })); 
+        res.json(mapped); 
+    } catch (err) { res.status(500).json({ error: 'Failed' }); } 
+});
+
+app.get('/api/public/roster', async (req, res) => { 
+    try { 
+        const roster = await Roster.findAll({ order: [['name', 'ASC']] }); 
+        const mapped = await Promise.all(roster.map(async user => { 
+            let displayName = user.name; 
+            if (user.useDiscordName) { 
+                const member = await getGuildMember(user.discordId); 
+                if (member) displayName = member.nickname; 
+            } 
+            return { 
+                discordId: user.discordId, 
+                name: displayName, 
+                type: user.type, 
+                title: user.title, 
+                imageUrl: user.imageUrl, 
+                colorStyle: user.colorStyle, 
+                bio: user.bio, 
+                links: safeParseJSON(user.links) 
+            }; 
+        })); 
+        res.json(mapped); 
+    } catch (err) { res.status(500).json({ error: 'Failed' }); } 
+});
 app.get('/api/public/archives', async (req, res) => { try { const archives = await Archive.findAll({ include: [{ model: Roster, attributes: ['name', 'useDiscordName', 'imageUrl'] }], order: [['date', 'DESC']] }); const mapped = await Promise.all(archives.map(async arc => { let djName = arc.Roster.name; if (arc.Roster.useDiscordName) { const member = await getGuildMember(arc.performerId); if (member) djName = member.nickname; } return { id: arc.id, performerId: arc.performerId, title: arc.title, date: arc.date, genre: arc.genre, link: arc.linkUrl, djName: djName, djImage: arc.Roster.imageUrl }; })); res.json(mapped); } catch (err) { res.status(500).json({ error: 'Failed' }); } });
 app.get('/api/public/apps', async (req, res) => {
     try {
@@ -579,6 +644,10 @@ app.get('/performer/:id', async (req, res) => {
         let displayName = performer.name;
         if (performer.useDiscordName) { const member = await getGuildMember(performer.discordId); if (member) displayName = member.nickname; }
         const archives = await Archive.findAll({ where: { performerId: performer.discordId }, order: [['date', 'DESC']] });
+        
+        // Fix JSON parsing for Linux
+        performer.links = safeParseJSON(performer.links);
+
         const settings = await Settings.findOne();
         const scheduleItem = await Schedule.findOne({ where: { performerId: performer.discordId }, include: [Roster] });
         let liveStatus = null; let activeSlot = null;
