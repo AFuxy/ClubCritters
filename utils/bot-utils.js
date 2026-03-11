@@ -248,22 +248,29 @@ async function createApplicationTicket(submission, slot) {
     const guildId = process.env.DISCORD_GUILD_ID;
     const categoryId = process.env.DISCORD_APPS_CATEGORY_ID;
     if (!guildId || !categoryId) return;
+
     try {
         const guild = await client.guilds.fetch(guildId);
-        const channelName = `app-${submission.discordTag || submission.id}`.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+
+        // Use Username for channel and embed (instead of nickname)
+        const user = await client.users.fetch(submission.discordId);
+        const username = user.username;
+        const appType = slot.roleName.toLowerCase().replace(/\s+/g, '-');
+
+        const channelName = `${appType}-${username}`.toLowerCase().replace(/[^\w-]/g, '');
+
         const channel = await guild.channels.create({
             name: channelName, type: ChannelType.GuildText, parent: categoryId,
             permissionOverwrites: [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }],
         });
         await submission.update({ channelId: channel.id });
-        const member = await getGuildMember(client, submission.discordId);
+
         const embed = new EmbedBuilder()
-            .setTitle(`New Application: ${slot.roleName} (${slot.roleType})`)
-            .setColor('#29C5F6').setTimestamp().setThumbnail(member ? member.avatar : null)
+            .setTitle(`Application: ${slot.roleName}`)
+            .setColor('#29C5F6').setTimestamp().setThumbnail(user.displayAvatarURL())
             .addFields(
-                { name: 'Applicant', value: `<@${submission.discordId}> (${submission.discordTag})`, inline: true },
-                { name: 'Status', value: submission.status.toUpperCase(), inline: true },
-                { name: 'Form Type', value: slot.roleType, inline: true }
+                { name: 'Applicant', value: `<@${submission.discordId}> (${username})`, inline: true },
+                { name: 'Status', value: submission.status.toUpperCase(), inline: true }
             );
         if (submission.answers) {
             Object.keys(submission.answers).forEach(key => {

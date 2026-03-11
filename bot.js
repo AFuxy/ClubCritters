@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Events, REST, Routes, Collection, EmbedBuilder, MessageFlags } = require('discord.js');
+const { Client, GatewayIntentBits, Events, REST, Routes, Collection, EmbedBuilder, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild } = require('./utils/bot-utils');
@@ -55,11 +55,16 @@ client.once(Events.ClientReady, (c) => {
     registerSlashCommands();
     
     // Start automated status loop
-    setInterval(() => autoUpdateStatus(client), 60000);
-    autoUpdateStatus(client);
+    if (process.env.DISABLE_VRC_BOT !== 'true') {
+        setInterval(() => autoUpdateStatus(client), 60000);
+        autoUpdateStatus(client);
+    } else {
+        console.log(`\x1b[33m[BOT] ⚠️ Logic & Status updates DISABLED (DISABLE_VRC_BOT=true)\x1b[0m`);
+    }
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+    if (process.env.DISABLE_VRC_BOT === 'true') return;
     // 1. Handle Slash Commands
     if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
@@ -75,40 +80,111 @@ client.on(Events.InteractionCreate, async interaction => {
     // 2. Handle Application Buttons
     if (interaction.isButton()) {
         if (interaction.customId.startsWith('app_')) {
-            const { ApplicationSubmission } = require('./db');
+            const { ApplicationSubmission, AppSlot } = require('./db');
             const parts = interaction.customId.split('_');
             const action = parts[1]; // 'approve' or 'deny'
             const submissionId = parts[2];
 
             try {
-                const status = action === 'approve' ? 'accepted' : 'declined';
-                await ApplicationSubmission.update({ status }, { where: { id: submissionId } });
+                const submission = await ApplicationSubmission.findByPk(submissionId, { include: [AppSlot] });
+                if (!submission) return interaction.reply({ content: "❌ Submission not found in database.", flags: MessageFlags.Ephemeral });
 
-                // Disable buttons on the original message
-                const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
-                originalEmbed.addFields({ name: 'Decision', value: `${status.toUpperCase()} by <@${interaction.user.id}>` });
-                
-                if (action === 'approve') originalEmbed.setColor('#00e676');
-                else originalEmbed.setColor('#ff5252');
+                if (action === 'approve') {
+                    await submission.update({ status: 'accepted' });
 
-                await interaction.update({ 
-                    content: `📢 **Application Processed: ${status.toUpperCase()}**`,
-                    embeds: [originalEmbed],
-                    components: [] // Remove buttons
-                });
+                    const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
+                    const fields = originalEmbed.data.fields.map(f => {
+                        if (f.name === 'Status') return { ...f, value: 'ACCEPTED' };
+                        return f;
+                    });
+                    originalEmbed.setFields(fields);
+                    originalEmbed.addFields({ name: 'Decision By', value: `<@${interaction.user.id}>`, inline: true });
+                    originalEmbed.setColor('#00e676');
 
-                console.log(`\x1b[32m[BOT] 🎫 Application #${submissionId} ${status} by ${interaction.user.username}\x1b[0m`);
+                    await interaction.update({ 
+                        content: `📢 **Application Processed: ACCEPTED**`,
+                        embeds: [originalEmbed],
+                        components: [] 
+                    });
+
+                    // DM Applicant
+                    try {
+                        const applicant = await client.users.fetch(submission.discordId);
+                        await applicant.send({
+                            content: `✨ **Congratulations!** Your application for **${submission.AppSlot.roleName}** at Club Critters has been **ACCEPTED**! \n\nA staff member will be in touch shortly.`
+                        });
+                    } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
+
+                } else if (action === 'deny') {
+                    // Show Modal for reason
+                    const modal = new ModalBuilder()
+                        .setCustomId(`app_deny_modal_${submissionId}`)
+                        .setTitle('Deny Application');
+
+                    const reasonInput = new TextInputBuilder()
+                        .setCustomId('deny_reason')
+                        .setLabel("Reason for denial (Optional)")
+                        .setStyle(TextInputStyle.Paragraph)
+                        .setPlaceholder("e.g. Needs more experience, Not a fit at this time...")
+                        .setRequired(false)
+                        .setMaxLength(500);
+
+                    modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+                    await interaction.showModal(modal);
+                }
 
             } catch (err) {
                 console.error("[BOT] Failed to process application button:", err);
-                await interaction.reply({ content: "❌ Failed to update application status.", flags: MessageFlags.Ephemeral });
+                if (!interaction.replied) await interaction.reply({ content: "❌ Failed to update status.", flags: MessageFlags.Ephemeral });
             }
+        }
+    }
+
+    // 3. Handle Modal Submissions
+    if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('app_deny_modal_')) {
+            const { ApplicationSubmission, AppSlot } = require('./db');
+            const submissionId = interaction.customId.split('_')[3];
+            const reason = interaction.fields.getTextInputValue('deny_reason') || "No reason provided.";
+
+            try {
+                const submission = await ApplicationSubmission.findByPk(submissionId, { include: [AppSlot] });
+                await submission.update({ status: 'declined' });
+
+                const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
+                const fields = originalEmbed.data.fields.map(f => {
+                    if (f.name === 'Status') return { ...f, value: 'DECLINED' };
+                    return f;
+                });
+                originalEmbed.setFields(fields);
+                originalEmbed.addFields(
+                    { name: 'Decision By', value: `<@${interaction.user.id}>`, inline: true },
+                    { name: 'Reason', value: reason, inline: false }
+                );
+                originalEmbed.setColor('#ff5252');
+
+                await interaction.update({ 
+                    content: `📢 **Application Processed: DECLINED**`,
+                    embeds: [originalEmbed],
+                    components: [] 
+                });
+
+                // DM Applicant
+                try {
+                    const applicant = await client.users.fetch(submission.discordId);
+                    await applicant.send({
+                        content: `📩 **Update on your application:** Your application for **${submission.AppSlot.roleName}** at Club Critters has been **DECLINED**. \n\n**Reason provided:** ${reason}`
+                    });
+                } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
+
+            } catch (err) { console.error("[BOT] Modal Error:", err); }
         }
     }
 });
 
 // Gallery Sync Listener
 client.on(Events.MessageCreate, async message => {
+    if (process.env.DISABLE_VRC_BOT === 'true') return;
     if (message.author.bot) return;
     if (message.channelId !== process.env.DISCORD_GALLERY_CH_ID) return;
 
@@ -140,6 +216,7 @@ client.on(Events.MessageCreate, async message => {
 });
 
 client.on(Events.MessageDelete, async message => {
+    if (process.env.DISABLE_VRC_BOT === 'true') return;
     if (message.channelId !== process.env.DISCORD_GALLERY_CH_ID) return;
     const { Gallery } = require('./db');
     try {

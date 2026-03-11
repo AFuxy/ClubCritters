@@ -106,6 +106,7 @@ const InstanceLog = sequelize.define('InstanceLog', {
     startTime: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     endTime: { type: DataTypes.DATE },
     peakCapacity: { type: DataTypes.INTEGER, defaultValue: 0 },
+    uniqueUsers: { type: DataTypes.INTEGER, defaultValue: 0 },
     totalDuration: { type: DataTypes.INTEGER }, // Stored in minutes
     isEventSession: { type: DataTypes.BOOLEAN, defaultValue: false } 
 });

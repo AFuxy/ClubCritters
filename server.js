@@ -494,9 +494,55 @@ app.get('/api/stats/instances', isAuthenticated, isStaff, async (req, res) => {
     try {
         const logs = await InstanceLog.findAll({
             order: [['startTime', 'DESC']],
-            limit: 20
+            limit: 50
         });
         res.json(logs);
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/stats/instances/add', isAuthenticated, isHostOrOwner, async (req, res) => {
+    try {
+        const { worldName, startTime, endTime, peakCapacity, uniqueUsers, isEventSession } = req.body;
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+        const duration = Math.floor((end - start) / 60000);
+        
+        await InstanceLog.create({
+            worldName,
+            startTime: start,
+            endTime: end,
+            peakCapacity,
+            uniqueUsers,
+            totalDuration: duration,
+            isEventSession,
+            instanceId: 'manual-entry'
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.delete('/api/stats/instances/:id', isAuthenticated, isHostOrOwner, async (req, res) => {
+    try {
+        await InstanceLog.destroy({ where: { id: req.params.id } });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.patch('/api/stats/instances/:id', isAuthenticated, isHostOrOwner, async (req, res) => {
+    try {
+        const { worldName, startTime, endTime, peakCapacity, uniqueUsers, isEventSession } = req.body;
+        const updateData = { worldName, peakCapacity, uniqueUsers, isEventSession };
+        
+        if (startTime && endTime) {
+            const start = new Date(startTime);
+            const end = new Date(endTime);
+            updateData.startTime = start;
+            updateData.endTime = end;
+            updateData.totalDuration = Math.floor((end - start) / 60000);
+        }
+
+        await InstanceLog.update(updateData, { where: { id: req.params.id } });
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
@@ -605,6 +651,21 @@ app.get('/api/public/vrc-status', async (req, res) => {
         
         const finalData = { ...data, groupStats };
         res.json(finalData);
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.get('/api/public/events', async (req, res) => {
+    try {
+        const { Op } = require('sequelize');
+        const logs = await InstanceLog.findAll({
+            where: { 
+                isEventSession: true,
+                endTime: { [Op.ne]: null } // Only show finished events
+            },
+            order: [['startTime', 'DESC']],
+            limit: 50
+        });
+        res.json(logs);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 

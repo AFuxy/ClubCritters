@@ -120,6 +120,10 @@ async function vrcFetch(url, options = {}) {
  * Log in to VRChat
  */
 async function loginVRC() {
+    if (process.env.DISABLE_VRC_BOT === 'true') {
+        lastStatus = "Disabled (Dev Mode)";
+        return null;
+    }
     if (loginPromise) return loginPromise;
 
     loginPromise = (async () => {
@@ -400,12 +404,15 @@ async function getGroupInstanceData(groupShortName) {
                 // Use .location if present, otherwise fallback to rebuilding
                 const location = bestInstance.location || `${bestInstance.worldId || bestInstance.world_id}:${bestInstance.instanceId || bestInstance.instance_id}`;
 
+                // Prefer custom instance name (VRC+), then fallback to worldName
+                const finalName = bestInstance.name || bestInstance.worldName || bestInstance.world?.name || 'Club Critters Hub';
+
                 result = { 
                     active: true, 
                     count: (bestInstance.n_users !== undefined) ? bestInstance.n_users : bestInstance.nUsers, 
                     capacity: bestInstance.capacity, 
                     location: location,
-                    name: bestInstance.worldName || bestInstance.world?.name || 'Club Critters Hub'
+                    name: finalName
                 };
             }
             cache.groupInstance = { data: result, timestamp: now };
