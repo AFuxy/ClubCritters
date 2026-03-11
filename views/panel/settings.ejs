@@ -2,28 +2,46 @@
 
 <div class="staff-hub" style="margin-top: 0; grid-column: span 2;">
     
-    <!-- VRCHAT API STATUS -->
-    <div class="staff-section" style="border-left: 4px solid var(--primary-blue); margin-bottom: 30px;">
-        <h2>VRChat API Integration</h2>
-        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
-            <div>
-                <p style="margin: 0; font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px;">Current Connection</p>
-                <h3 id="vrc-status-text" style="margin: 5px 0 0 0; color: #fff;">Checking...</h3>
+    <!-- API INTEGRATION STATUS -->
+    <div class="grid-2" style="margin-bottom: 30px;">
+        <!-- VRCHAT API STATUS -->
+        <div class="staff-section" style="border-left: 4px solid var(--primary-blue); margin: 0;">
+            <h2>VRChat API Integration</h2>
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
+                <div>
+                    <p style="margin: 0; font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px;">Current Connection</p>
+                    <h3 id="vrc-status-text" style="margin: 5px 0 0 0; color: #fff;">Checking...</h3>
+                </div>
+                <button class="btn-cc btn-small btn-dark" onclick="checkVrcStatus()">🔄 Refresh</button>
             </div>
-            <button class="btn-cc btn-small btn-dark" onclick="checkVrcStatus()">🔄 Refresh</button>
+
+            <div id="vrc-verify-box" class="hidden" style="margin-top: 20px; padding: 20px; background: rgba(255, 152, 0, 0.1); border: 1px solid rgba(255, 152, 0, 0.3); border-radius: 10px;">
+                <h3 style="margin: 0 0 10px 0; color: #FF9800; font-size: 1rem;">🔐 Email Verification Required</h3>
+                <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: #ccc;">VRChat has sent a 6-digit code to your email. Enter it below to authorize this server.</p>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="vrc-otp-code" placeholder="123456" style="flex: 1; text-align: center; letter-spacing: 5px; font-weight: bold;">
+                    <button class="btn-cc btn-primary" style="margin: 0;" onclick="submitVrcCode()">Verify Code</button>
+                </div>
+            </div>
+
+            <div id="vrc-connected-msg" class="hidden" style="margin-top: 15px; font-size: 0.8rem; color: #00e676; opacity: 0.8;">
+                ✅ API is fully authorized and tracking group activity.
+            </div>
         </div>
 
-        <div id="vrc-verify-box" class="hidden" style="margin-top: 20px; padding: 20px; background: rgba(255, 152, 0, 0.1); border: 1px solid rgba(255, 152, 0, 0.3); border-radius: 10px;">
-            <h3 style="margin: 0 0 10px 0; color: #FF9800; font-size: 1rem;">🔐 Email Verification Required</h3>
-            <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: #ccc;">VRChat has sent a 6-digit code to your email. Enter it below to authorize this server.</p>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="vrc-otp-code" placeholder="123456" style="flex: 1; text-align: center; letter-spacing: 5px; font-weight: bold;">
-                <button class="btn-cc btn-primary" style="margin: 0;" onclick="submitVrcCode()">Verify Code</button>
+        <!-- DISCORD BOT STATUS -->
+        <div class="staff-section" style="border-left: 4px solid #5865F2; margin: 0;">
+            <h2>Discord Bot Status</h2>
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
+                <div>
+                    <p style="margin: 0; font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px;">Bot Connectivity</p>
+                    <h3 id="discord-status-text" style="margin: 5px 0 0 0; color: #fff;">Checking...</h3>
+                </div>
+                <button class="btn-cc btn-small btn-dark" onclick="checkDiscordStatus()">🔄 Refresh</button>
             </div>
-        </div>
-
-        <div id="vrc-connected-msg" class="hidden" style="margin-top: 15px; font-size: 0.8rem; color: #00e676; opacity: 0.8;">
-            ✅ API is fully authorized and tracking group activity.
+            <div id="discord-connected-msg" class="hidden" style="margin-top: 15px; font-size: 0.8rem; color: #5865F2; opacity: 0.8;">
+                ✅ Bot is connected and listening for slash commands.
+            </div>
         </div>
     </div>
 
@@ -75,6 +93,25 @@
         instanceUrlInput.value = settings.instanceUrl || '';
         forceOfflineInput.checked = settings.forceOffline;
         checkVrcStatus();
+        checkDiscordStatus();
+    }
+
+    async function checkDiscordStatus() {
+        const res = await fetch('/api/discord/status');
+        const data = await res.json();
+        const text = document.getElementById('discord-status-text');
+        const connectedMsg = document.getElementById('discord-connected-msg');
+        
+        const status = data.status || 'Offline';
+        text.innerText = status;
+        
+        if (status.includes('Connected')) {
+            text.style.color = '#5865F2';
+            connectedMsg.classList.remove('hidden');
+        } else {
+            text.style.color = '#ff5252';
+            connectedMsg.classList.add('hidden');
+        }
     }
 
     async function checkVrcStatus() {
@@ -148,7 +185,10 @@
 
     loadSettings();
     // Auto-refresh status while on this page
-    setInterval(checkVrcStatus, 10000);
+    setInterval(() => {
+        checkVrcStatus();
+        checkDiscordStatus();
+    }, 10000);
 </script>
 
 <%- include('footer') %>

@@ -3,7 +3,7 @@ const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
 const { sequelize, initDB, Roster, Settings, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog } = require('./db');
-const { getGuildMember, updateBotStatus, joinGuild } = require('./bot');
+const { getGuildMember, updateBotStatus, joinGuild, getDiscordStatus } = require('./bot');
 const { getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus } = require('./utils/vrc-api');
 const path = require('path');
 require('dotenv').config();
@@ -258,6 +258,10 @@ app.get('/api/settings', isStaff, async (req, res) => {
 
 app.get('/api/vrchat/status', isStaff, (req, res) => {
     res.json({ status: getVrcStatus() });
+});
+
+app.get('/api/discord/status', isStaff, (req, res) => {
+    res.json({ status: getDiscordStatus() });
 });
 
 app.post('/api/vrchat/verify', isStaff, async (req, res) => {

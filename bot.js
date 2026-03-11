@@ -237,5 +237,11 @@ module.exports = {
     client, 
     getGuildMember: (userId) => getGuildMember(client, userId), 
     updateBotStatus: (statusText) => updateBotStatus(client, statusText),
-    joinGuild: (userId, accessToken) => joinGuild(client, userId, accessToken)
+    joinGuild: (userId, accessToken) => joinGuild(client, userId, accessToken),
+    getDiscordStatus: () => {
+        if (!client || !client.user) return "Offline";
+        const status = client.isReady() ? "Connected" : "Connecting";
+        if (process.env.DISABLE_VRC_BOT === 'true') return `${status} (Limited)`;
+        return status;
+    }
 };
