@@ -144,12 +144,12 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         // 2.1 Handle VRChat Moderation Buttons
-        if (interaction.customId.startsWith('vrc_mod_')) {
+        if (interaction.customId.startsWith('vrcmod:')) {
             const { VrcGroupAudit } = require('./db');
             const { banGroupMember } = require('./utils/vrc-api');
-            const parts = interaction.customId.split('_');
-            const action = parts[2]; // 'monitor' or 'ban'
-            const vrcUserId = parts[3];
+            const parts = interaction.customId.split(':');
+            const action = parts[1]; // 'safe', 'monitor' or 'ban'
+            const vrcUserId = parts[2];
 
             try {
                 const audit = await VrcGroupAudit.findByPk(vrcUserId);
@@ -157,7 +157,17 @@ client.on(Events.InteractionCreate, async interaction => {
 
                 const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
 
-                if (action === 'monitor') {
+                if (action === 'safe') {
+                    await audit.update({ status: 'processed' });
+                    originalEmbed.setColor('#00e676');
+                    originalEmbed.addFields({ name: 'Action Taken', value: `✅ Marked as Safe by <@${interaction.user.id}>` });
+                    
+                    await interaction.update({ 
+                        content: `✅ User **${audit.displayName}** has been marked as safe.`,
+                        embeds: [originalEmbed],
+                        components: [] 
+                    });
+                } else if (action === 'monitor') {
                     await audit.update({ status: 'monitored' });
                     originalEmbed.setColor('#B36AF4');
                     originalEmbed.addFields({ name: 'Action Taken', value: `👀 Marked for Monitoring by <@${interaction.user.id}>` });

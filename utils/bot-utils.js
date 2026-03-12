@@ -385,11 +385,15 @@ async function auditGroupMembers(client) {
 
                     const row = new ActionRowBuilder().addComponents(
                         new ButtonBuilder()
-                            .setCustomId(`vrc_mod_monitor_${member.userId}`)
+                            .setCustomId(`vrcmod:safe:${member.userId}`)
+                            .setLabel('Safe')
+                            .setStyle(ButtonStyle.Success),
+                        new ButtonBuilder()
+                            .setCustomId(`vrcmod:monitor:${member.userId}`)
                             .setLabel('Monitor')
                             .setStyle(ButtonStyle.Secondary),
                         new ButtonBuilder()
-                            .setCustomId(`vrc_mod_ban_${member.userId}`)
+                            .setCustomId(`vrcmod:ban:${member.userId}`)
                             .setLabel('Ban from Group')
                             .setStyle(ButtonStyle.Danger)
                     );
