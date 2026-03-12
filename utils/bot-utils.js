@@ -325,16 +325,15 @@ async function auditGroupMembers(client) {
             const createdAt = new Date(fullInfo.date_joined || fullInfo.created_at);
             const ageDays = Math.floor((new Date() - createdAt) / (1000 * 60 * 60 * 24));
             
-            // Mapping VRChat Trust Ranks
-            const trustRanks = {
-                'system_trust_legend': 'Legendary',
-                'system_trust_veteran': 'Trusted',
-                'system_trust_trusted': 'Known',
-                'system_trust_known': 'User',
-                'system_trust_basic': 'New User',
-                'system_trust_visitor': 'Visitor'
-            };
-            const rank = trustRanks[fullInfo.trustRank] || 'Unknown';
+            // Correctly parse Trust Rank from tags array (VRChat API standard)
+            const tags = fullInfo.tags || [];
+            let rank = 'Visitor'; // Default if no system trust tag is found
+            
+            if (tags.includes('system_trust_legend')) rank = 'Legendary';
+            else if (tags.includes('system_trust_veteran')) rank = 'Trusted';
+            else if (tags.includes('system_trust_trusted')) rank = 'Known';
+            else if (tags.includes('system_trust_known')) rank = 'User';
+            else if (tags.includes('system_trust_basic')) rank = 'New User';
 
             // 3. Save to DB
             const audit = await VrcGroupAudit.create({
