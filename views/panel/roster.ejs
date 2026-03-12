@@ -17,6 +17,17 @@
     <div class="staff-section" style="width: 90%; max-width: 500px; margin-bottom: 0; border: 1px solid var(--primary-blue);">
         <h2 id="edit-modal-title">Edit User</h2>
         
+        <% const userType = user.type.toLowerCase(); %>
+        <% const isUpperStaff = userType.includes('host') || userType.includes('owner'); %>
+
+        <div class="form-group">
+            <label>Display Name</label>
+            <input type="text" id="edit-user-name" <%= isUpperStaff ? '' : 'disabled' %>>
+            <% if (!isUpperStaff) { %>
+                <p style="font-size: 0.7rem; color: #666; margin-top: 5px;">Only Hosts and Owners can change stored names.</p>
+            <% } %>
+        </div>
+
         <div class="form-group">
             <label>Title (e.g. Event Host)</label>
             <input type="text" id="edit-user-title">
@@ -32,6 +43,11 @@
             </select>
         </div>
 
+        <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
+            <input type="checkbox" id="edit-user-banned" style="width: auto;">
+            <label style="margin: 0; color: #ff4444;">Banned from Site Access</label>
+        </div>
+
         <div style="display: flex; gap: 10px; margin-top: 20px;">
             <button class="btn-cc btn-primary" style="flex: 1; margin: 0;" onclick="saveUserEdit()">Save Changes</button>
             <button class="btn-cc btn-dark btn-small" style="flex: 0.5; margin: 0;" onclick="closeEditModal()">Cancel</button>
@@ -44,6 +60,8 @@
     const editModal = document.getElementById('edit-user-modal');
     const editTitleInput = document.getElementById('edit-user-title');
     const editTypeSelect = document.getElementById('edit-user-type');
+    const editNameInput = document.getElementById('edit-user-name');
+    const editBannedCheckbox = document.getElementById('edit-user-banned');
     
     const isOwner = <%= user.type.toLowerCase().includes('owner') %>;
     const FALLBACK_IMAGE = "/cdn/logos/club/HeadOnly.png";
@@ -69,15 +87,18 @@
                 const deleteBtn = isOwner && !m.type.toLowerCase().includes('owner') ? 
                     `<button class="btn-cc btn-small btn-danger" onclick="deleteUser('${m.discordId}', '${m.name}')">Delete</button>` : 
                     '';
+                
+                const bannedBadge = m.isBanned ? '<span style="background: #ff4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 10px;">BANNED</span>' : '';
 
                 return `
-                <div class="schedule-item" style="--sidebar-color: ${accent}; background: #151e29; padding: 15px; border-radius: 12px;">
+                <div class="schedule-item" style="--sidebar-color: ${m.isBanned ? '#ff4444' : accent}; background: #151e29; padding: 15px; border-radius: 12px; opacity: ${m.isBanned ? '0.6' : '1'};">
                     <div style="flex: 1; display: flex; align-items: center; gap: 15px; padding-left: 10px;">
                         <img src="${m.imageUrl || FALLBACK_IMAGE}" 
                              onerror="this.src='${FALLBACK_IMAGE}'"
-                             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid; border-color: ${isGradient ? 'var(--primary-blue)' : accent};">
+                             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid; border-color: ${m.isBanned ? '#ff4444' : (isGradient ? 'var(--primary-blue)' : accent)};">
                         <div>
                             <strong style="font-size: 1.15rem; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent};">${m.name}</strong>
+                            ${bannedBadge}
                             <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 2px;">
                                 <span style="color: var(--primary-blue); font-weight: bold;">${m.type}</span> 
                                 ${m.title ? '• ' + m.title : ''}
@@ -85,7 +106,7 @@
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <button class="btn-cc btn-small btn-dark" onclick="openEditModal('${m.discordId}', '${m.name}', '${m.title || ''}', '${m.type}')">Edit</button>
+                        <button class="btn-cc btn-small btn-dark" onclick="openEditModal('${m.discordId}', '${m.name}', '${m.title || ''}', '${m.type}', ${m.isBanned})">Edit</button>
                         ${deleteBtn}
                     </div>
                 </div>
@@ -96,10 +117,12 @@
         }
     }
 
-    function openEditModal(id, name, title, type) {
+    function openEditModal(id, name, title, type, isBanned = false) {
         currentEditId = id;
         document.getElementById('edit-modal-title').innerText = `Edit ${name}`;
+        editNameInput.value = name;
         editTitleInput.value = title;
+        editBannedCheckbox.checked = isBanned;
         if (Array.from(editTypeSelect.options).some(opt => opt.value === type)) {
             editTypeSelect.value = type;
         }
@@ -117,7 +140,12 @@
             const res = await fetch(`/api/roster/${currentEditId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: editTitleInput.value.trim(), type: editTypeSelect.value })
+                body: JSON.stringify({ 
+                    name: editNameInput.value.trim(),
+                    title: editTitleInput.value.trim(), 
+                    type: editTypeSelect.value,
+                    isBanned: editBannedCheckbox.checked
+                })
             });
             if (res.ok) {
                 showNotify('User updated successfully!');

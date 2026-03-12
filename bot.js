@@ -145,7 +145,10 @@ client.on(Events.InteractionCreate, async interaction => {
         if (interaction.customId.startsWith('app_deny_modal_')) {
             const { ApplicationSubmission, AppSlot } = require('./db');
             const submissionId = interaction.customId.split('_')[3];
-            const reason = interaction.fields.getTextInputValue('deny_reason') || "No reason provided.";
+            const rawReason = interaction.fields.getTextInputValue('deny_reason');
+            
+            const reason = rawReason || "We don't have specific feedback to share at this time, but we really appreciate your interest in the team! Please don't let this discourage you from applying again in the future.";
+            const dmReason = rawReason ? `**Reason provided:** ${rawReason}` : "The team didn't provide specific feedback this time, but we'd love to see you keep hanging out in the community and apply again during our next recruitment cycle!";
 
             try {
                 const submission = await ApplicationSubmission.findByPk(submissionId, { include: [AppSlot] });
@@ -173,7 +176,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 try {
                     const applicant = await client.users.fetch(submission.discordId);
                     await applicant.send({
-                        content: `📩 **Update on your application:** Your application for **${submission.AppSlot.roleName}** at Club Critters has been **DECLINED**. \n\n**Reason provided:** ${reason}`
+                        content: `📩 **Update on your application:** Your application for **${submission.AppSlot.roleName}** at Club Critters has been **DECLINED**. \n\n${dmReason}`
                     });
                 } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
 

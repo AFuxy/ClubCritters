@@ -28,6 +28,7 @@ const Roster = sequelize.define('Roster', {
     colorStyle: { type: DataTypes.STRING }, // Support for hex or gradients
     bio: { type: DataTypes.TEXT },
     useDiscordName: { type: DataTypes.BOOLEAN, defaultValue: false },
+    isBanned: { type: DataTypes.BOOLEAN, defaultValue: false },
     links: { type: DataTypes.JSON } // JSON storage for social links
 });
 

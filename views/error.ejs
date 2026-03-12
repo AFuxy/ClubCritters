@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Critters - <%= title %></title>
+    <link rel="icon" type="image/png" href="/cdn/logos/club/HeadOnly.png">
+    <link rel="stylesheet" href="/cdn/css/main.css">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #0b1016; /* Hardcoded fallback */
+            background-color: var(--dark-bg);
+            text-align: center;
+            color: white;
+        }
+        .error-card {
+            background: rgba(21, 30, 41, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+        }
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+        h1 {
+            margin-bottom: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        p {
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .btn-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <span class="error-icon"><%= icon %></span>
+        <h1><%= title %></h1>
+        <p><%= message %></p>
+        
+        <div class="btn-container">
+            <% buttons.forEach(btn => { %>
+                <a href="<%= btn.link %>" class="btn-cc <%= btn.class || 'btn-primary' %>"><%= btn.label %></a>
+            <% }) %>
+        </div>
+    </div>
+</body>
+</html>

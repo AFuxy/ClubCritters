@@ -37,6 +37,9 @@ passport.deserializeUser(async (id, done) => {
         let user = await Roster.findByPk(id);
         
         if (user) {
+            // Block banned users
+            if (user.isBanned) return done(null, false);
+
             // Fix JSON parsing for Linux/MariaDB
             user.links = safeParseJSON(user.links);
         }
@@ -82,6 +85,11 @@ passport.use(new DiscordStrategy({
 
         // 3. Find or identify user
         let user = await Roster.findByPk(profile.id);
+        
+        if (user && user.isBanned) {
+            return done(null, false, { message: 'Banned' });
+        }
+
         if (!user) {
             // For applicants, we return a virtual user object
             return done(null, { discordId: profile.id, name: profile.username, type: "Public", isPublic: true });
@@ -128,6 +136,7 @@ const isOwner = (req, res, next) => {
 };
 
 app.set('view engine', 'ejs');
+app.set('trust proxy', 1); // Trust first proxy (needed for secure cookies behind Nginx/etc)
 app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -135,16 +144,25 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: { 
+        secure: process.env.COOKIE_SECURE !== 'false', 
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 Days
+    }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
 
 // Auth Routes
 app.get('/auth/discord', (req, res, next) => {
-    let returnTo = req.query.returnTo || req.get('Referer') || req.get('Referrer') || '/';
+    // 1. Check session for returnTo first, then query, then Referer
+    let returnTo = req.session.returnTo || req.query.returnTo || req.get('Referer') || '/';
     
-    // Clean returnTo if it's a full URL
+    // 2. Safety: Never redirect back to auth or login-error
+    if (returnTo.includes('/auth/discord') || returnTo.includes('/login-error')) {
+        returnTo = '/';
+    }
+
+    // 3. Safety: Clean returnTo if it's a full URL
     if (returnTo.includes(req.get('host'))) {
         try {
             const url = new URL(returnTo, `http://${req.get('host')}`);
@@ -154,32 +172,30 @@ app.get('/auth/discord', (req, res, next) => {
         returnTo = '/'; // Don't redirect to external sites
     }
 
-    console.log(`[AUTH] Initiating login. State (returnTo): ${returnTo}`);
+    console.log(`[AUTH] 🔑 Starting Login. Target: ${returnTo}`);
     
-    // Pass returnTo as the 'state' parameter to Discord
-    // Base64 encode it just to be safe with special characters
+    // Pass returnTo as state
     const state = Buffer.from(returnTo).toString('base64');
-    
-    passport.authenticate('discord', { state })(req, res, next);
+    passport.authenticate('discord', { state, prompt: 'none' })(req, res, next);
 });
 
 app.get('/auth/discord/callback', (req, res, next) => {
-    // Determine the return path from the 'state' parameter returned by Discord
     let returnTo = '/';
     if (req.query.state) {
         try {
             returnTo = Buffer.from(req.query.state, 'base64').toString('ascii');
-        } catch (e) { console.error("[AUTH] Failed to decode state", e); }
+        } catch (e) { console.error("[AUTH] ❌ Failed to decode state", e); }
     }
 
     passport.authenticate('discord', { failureRedirect: '/login-error' })(req, res, async (err) => {
         if (err) return next(err);
         if (!req.user) return res.redirect('/login-error');
 
-        console.log(`[AUTH] Callback for ${req.user.name}. Redirecting to: ${returnTo}`);
+        // Clear the session returnTo now that we used it
+        delete req.session.returnTo;
 
-        // If they are on the roster (Team member) and tried to go to '/', send to panel
-        // If they are an applicant, always respect the returnTo (e.g. /apply)
+        console.log(`[AUTH] ✅ Login Success: ${req.user.name}. Redirect: ${returnTo}`);
+
         if (!req.user.isPublic && returnTo === '/') {
             return res.redirect('/panel');
         }
@@ -345,8 +361,19 @@ app.get('/api/roster/all', isStaff, async (req, res) => {
 
 app.patch('/api/roster/:id', isStaff, async (req, res) => {
     try {
-        const { title, type } = req.body;
-        await Roster.update({ title, type }, { where: { discordId: req.params.id } });
+        const { title, type, name, isBanned } = req.body;
+        const updateData = { title, type };
+        
+        // Only allow Host or Owner to change the stored name or ban status
+        const userType = (req.user?.type || "").toLowerCase();
+        const canManageUser = userType.includes('host') || userType.includes('owner');
+        
+        if (canManageUser) {
+            if (name) updateData.name = name;
+            if (isBanned !== undefined) updateData.isBanned = isBanned;
+        }
+
+        await Roster.update(updateData, { where: { discordId: req.params.id } });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
@@ -598,7 +625,10 @@ app.get('/api/public/schedule', async (req, res) => {
 
 app.get('/api/public/roster', async (req, res) => { 
     try { 
-        const roster = await Roster.findAll({ order: [['name', 'ASC']] }); 
+        const roster = await Roster.findAll({ 
+            where: { isBanned: false },
+            order: [['name', 'ASC']] 
+        }); 
         const mapped = await Promise.all(roster.map(async user => { 
             let displayName = user.name; 
             if (user.useDiscordName) { 
@@ -705,7 +735,12 @@ app.get('/api/public/gallery', async (req, res) => {
 app.get('/performer/:id', async (req, res) => {
     try {
         const performer = await Roster.findByPk(req.params.id);
-        if (!performer) return res.status(404).send('Performer not found');
+        if (!performer || performer.isBanned) return res.status(404).render('error', {
+            title: 'Lost the Scent!',
+            message: "This performer's trail has gone cold. They might have left the club or moved on to new adventures!",
+            icon: '🐾',
+            buttons: [{ label: 'Back to the Den', link: '/', class: 'btn-primary' }]
+        });
         let displayName = performer.name;
         if (performer.useDiscordName) { const member = await getGuildMember(performer.discordId); if (member) displayName = member.nickname; }
         const archives = await Archive.findAll({ where: { performerId: performer.discordId }, order: [['date', 'DESC']] });
@@ -747,7 +782,30 @@ app.get('/apply', (req, res) => { res.render('apply', { user: req.user || null }
 app.get('/gallery', (req, res) => { res.render('gallery'); });
 app.get('/flyer', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'flyer.html')); });
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
-app.get('/login-error', (req, res) => { res.send('<h1>Login Error</h1><p>You might not be on the authorized roster, or something went wrong.</p><a href="/">Back Home</a>'); });
+
+app.get('/login-error', (req, res) => { 
+    res.render('error', {
+        title: 'Team Access Required',
+        message: "This area is reserved for members of the Club Critters team. If you're interested in joining us as a performer or staff member, please check out our application page!",
+        icon: '🔒',
+        buttons: [
+            { label: 'Apply to Join', link: '/apply', class: 'btn-primary' },
+            { label: 'Back to Home', link: '/', class: 'btn-secondary' }
+        ]
+    });
+});
+
+// 404 Handler
+app.use((req, res) => {
+    res.status(404).render('error', {
+        title: 'Lost the Scent!',
+        message: "Even our best scouts can't find this page. It looks like you've wandered down the wrong burrow!",
+        icon: '🐾',
+        buttons: [
+            { label: 'Back to the Den', link: '/', class: 'btn-primary' }
+        ]
+    });
+});
 
 async function start() {
     await initDB();
