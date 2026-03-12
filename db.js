@@ -147,4 +147,4 @@ async function initDB() {
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, initDB };
