@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, Events, REST, Routes, Collection, EmbedBuilder, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild } = require('./utils/bot-utils');
+const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild, auditGroupMembers } = require('./utils/bot-utils');
 require('dotenv').config();
 
 const client = new Client({
@@ -58,6 +58,10 @@ client.once(Events.ClientReady, (c) => {
     if (process.env.DISABLE_VRC_BOT !== 'true') {
         setInterval(() => autoUpdateStatus(client), 60000);
         autoUpdateStatus(client);
+
+        // Group Audit Loop (Every 10 minutes)
+        setInterval(() => auditGroupMembers(client), 600000);
+        setTimeout(() => auditGroupMembers(client), 15000); // Initial run
     } else {
         console.log(`\x1b[33m[BOT] ⚠️ Logic & Status updates DISABLED (DISABLE_VRC_BOT=true)\x1b[0m`);
     }
@@ -136,6 +140,52 @@ client.on(Events.InteractionCreate, async interaction => {
             } catch (err) {
                 console.error("[BOT] Failed to process application button:", err);
                 if (!interaction.replied) await interaction.reply({ content: "❌ Failed to update status.", flags: MessageFlags.Ephemeral });
+            }
+        }
+
+        // 2.1 Handle VRChat Moderation Buttons
+        if (interaction.customId.startsWith('vrc_mod_')) {
+            const { VrcGroupAudit } = require('./db');
+            const { banGroupMember } = require('./utils/vrc-api');
+            const parts = interaction.customId.split('_');
+            const action = parts[2]; // 'monitor' or 'ban'
+            const vrcUserId = parts[3];
+
+            try {
+                const audit = await VrcGroupAudit.findByPk(vrcUserId);
+                if (!audit) return interaction.reply({ content: "❌ Audit record not found.", flags: MessageFlags.Ephemeral });
+
+                const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
+
+                if (action === 'monitor') {
+                    await audit.update({ status: 'monitored' });
+                    originalEmbed.setColor('#B36AF4');
+                    originalEmbed.addFields({ name: 'Action Taken', value: `👀 Marked for Monitoring by <@${interaction.user.id}>` });
+                    
+                    await interaction.update({ 
+                        content: `✅ User **${audit.displayName}** is now being monitored.`,
+                        embeds: [originalEmbed],
+                        components: [] 
+                    });
+                } else if (action === 'ban') {
+                    const success = await banGroupMember(process.env.VRC_GROUPID || "CLUBLC.9601", vrcUserId);
+                    if (success) {
+                        await audit.update({ status: 'banned' });
+                        originalEmbed.setColor('#ff4444');
+                        originalEmbed.addFields({ name: 'Action Taken', value: `🔨 BANNED from Group by <@${interaction.user.id}>` });
+                        
+                        await interaction.update({ 
+                            content: `🔨 User **${audit.displayName}** has been banned from the VRChat Group.`,
+                            embeds: [originalEmbed],
+                            components: [] 
+                        });
+                    } else {
+                        await interaction.reply({ content: "❌ Failed to ban user from VRChat group. Check bot permissions.", flags: MessageFlags.Ephemeral });
+                    }
+                }
+            } catch (err) {
+                console.error("[BOT] Mod Error:", err);
+                if (!interaction.replied) await interaction.reply({ content: "❌ Error processing action.", flags: MessageFlags.Ephemeral });
             }
         }
     }

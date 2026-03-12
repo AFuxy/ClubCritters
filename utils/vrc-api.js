@@ -464,6 +464,55 @@ async function getGroupStats(groupShortName) {
     return null;
 }
 
+/**
+ * Fetch detailed information about a user
+ */
+async function getUserInfo(userId) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return null;
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/users/${userId}`);
+        if (res.ok) return await res.json();
+    } catch (e) {}
+    return null;
+}
+
+/**
+ * Fetch all members of a group
+ */
+async function getGroupMembers(groupShortName) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return [];
+    const groupId = await getGroupId(groupShortName);
+    if (!groupId) return [];
+    
+    try {
+        // VRChat Group Members endpoint: GET /groups/{groupId}/members
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/members?n=100&sort=joinedAt:desc`);
+        if (res.ok) return await res.json();
+    } catch (e) {}
+    return [];
+}
+
+/**
+ * Ban a user from a group
+ */
+async function banGroupMember(groupShortName, userId) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return false;
+    const groupId = await getGroupId(groupShortName);
+    if (!groupId) return false;
+
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/bans`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+        return res.ok;
+    } catch (e) { return false; }
+}
+
 async function autoAcceptFriends() {
     if (!authCookie) await loadCookieFromDB();
     if (!authCookie) await loginVRC();
@@ -524,4 +573,4 @@ async function closeGroupInstance(location) {
     }
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance };
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember };

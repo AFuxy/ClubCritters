@@ -112,6 +112,20 @@ const InstanceLog = sequelize.define('InstanceLog', {
     isEventSession: { type: DataTypes.BOOLEAN, defaultValue: false } 
 });
 
+// 10. VRChat Group Audit (Automated Moderation)
+const VrcGroupAudit = sequelize.define('VrcGroupAudit', {
+    vrcUserId: { type: DataTypes.STRING, primaryKey: true },
+    username: { type: DataTypes.STRING },
+    displayName: { type: DataTypes.STRING },
+    trustRank: { type: DataTypes.STRING },
+    accountAgeDays: { type: DataTypes.INTEGER },
+    ageVerified: { type: DataTypes.BOOLEAN, defaultValue: false },
+    ageVerified18: { type: DataTypes.BOOLEAN, defaultValue: false },
+    joinDate: { type: DataTypes.DATE },
+    status: { type: DataTypes.ENUM('processed', 'monitored', 'banned'), defaultValue: 'processed' },
+    alertSent: { type: DataTypes.BOOLEAN, defaultValue: false }
+});
+
 // Relationships
 Roster.hasMany(Schedule, { foreignKey: 'performerId' });
 Schedule.belongsTo(Roster, { foreignKey: 'performerId' });

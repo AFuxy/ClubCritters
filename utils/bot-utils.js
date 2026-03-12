@@ -298,4 +298,110 @@ async function joinGuild(client, userId, accessToken) {
     } catch (err) { return false; }
 }
 
-module.exports = { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, createApplicationTicket, joinGuild };
+const { getUserInfo, getGroupMembers, banGroupMember } = require('./vrc-api');
+
+/**
+ * Audit VRChat Group Members for suspicious/new accounts
+ */
+async function auditGroupMembers(client) {
+    const { VrcGroupAudit } = require('../db');
+    const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
+    const logChannelId = process.env.VRC_GROUP_LOG_CH_ID;
+    if (!logChannelId) return;
+
+    try {
+        const members = await getGroupMembers(groupId);
+        if (!members || members.length === 0) return;
+
+        for (const member of members) {
+            // 1. Check if we've already seen this user
+            const existing = await VrcGroupAudit.findByPk(member.userId);
+            if (existing) continue;
+
+            // 2. Fetch full user info for age/trust checks
+            const fullInfo = await getUserInfo(member.userId);
+            if (!fullInfo) continue;
+
+            const createdAt = new Date(fullInfo.date_joined || fullInfo.created_at);
+            const ageDays = Math.floor((new Date() - createdAt) / (1000 * 60 * 60 * 24));
+            
+            // Mapping VRChat Trust Ranks
+            const trustRanks = {
+                'system_trust_legend': 'Legendary',
+                'system_trust_veteran': 'Trusted',
+                'system_trust_trusted': 'Known',
+                'system_trust_known': 'User',
+                'system_trust_basic': 'New User',
+                'system_trust_visitor': 'Visitor'
+            };
+            const rank = trustRanks[fullInfo.trustRank] || 'Unknown';
+
+            // 3. Save to DB
+            const audit = await VrcGroupAudit.create({
+                vrcUserId: member.userId,
+                username: fullInfo.username,
+                displayName: fullInfo.displayName,
+                trustRank: rank,
+                accountAgeDays: ageDays,
+                ageVerified: fullInfo.ageVerified || false,
+                ageVerified18: fullInfo.ageVerified18 || false,
+                joinDate: member.joinedAt,
+                status: 'processed'
+            });
+
+            // 4. Check Thresholds (Suspicious if Visitor/New User OR < 30 days old)
+            const isSuspiciousRank = (rank === 'Visitor' || rank === 'New User');
+            const isSuspiciousAge = (ageDays < (parseInt(process.env.VRC_ACCOUNT_AGE_THRESHOLD) || 30));
+
+            if (isSuspiciousRank || isSuspiciousAge) {
+                const logChannel = await client.channels.fetch(logChannelId);
+                if (logChannel) {
+                    const accountDate = createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                    const groupJoinDate = new Date(member.joinedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                    
+                    const ageVerifiedStr = fullInfo.ageVerified18 ? "✅ Verified 18+" : (fullInfo.ageVerified ? "✅ Verified" : "❌ Unverified");
+
+                    // Prioritize VRChat Plus profile pics/icons
+                    const userImage = fullInfo.profilePicOverrideThumbnail || 
+                                     fullInfo.profilePicOverride || 
+                                     fullInfo.userIcon || 
+                                     fullInfo.currentAvatarThumbnailImageUrl || 
+                                     fullInfo.currentAvatarImageUrl;
+
+                    const embed = new EmbedBuilder()
+                        .setTitle(`🛡️ Group Audit: Suspicious Join`)
+                        .setColor(isSuspiciousRank ? '#ff9800' : '#29C5F6')
+                        .setThumbnail(userImage)
+                        .addFields(
+                            { name: 'User', value: `**${fullInfo.displayName}** (${fullInfo.username})`, inline: false },
+                            { name: 'Trust Rank', value: `**${rank}**`, inline: true },
+                            { name: 'Age Verified', value: ageVerifiedStr, inline: true },
+                            { name: 'Account Age', value: `${ageDays} days\n*(Created: ${accountDate})*`, inline: true },
+                            { name: 'Group Joined', value: groupJoinDate, inline: true },
+                            { name: 'Reason', value: `**${[isSuspiciousRank ? '⚠️ Low Trust Rank' : '', isSuspiciousAge ? '🆕 Young Account' : ''].filter(Boolean).join(' | ')}**` }
+                        )
+                        .setFooter({ text: `VRChat User ID: ${member.userId}` })
+                        .setTimestamp();
+
+                    const row = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`vrc_mod_monitor_${member.userId}`)
+                            .setLabel('Monitor')
+                            .setStyle(ButtonStyle.Secondary),
+                        new ButtonBuilder()
+                            .setCustomId(`vrc_mod_ban_${member.userId}`)
+                            .setLabel('Ban from Group')
+                            .setStyle(ButtonStyle.Danger)
+                    );
+
+                    await logChannel.send({ embeds: [embed], components: [row] });
+                    await audit.update({ alertSent: true });
+                }
+            }
+        }
+    } catch (err) {
+        console.error("[VRC AUDIT] Error auditing members:", err);
+    }
+}
+
+module.exports = { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, createApplicationTicket, joinGuild, auditGroupMembers };
