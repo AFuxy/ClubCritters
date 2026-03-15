@@ -490,7 +490,7 @@ app.get('/api/stats/global', isAuthenticated, isStaff, async (req, res) => {
         const djIds = topDJs.map(a => a.targetId);
         const djRecords = await Roster.findAll({ where: { discordId: { [Op.in]: djIds } }, attributes: ['discordId', 'name'] });
 
-        // 5. Application Interest
+        // 5. Application Interest (Clicks)
         const appInterest = await Stats.findAll({
             attributes: [
                 [sequelize.literal("JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.label'))"), 'label'],
@@ -502,6 +502,14 @@ app.get('/api/stats/global', isAuthenticated, isStaff, async (req, res) => {
             },
             group: [sequelize.literal("JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.label'))")],
             order: [[fn('COUNT', col('id')), 'DESC']]
+        });
+
+        // 6. Actual Submissions
+        const appSubmissions = await ApplicationSubmission.findAll({
+            attributes: [[fn('COUNT', col('ApplicationSubmission.id')), 'count']],
+            include: [{ model: AppSlot, attributes: ['roleName'] }],
+            group: ['slotId', 'AppSlot.id'],
+            order: [[fn('COUNT', col('ApplicationSubmission.id')), 'DESC']]
         });
 
         res.json({
@@ -516,7 +524,8 @@ app.get('/api/stats/global', isAuthenticated, isStaff, async (req, res) => {
                 }; 
             }),
             topDJs: topDJs.map(d => { const rec = djRecords.find(r => r.discordId === d.targetId); return { name: rec ? rec.name : 'Unknown', count: d.get('count') }; }),
-            appInterest: appInterest.map(a => ({ label: a.get('label'), count: a.get('count') }))
+            appInterest: appInterest.map(a => ({ label: a.get('label'), count: a.get('count') })),
+            appSubmissions: appSubmissions.map(s => ({ label: s.AppSlot ? s.AppSlot.roleName : 'Unknown', count: s.get('count') }))
         });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });

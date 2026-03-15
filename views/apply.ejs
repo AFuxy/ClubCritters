@@ -255,6 +255,30 @@
         const emptyMsg = document.getElementById('empty-msg');
         const fieldsContainer = document.getElementById('dynamic-fields-container');
 
+        // --- TRACKING LOGIC ---
+        function trackAppClick(id, label) {
+            fetch('/api/stats/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    type: 'link_click', 
+                    targetId: id, 
+                    metadata: { page: 'apply', label: label, category: 'application' } 
+                })
+            }).catch(() => {});
+        }
+
+        // Track Page View on Load
+        fetch('/api/stats/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                type: 'page_view', 
+                targetId: 'apply', 
+                metadata: { page: 'apply' } 
+            })
+        }).catch(() => {});
+
         const FORM_DEFINITIONS = {
             'DJ': [
                 { label: 'DJ Name / Stage Name', key: 'DJ Name', type: 'text', required: true, placeholder: 'What do we call you?' },
@@ -333,7 +357,7 @@
                                 <p>${app.description || 'No description provided.'}</p>
                                 ${isOpen ? 
                                     (app.isInternal ? 
-                                        `<button onclick="handleInternalApply('${app.id}', '${app.roleName}', \`${app.description || ''}\`, '${app.roleType}')" class="btn-cc btn-primary">Apply Now</button>` :
+                                        `<button onclick="trackAppClick('${app.id}', '${app.roleName}'); handleInternalApply('${app.id}', '${app.roleName}', \`${app.description || ''}\`, '${app.roleType}')" class="btn-cc btn-primary">Apply Now</button>` :
                                         `<a href="${app.formUrl}" target="_blank" class="btn-cc btn-primary" onclick="trackAppClick('${app.id}', '${app.roleName}')">Apply Now</a>`
                                     ) : 
                                     `<button class="btn-cc btn-dark" disabled>Applications Closed</button>`

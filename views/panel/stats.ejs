@@ -88,9 +88,17 @@
 
         <!-- 2. APPLICATION INTEREST (GREEN) -->
         <div class="staff-section stat-block accent-green">
-            <h2>Application Interest</h2>
+            <h2>Application Interest (Clicks)</h2>
             <div class="scrollable-stats">
                 <ul id="app-interest-list" class="schedule-list" style="margin-top: 0;"></ul>
+            </div>
+        </div>
+
+        <!-- 3. ACTUAL SUBMISSIONS (BLUE) -->
+        <div class="staff-section stat-block accent-blue">
+            <h2>Completed Applications</h2>
+            <div class="scrollable-stats">
+                <ul id="app-submissions-list" class="schedule-list" style="margin-top: 0;"></ul>
             </div>
         </div>
     </div>
@@ -216,6 +224,17 @@
                     </li>
                 `).join('');
             } else { appList.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No data yet.</p>'; }
+
+            // Render App Submissions
+            const subList = document.getElementById('app-submissions-list');
+            if (data.appSubmissions && data.appSubmissions.length > 0) {
+                subList.innerHTML = data.appSubmissions.map(s => `
+                    <li class="schedule-item">
+                        <span>${s.label}</span>
+                        <span class="stat-value-highlight" style="color: #29C5F6;">${s.count.toLocaleString()} apps</span>
+                    </li>
+                `).join('');
+            } else { subList.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No apps yet.</p>'; }
 
             // Render Top Platforms
             const topPlatformsList = document.getElementById('top-platforms-list');
