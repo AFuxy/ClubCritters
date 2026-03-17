@@ -77,6 +77,33 @@
             <p style="font-size: 0.75rem; color: #666; margin-top: 15px;">Note: You can only update the VRChat Instance URL. Only Hosts and Owners can change event times.</p>
         <% } %>
     </div>
+    <!-- MULTI-INSTANCE TRACKING -->
+    <div class="staff-section" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 30px; margin-top: 30px;">
+        <h2 style="color: var(--primary-purple);">Manage Active Instances</h2>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Track multiple instances simultaneously (e.g., Overflow instances). These contribute to the total player count shown on the hub.</p>
+        
+        <% if (canManageAll) { %>
+        <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label>Add Instance URL</label>
+                    <input type="text" id="new-instance-url" placeholder="https://vrchat.com/home/launch?worldId=...">
+                </div>
+                <div class="form-group" style="margin: 0; display: flex; align-items: center; gap: 5px; padding-bottom: 12px;">
+                    <input type="checkbox" id="new-instance-event" style="width: auto;">
+                    <label style="margin: 0; font-size: 0.7rem;">Event Session</label>
+                </div>
+                <button class="btn-cc btn-primary" style="margin: 0;" onclick="startInstanceTracking()">Track Instance</button>
+            </div>
+        </div>
+        <% } %>
+
+        <div id="active-instances-list" class="schedule-list">
+            <!-- Active instances will appear here -->
+            <p style="text-align: center; color: #555; font-size: 0.8rem; padding: 20px;">No additional instances currently being tracked.</p>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -84,59 +111,133 @@
     const eventEndInput = document.getElementById('event-end');
     const instanceUrlInput = document.getElementById('instance-url');
     const forceOfflineInput = document.getElementById('force-offline');
+    const instancesList = document.getElementById('active-instances-list');
 
     async function loadSettings() {
-        const setRes = await fetch('/api/settings');
-        const settings = await setRes.json();
-        if (settings.eventStartTime) eventStartInput.value = settings.eventStartTime.slice(0, 16);
-        if (settings.eventEndTime) eventEndInput.value = settings.eventEndTime.slice(0, 16);
-        instanceUrlInput.value = settings.instanceUrl || '';
-        forceOfflineInput.checked = settings.forceOffline;
+        try {
+            const setRes = await fetch('/api/settings');
+            const settings = await setRes.json();
+            
+            if (settings) {
+                if (settings.eventStartTime) eventStartInput.value = settings.eventStartTime.slice(0, 16);
+                if (settings.eventEndTime) eventEndInput.value = settings.eventEndTime.slice(0, 16);
+                instanceUrlInput.value = settings.instanceUrl || '';
+                if (forceOfflineInput) forceOfflineInput.checked = settings.forceOffline;
+            }
+        } catch (e) { console.error("Error loading settings:", e); }
+        
+        // Ensure status checks run even if settings fail
         checkVrcStatus();
         checkDiscordStatus();
+        loadActiveInstances();
+    }
+
+    async function loadActiveInstances() {
+        try {
+            const res = await fetch('/api/vrchat/instances');
+            const instances = await res.json();
+            
+            if (!instances || instances.length === 0) {
+                instancesList.innerHTML = '<p style="text-align: center; color: #555; font-size: 0.8rem; padding: 20px;">No additional instances currently being tracked.</p>';
+                return;
+            }
+
+            instancesList.innerHTML = instances.map(inst => `
+                <li class="schedule-item" style="border-left: 4px solid ${inst.isEventSession ? 'var(--primary-blue)' : '#888'};">
+                    <div style="flex:1;">
+                        <strong>${inst.worldName}</strong> 
+                        <span style="font-size: 0.7rem; color: #888; display: block;">ID: ${inst.instanceId}</span>
+                        <div style="margin-top: 5px;">
+                            <span class="btn-cc btn-small" style="font-size: 0.6rem; background: ${inst.isEventSession ? 'rgba(41, 197, 246, 0.1)' : 'rgba(255,255,255,0.05)'}; color: ${inst.isEventSession ? 'var(--primary-blue)' : '#888'};">
+                                ${inst.isEventSession ? 'EVENT SESSION' : 'CASUAL SESSION'}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button onclick="stopInstanceTracking(${inst.id})" class="btn-cc btn-small btn-danger">Stop Tracking</button>
+                    </div>
+                </li>
+            `).join('');
+        } catch (e) { console.error("Error loading instances:", e); }
+    }
+
+    async function startInstanceTracking() {
+        const url = document.getElementById('new-instance-url').value;
+        const isEvent = document.getElementById('new-instance-event').checked;
+        if (!url) return showNotify('URL is required', 'error');
+
+        try {
+            const res = await fetch('/api/vrchat/instances/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ instanceUrl: url, isEventSession: isEvent })
+            });
+            if (res.ok) {
+                showNotify('Instance tracking started!');
+                document.getElementById('new-instance-url').value = '';
+                loadActiveInstances();
+            } else {
+                showNotify('Failed to start tracking.', 'error');
+            }
+        } catch (e) { showNotify('Network error', 'error'); }
+    }
+
+    async function stopInstanceTracking(id) {
+        if (!confirm('Stop tracking this instance? This will finalize the log.')) return;
+        try {
+            const res = await fetch(`/api/vrchat/instances/${id}/stop`, { method: 'DELETE' });
+            if (res.ok) {
+                showNotify('Tracking stopped.');
+                loadActiveInstances();
+            }
+        } catch (e) { showNotify('Network error', 'error'); }
     }
 
     async function checkDiscordStatus() {
-        const res = await fetch('/api/discord/status');
-        const data = await res.json();
-        const text = document.getElementById('discord-status-text');
-        const connectedMsg = document.getElementById('discord-connected-msg');
-        
-        const status = data.status || 'Offline';
-        text.innerText = status;
-        
-        if (status.includes('Connected')) {
-            text.style.color = '#5865F2';
-            connectedMsg.classList.remove('hidden');
-        } else {
-            text.style.color = '#ff5252';
-            connectedMsg.classList.add('hidden');
-        }
+        try {
+            const res = await fetch('/api/discord/status');
+            const data = await res.json();
+            const text = document.getElementById('discord-status-text');
+            const connectedMsg = document.getElementById('discord-connected-msg');
+            
+            const status = data.status || 'Offline';
+            text.innerText = status;
+            
+            if (status.includes('Connected')) {
+                text.style.color = '#5865F2';
+                connectedMsg.classList.remove('hidden');
+            } else {
+                text.style.color = '#ff5252';
+                connectedMsg.classList.add('hidden');
+            }
+        } catch (e) { console.error("Error checking Discord status:", e); }
     }
 
     async function checkVrcStatus() {
-        const res = await fetch('/api/vrchat/status');
-        const data = await res.json();
-        const text = document.getElementById('vrc-status-text');
-        const verifyBox = document.getElementById('vrc-verify-box');
-        const connectedMsg = document.getElementById('vrc-connected-msg');
-        
-        const status = data.status || 'Disconnected';
-        text.innerText = status;
-        
-        if (status === 'Connected') {
-            text.style.color = '#00e676';
-            verifyBox.classList.add('hidden');
-            connectedMsg.classList.remove('hidden');
-        } else if (status === '2FA Required') {
-            text.style.color = '#FF9800';
-            verifyBox.classList.remove('hidden');
-            connectedMsg.classList.add('hidden');
-        } else {
-            text.style.color = '#ff5252';
-            verifyBox.classList.add('hidden');
-            connectedMsg.classList.add('hidden');
-        }
+        try {
+            const res = await fetch('/api/vrchat/status');
+            const data = await res.json();
+            const text = document.getElementById('vrc-status-text');
+            const verifyBox = document.getElementById('vrc-verify-box');
+            const connectedMsg = document.getElementById('vrc-connected-msg');
+            
+            const status = data.status || 'Disconnected';
+            text.innerText = status;
+            
+            if (status === 'Connected') {
+                text.style.color = '#00e676';
+                verifyBox.classList.add('hidden');
+                connectedMsg.classList.remove('hidden');
+            } else if (status === '2FA Required') {
+                text.style.color = '#FF9800';
+                verifyBox.classList.remove('hidden');
+                connectedMsg.classList.add('hidden');
+            } else {
+                text.style.color = '#ff5252';
+                verifyBox.classList.add('hidden');
+                connectedMsg.classList.add('hidden');
+            }
+        } catch (e) { console.error("Error checking VRC status:", e); }
     }
 
     async function submitVrcCode() {
@@ -168,7 +269,7 @@
                     eventStartTime: eventStartInput.value,
                     eventEndTime: eventEndInput.value,
                     instanceUrl: instanceUrlInput.value,
-                    forceOffline: forceOfflineInput.checked
+                    forceOffline: forceOfflineInput ? forceOfflineInput.checked : false
                 })
             });
             if (response.ok) {

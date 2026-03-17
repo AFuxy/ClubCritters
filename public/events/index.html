@@ -63,6 +63,16 @@
         }
         .event-stats {
             text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+        .badge-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
         .peak-badge {
             background: rgba(0, 230, 118, 0.1);
@@ -71,12 +81,67 @@
             border-radius: 20px;
             font-weight: bold;
             font-size: 0.9rem;
+            white-space: nowrap;
         }
         .duration-text {
-            display: block;
             font-size: 0.8rem;
             color: #666;
-            margin-top: 5px;
+        }
+        .breakdown-toggle {
+            font-size: 0.7rem;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(179, 106, 244, 0.15);
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(179, 106, 244, 0.3);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+        .breakdown-toggle:hover {
+            background: rgba(179, 106, 244, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 0 10px rgba(179, 106, 244, 0.2);
+        }
+        .instance-breakdown {
+            width: 100%;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: none;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .instance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .instance-row:last-child {
+            border-bottom: none;
+        }
+        .instance-name {
+            color: var(--primary-blue);
+            font-weight: 700;
+        }
+        .instance-data {
+            color: #888;
+            font-family: monospace;
+        }
+        .instance-data b {
+            color: #fff;
         }
     </style>
 </head>

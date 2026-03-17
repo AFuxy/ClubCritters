@@ -10,7 +10,7 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 async function autoUpdateStatus(client) {
     if (!client || !client.user) return;
 
-    const { Settings, Schedule, Roster, InstanceLog } = require('../db');
+    const { Settings, Schedule, Roster, InstanceLog, InstanceVisitor } = require('../db');
 
     try {
         const settings = await Settings.findOne();
@@ -30,79 +30,132 @@ async function autoUpdateStatus(client) {
         await autoAcceptFriends();
 
         // 3. Ensure Pipeline is ALWAYS connected (24/7)
-        // We pass the current location (even if null) so the responder knows where to invite people
         let currentLocation = null;
-        let vrcData = null;
+        let vrcDataAggregate = { active: false, count: 0, capacity: 0, names: [] };
 
         /**
          * Helper to close an instance via API and clear DB
          */
-        const closeVrcInstance = async (location, settings, reason) => {
-            if (!location) return;
-            console.log(`[VRC AUTO-CLOSE] ${reason}. Terminating instance...`);
+        const closeVrcInstance = async (log, settings, reason) => {
+            if (!log) return;
+            console.log(`[VRC AUTO-CLOSE] ${reason} for ${log.worldName}. Terminating...`);
             
-            // Call universal terminator with full location string
-            await closeGroupInstance(location);
+            // Call universal terminator
+            await closeGroupInstance(log.instanceUrl || log.instanceId);
 
-            await settings.update({ instanceUrl: null, instanceEmptySince: null });
+            const now = new Date();
+            const durationMins = Math.floor((now - new Date(log.startTime)) / 60000);
+            await log.update({ 
+                isActive: false, 
+                endTime: now, 
+                totalDuration: durationMins 
+            });
         };
 
         if (settings && !settings.forceOffline) {
             const now = new Date();
             const start = new Date(settings.eventStartTime);
             const end = new Date(settings.eventEndTime);
+            const isLive = (now >= start && now < end);
 
-            // Fetch VRChat instance data
-            let vrcStats = "";
+            // 1. AUTO-DISCOVERY: Fetch ALL active instances from VRChat API
+            const vrcInstances = await getGroupInstanceData(groupId);
             
-            if (settings.instanceUrl && settings.instanceUrl.includes("worldId=")) {
-                vrcData = await getInstanceData(settings.instanceUrl);
-            } else {
-                vrcData = await getGroupInstanceData(groupId);
-            }
-
-            if (vrcData && vrcData.active) {
-                vrcStats = ` (${vrcData.count}/${vrcData.capacity})`;
-                currentLocation = vrcData.location || settings.instanceUrl;
-
-                // --- AUTO-CLOSE LOGIC ---
-                // 1. Check if event is over by 30 mins
-                const thirtyMinsAfterEvent = new Date(end.getTime() + 30 * 60000);
-                if (now > thirtyMinsAfterEvent) {
-                    await closeVrcInstance(currentLocation, settings, "Event ended 30+ mins ago");
-                    vrcData.active = false;
-                } 
-                // 2. Check if instance is empty (0 players) for 10 mins
-                else if (vrcData.count === 0) {
-                    if (!settings.instanceEmptySince) {
-                        await settings.update({ instanceEmptySince: now });
-                    } else {
-                        const emptyDuration = now - new Date(settings.instanceEmptySince);
-                        if (emptyDuration > 10 * 60000) { // 10 minutes
-                            await closeVrcInstance(currentLocation, settings, "Instance empty for 10+ mins");
-                            vrcData.active = false;
-                        }
-                    }
-                } else {
-                    // Reset empty tracker if players are present
-                    if (settings.instanceEmptySince) {
-                        await settings.update({ instanceEmptySince: null });
+            // If live, ensure all discovered instances are being tracked in DB
+            if (isLive && vrcInstances.length > 0) {
+                for (const inst of vrcInstances) {
+                    const existing = await InstanceLog.findOne({ where: { instanceId: inst.location, isActive: true } });
+                    if (!existing) {
+                        await InstanceLog.create({
+                            instanceId: inst.location,
+                            worldName: inst.name,
+                            isEventSession: true,
+                            startTime: new Date(),
+                            isActive: true
+                        });
+                        console.log(`[VRC DISCOVERY] 📡 Auto-started tracking for newly discovered instance: ${inst.name} (${inst.location})`);
                     }
                 }
-            } else if (settings.instanceEmptySince) {
-                // Clean up tracker if instance is no longer active anyway
-                await settings.update({ instanceEmptySince: null });
             }
 
-            if (vrcData && vrcData.active) {
-                vrcStats = ` (${vrcData.count}/${vrcData.capacity})`;
-                currentLocation = vrcData.location || settings.instanceUrl;
-            } else {
-                vrcStats = "";
-                currentLocation = null;
+            // 2. AGGREGATION: Fetch ALL active logs from DB and update stats
+            const activeLogs = await InstanceLog.findAll({ where: { isActive: true } });
+            
+            for (const log of activeLogs) {
+                let vrcData = null;
+                // Check if this log is specifically for the override URL or a group discovery
+                if (log.instanceUrl && log.instanceUrl.includes("worldId=")) {
+                    vrcData = await getInstanceData(log.instanceUrl);
+                } else {
+                    // Find this specific instance in the vrcInstances list
+                    vrcData = vrcInstances.find(i => i.location === log.instanceId);
+                    
+                    // If we found the instance but it lacks user details, fetch them specifically
+                    if (vrcData && (!vrcData.users || vrcData.users.length === 0)) {
+                        const detailed = await getInstanceData(vrcData.location);
+                        if (detailed) vrcData = detailed;
+                    }
+                }
+
+                if (vrcData && vrcData.active) {
+                    vrcDataAggregate.active = true;
+                    vrcDataAggregate.count += vrcData.count;
+                    vrcDataAggregate.capacity += vrcData.capacity;
+                    if (vrcData.name && !vrcDataAggregate.names.includes(vrcData.name)) {
+                        vrcDataAggregate.names.push(vrcData.name);
+                    }
+                    
+                    // Set primary location for pipeline (usually the first one or most populated)
+                    if (!currentLocation || vrcData.count > 0) {
+                        currentLocation = vrcData.location || log.instanceUrl;
+                    }
+
+                    // Update peak capacity for this specific log
+                    if (vrcData.count > log.peakCapacity) {
+                        await log.update({ peakCapacity: vrcData.count });
+                    }
+                    if (isLive && !log.isEventSession) {
+                        await log.update({ isEventSession: true });
+                    }
+
+                    // --- AUTOMATED UNIQUE USER TRACKING ---
+                    if (vrcData.users && vrcData.users.length > 0) {
+                        for (const vrcUser of vrcData.users) {
+                            const [visitor, created] = await InstanceVisitor.findOrCreate({
+                                where: { 
+                                    instanceLogId: log.id,
+                                    vrcUserId: vrcUser.id
+                                },
+                                defaults: { vrcUsername: vrcUser.displayName || vrcUser.username }
+                            });
+
+                            if (created) {
+                                // New unique visitor detected for this instance!
+                                await log.increment('uniqueUsers');
+                            }
+                        }
+                    }
+
+                    // --- AUTO-CLOSE LOGIC ---
+                    const thirtyMinsAfterEvent = new Date(end.getTime() + 30 * 60000);
+                    if (now > thirtyMinsAfterEvent) {
+                        await closeVrcInstance(log, settings, "Event ended 30+ mins ago");
+                    }
+                } else {
+                    // Instance is dead, finalize log
+                    const durationMins = Math.floor((now - new Date(log.startTime)) / 60000);
+                    await log.update({ 
+                        isActive: false, 
+                        endTime: now, 
+                        totalDuration: durationMins 
+                    });
+                    console.log(`[ANALYTICS] 📉 Auto-finalized dead instance log: ${log.id}`);
+                }
             }
 
-            if (now >= start && now < end) {
+            let vrcStats = vrcDataAggregate.active ? ` (${vrcDataAggregate.count}/${vrcDataAggregate.capacity})` : "";
+
+            if (isLive) {
                 statusText = `🔊 Club is LIVE!${vrcStats}`;
                 statusIcon = 'online';
                 vrcPresenceStatus = 'join me'; // Blue
@@ -136,49 +189,6 @@ async function autoUpdateStatus(client) {
 
         // Maintain Pipeline connection 24/7
         await connectPipeline(currentLocation);
-
-        // --- HISTORICAL INSTANCE ANALYTICS ---
-        if (currentLocation) {
-            const isLive = (new Date() >= new Date(settings.eventStartTime) && new Date() < new Date(settings.eventEndTime));
-            
-            if (!settings.currentInstanceLogId) {
-                // Start a new session log
-                const newLog = await InstanceLog.create({
-                    instanceId: currentLocation,
-                    worldName: (vrcData && vrcData.name) ? vrcData.name : 'Club Critters Hub',
-                    isEventSession: isLive,
-                    startTime: new Date()
-                });
-                await settings.update({ currentInstanceLogId: newLog.id });
-                console.log(`[ANALYTICS] 📈 Started new instance session log: ${newLog.id} (${newLog.worldName})`);
-            } else {
-                // Update existing session
-                const log = await InstanceLog.findByPk(settings.currentInstanceLogId);
-                if (log) {
-                    const currentCount = (vrcData && vrcData.active) ? vrcData.count : 0;
-                    if (currentCount > log.peakCapacity) {
-                        await log.update({ peakCapacity: currentCount });
-                    }
-                    // If it becomes an event while open, mark it
-                    if (isLive && !log.isEventSession) {
-                        await log.update({ isEventSession: true });
-                    }
-                }
-            }
-        } else if (settings.currentInstanceLogId) {
-            // Instance was just cleared, finalize the log
-            const log = await InstanceLog.findByPk(settings.currentInstanceLogId);
-            if (log) {
-                const now = new Date();
-                const durationMins = Math.floor((now - new Date(log.startTime)) / 60000);
-                await log.update({ 
-                    endTime: now,
-                    totalDuration: durationMins
-                });
-                console.log(`[ANALYTICS] 📉 Finalized instance session log: ${log.id} (${durationMins} mins, Peak: ${log.peakCapacity})`);
-            }
-            await settings.update({ currentInstanceLogId: null });
-        }
 
         // Update Discord Presence
         client.user.setPresence({

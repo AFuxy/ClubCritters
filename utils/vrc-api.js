@@ -390,36 +390,29 @@ async function getGroupInstanceData(groupShortName) {
     const now = Date.now();
     if (cache.groupInstance.data && (now - cache.groupInstance.timestamp < CACHE_TTL)) return cache.groupInstance.data;
     if (!authCookie) await loginVRC();
-    if (!authCookie) return { active: false, count: 0, capacity: 0 };
+    if (!authCookie) return [];
     const groupId = await getGroupId(groupShortName);
-    if (!groupId) return { active: false, count: 0, capacity: 0 };
+    if (!groupId) return [];
     try {
         const res = await vrcFetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/instances`);
         if (res.status === 200) {
             const instances = await res.json();
-            let result = { active: false, count: 0, capacity: 0, location: null };
+            let results = [];
             if (instances && instances.length > 0) {
-                const bestInstance = instances.reduce((prev, current) => (prev.n_users > current.n_users) ? prev : current);
-                
-                // Use .location if present, otherwise fallback to rebuilding
-                const location = bestInstance.location || `${bestInstance.worldId || bestInstance.world_id}:${bestInstance.instanceId || bestInstance.instance_id}`;
-
-                // Prefer custom instance name (VRC+), then fallback to worldName
-                const finalName = bestInstance.name || bestInstance.worldName || bestInstance.world?.name || 'Club Critters Hub';
-
-                result = { 
-                    active: true, 
-                    count: (bestInstance.n_users !== undefined) ? bestInstance.n_users : bestInstance.nUsers, 
-                    capacity: bestInstance.capacity, 
-                    location: location,
-                    name: finalName
-                };
+                results = instances.map(inst => ({
+                    active: true,
+                    count: (inst.n_users !== undefined) ? inst.n_users : inst.nUsers,
+                    capacity: inst.capacity,
+                    location: inst.location || `${inst.worldId || inst.world_id}:${inst.instanceId || inst.instance_id}`,
+                    name: inst.name || inst.worldName || inst.world?.name || 'Club Critters Hub',
+                    users: inst.users || [] // Include user list if API provides it
+                }));
             }
-            cache.groupInstance = { data: result, timestamp: now };
-            return result;
+            cache.groupInstance = { data: results, timestamp: now };
+            return results;
         }
     } catch (err) {}
-    return { active: false, count: 0, capacity: 0 };
+    return [];
 }
 
 async function getInstanceData(instanceUrl) {
@@ -436,7 +429,14 @@ async function getInstanceData(instanceUrl) {
         const res = await vrcFetch(`https://api.vrchat.cloud/api/1/instances/${target}`);
         if (res.status === 200) {
             const data = await res.json();
-            const result = { active: true, count: data.n_users, capacity: data.capacity, location: target };
+            const result = { 
+                active: true, 
+                count: data.n_users, 
+                capacity: data.capacity, 
+                location: target,
+                name: data.name || data.worldName || 'Club Critters Hub',
+                users: data.users || [] // Capture the player list
+            };
             cache.specificInstance.set(instanceUrl, { data: result, timestamp: now });
             return result;
         }

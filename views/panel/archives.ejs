@@ -20,9 +20,10 @@
     </div>
 
     <div class="staff-section">
-        <h2>My Set Archives</h2>
+        <h2 id="form-title">Upload Set Archive</h2>
         <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Upload your DJ sets here. These will appear in the public archive page.</p>
         
+        <input type="hidden" id="edit-archive-id">
         <div class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
             <div class="form-group">
                 <label>Set Title</label>
@@ -40,8 +41,9 @@
                 <label>Listen Link (SoundCloud, Mixcloud, etc.)</label>
                 <input type="text" id="archive-link" placeholder="https://soundcloud.com/...">
             </div>
-            <div class="form-group" style="grid-column: span 2;">
-                <button class="btn-cc btn-primary" style="margin: 0; width: 100%;" onclick="uploadArchive()">Upload Set</button>
+            <div class="form-group" style="grid-column: span 2; display: flex; gap: 10px;">
+                <button id="btn-save" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="saveArchive()">Upload Set</button>
+                <button id="btn-cancel" class="btn-cc btn-secondary hidden" style="margin: 0;" onclick="cancelEdit()">Cancel</button>
             </div>
         </div>
 
@@ -50,10 +52,23 @@
             <!-- Archives will appear here -->
         </ul>
     </div>
+
+    <% if (user.type.toLowerCase().includes('host') || user.type.toLowerCase().includes('owner')) { %>
+    <div class="staff-section" style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 30px;">
+        <h2 style="color: var(--primary-purple);">Global Archive Management</h2>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">As a Host or Owner, you can manage archives from all performers.</p>
+        <ul id="all-archive-list" class="schedule-list">
+            <!-- All archives will appear here -->
+        </ul>
+    </div>
+    <% } %>
 </div>
 
 <script>
     const archiveList = document.getElementById('user-archive-list');
+    const allArchiveList = document.getElementById('all-archive-list');
+    let myArchives = [];
+    let allArchives = [];
 
     async function loadArchives() {
         const [archiveRes, statsRes] = await Promise.all([
@@ -61,7 +76,7 @@
             fetch('/api/stats/my')
         ]);
         
-        const archives = await archiveRes.json();
+        myArchives = await archiveRes.json();
         const stats = await statsRes.json();
 
         // Update Stats Counters
@@ -79,18 +94,70 @@
             breakdownEl.innerHTML = '<span style="font-size:0.7rem; color:#666;">No clicks yet.</span>';
         }
 
-        archiveList.innerHTML = archives.map(item => `
+        archiveList.innerHTML = myArchives.map(item => `
             <li class="schedule-item" style="border-left: 4px solid var(--primary-blue);">
-                <span><strong>${item.date}</strong> - ${item.title} (${item.genre})</span>
-                <div style="display:flex; align-items:center; gap:15px;">
-                    <span style="font-size:0.75rem; color:#888;">📊 ${stats.archiveClicks[item.id] || 0} clicks</span>
-                    <a href="${item.linkUrl}" target="_blank" class="btn-cc btn-small btn-secondary">View Link</a>
+                <div style="flex:1;">
+                    <strong>${item.date}</strong> - ${item.title} <span style="opacity: 0.6; font-size: 0.8rem;">(${item.genre})</span>
+                    <div style="margin-top: 5px; font-size: 0.7rem; color: #888;">📊 ${stats.archiveClicks[item.id] || 0} clicks</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button onclick="editArchive('${item.id}')" class="btn-cc btn-small btn-secondary">Edit</button>
+                    <button onclick="deleteArchive('${item.id}')" class="btn-cc btn-small btn-danger">Delete</button>
+                    <a href="${item.linkUrl}" target="_blank" class="btn-cc btn-small btn-primary">View</a>
                 </div>
             </li>
         `).join('');
+
+        if (allArchiveList) {
+            const allRes = await fetch('/api/archives/all');
+            allArchives = await allRes.json();
+            allArchiveList.innerHTML = allArchives.map(item => `
+                <li class="schedule-item" style="border-left: 4px solid var(--primary-purple);">
+                    <div style="flex:1;">
+                        <strong>${item.date}</strong> - ${item.title} <span style="opacity: 0.6; font-size: 0.8rem;">(${item.genre})</span>
+                        <div style="margin-top: 5px; font-size: 0.7rem; color: #888;">👤 By: ${item.Roster ? item.Roster.name : 'Unknown'}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button onclick="editArchive('${item.id}', true)" class="btn-cc btn-small btn-secondary">Edit</button>
+                        <button onclick="deleteArchive('${item.id}')" class="btn-cc btn-small btn-danger">Delete</button>
+                        <a href="${item.linkUrl}" target="_blank" class="btn-cc btn-small btn-primary">View</a>
+                    </div>
+                </li>
+            `).join('');
+        }
     }
 
-    async function uploadArchive() {
+    function editArchive(id, fromGlobal = false) {
+        const item = (fromGlobal ? allArchives : myArchives).find(a => a.id.toString() === id.toString());
+        if (!item) return;
+
+        document.getElementById('edit-archive-id').value = item.id;
+        document.getElementById('archive-title').value = item.title;
+        document.getElementById('archive-date').value = item.date;
+        document.getElementById('archive-genre').value = item.genre;
+        document.getElementById('archive-link').value = item.linkUrl;
+
+        document.getElementById('form-title').innerText = 'Edit Set Archive';
+        document.getElementById('btn-save').innerText = 'Update Set';
+        document.getElementById('btn-cancel').classList.remove('hidden');
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+        document.getElementById('edit-archive-id').value = '';
+        document.getElementById('archive-title').value = '';
+        document.getElementById('archive-date').value = '';
+        document.getElementById('archive-genre').value = '';
+        document.getElementById('archive-link').value = '';
+
+        document.getElementById('form-title').innerText = 'Upload Set Archive';
+        document.getElementById('btn-save').innerText = 'Upload Set';
+        document.getElementById('btn-cancel').classList.add('hidden');
+    }
+
+    async function saveArchive() {
+        const id = document.getElementById('edit-archive-id').value;
         const title = document.getElementById('archive-title').value;
         const date = document.getElementById('archive-date').value;
         const genre = document.getElementById('archive-genre').value;
@@ -98,22 +165,38 @@
 
         if (!title || !date || !linkUrl) return showNotify('Fill in all required fields!', 'error');
 
+        const method = id ? 'PATCH' : 'POST';
+        const url = id ? `/api/archives/${id}` : '/api/archives/add';
+
         try {
-            const response = await fetch('/api/archives/add', {
-                method: 'POST',
+            const response = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, date, genre, linkUrl })
             });
 
             if (response.ok) {
-                showNotify('Set archived successfully!');
-                document.getElementById('archive-title').value = '';
-                document.getElementById('archive-date').value = '';
-                document.getElementById('archive-genre').value = '';
-                document.getElementById('archive-link').value = '';
+                showNotify(id ? 'Set updated successfully!' : 'Set archived successfully!');
+                cancelEdit();
                 loadArchives();
             } else {
-                showNotify('Failed to upload archive.', 'error');
+                showNotify('Failed to save archive.', 'error');
+            }
+        } catch (e) {
+            showNotify('Network error occurred.', 'error');
+        }
+    }
+
+    async function deleteArchive(id) {
+        if (!confirm('Are you sure you want to delete this archive?')) return;
+
+        try {
+            const response = await fetch(`/api/archives/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                showNotify('Archive deleted successfully!');
+                loadArchives();
+            } else {
+                showNotify('Failed to delete archive.', 'error');
             }
         } catch (e) {
             showNotify('Network error occurred.', 'error');

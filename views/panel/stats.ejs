@@ -278,30 +278,88 @@
             const logBody = document.getElementById('instance-logs-body');
             
             if (allLogs.length > 0) {
-                logBody.innerHTML = allLogs.map(log => {
-                    const date = new Date(log.startTime).toLocaleDateString();
-                    const duration = log.totalDuration ? `${Math.floor(log.totalDuration / 60)}h ${log.totalDuration % 60}m` : 'Active...';
-                    const typeBadge = log.isEventSession 
+                // GROUP LOGS BY DATE
+                const grouped = {};
+                allLogs.forEach(log => {
+                    const dateKey = new Date(log.startTime).toISOString().split('T')[0];
+                    if (!grouped[dateKey]) {
+                        grouped[dateKey] = {
+                            date: dateKey,
+                            worldName: log.worldName,
+                            peakCapacity: log.peakCapacity,
+                            uniqueUsers: log.uniqueUsers,
+                            totalDuration: log.totalDuration || 0,
+                            isEventSession: log.isEventSession,
+                            isActive: log.isActive,
+                            instances: []
+                        };
+                    } else {
+                        grouped[dateKey].peakCapacity += log.peakCapacity;
+                        grouped[dateKey].uniqueUsers += log.uniqueUsers;
+                        if ((log.totalDuration || 0) > grouped[dateKey].totalDuration) {
+                            grouped[dateKey].totalDuration = log.totalDuration;
+                        }
+                        if (log.isActive) grouped[dateKey].isActive = true;
+                    }
+                    grouped[dateKey].instances.push(log);
+                });
+
+                logBody.innerHTML = Object.values(grouped).map(event => {
+                    const displayDate = new Date(event.date + 'T12:00:00').toLocaleDateString();
+                    const duration = event.isActive ? '<span style="color:#00e676; font-size:0.7rem;">● Tracking...</span>' : (event.totalDuration ? `${Math.floor(event.totalDuration / 60)}h ${event.totalDuration % 60}m` : '---');
+                    const typeBadge = event.isEventSession 
                         ? '<span style="color:#ff4444; font-weight:bold;">LIVE</span>' 
                         : '<span style="color:#00bcd4;">Social</span>';
                     
-                    const uniqueStr = log.uniqueUsers > 0 ? `<br><span style="font-size:0.75rem; color:#888;">Uniq: ${log.uniqueUsers}</span>` : "";
+                    const uniqueStr = event.uniqueUsers > 0 ? `<br><span style="font-size:0.75rem; color:#888;">Uniq: ${event.uniqueUsers}</span>` : "";
+                    const multiBadge = `<br><span style="font-size:0.65rem; color:var(--primary-purple); cursor:pointer; white-space:nowrap;" onclick="toggleBreakdown('${event.date}')">🔍 ${event.instances.length} Instances</span>`;
 
                     return `
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${event.isActive ? 'background: rgba(0,230,118,0.02);' : ''}">
                             <td style="padding: 10px;">
-                                <div style="font-weight:bold;">${log.worldName}</div>
-                                <div style="font-size:0.7rem; opacity:0.5; font-family:monospace;">${log.instanceId}</div>
+                                <div style="font-weight:bold;">${event.worldName}</div>
+                                ${multiBadge}
                             </td>
                             <td style="padding: 10px;">${typeBadge}</td>
-                            <td style="padding: 10px;">${date}</td>
+                            <td style="padding: 10px;">${displayDate}</td>
                             <td style="padding: 10px; color: #00e676; font-weight:bold;">
-                                ${log.peakCapacity} ${uniqueStr}
+                                ${event.peakCapacity} ${uniqueStr}
                             </td>
                             <td style="padding: 10px; opacity:0.8;">${duration}</td>
                             <td style="padding: 10px; display:flex; gap:10px;">
-                                <button onclick="editLog(${log.id})" style="background:none; border:none; color:#29C5F6; cursor:pointer; font-size:1.2rem;" title="Edit">✏️</button>
-                                <button onclick="deleteLog(${log.id})" style="background:none; border:none; color:#ff5252; cursor:pointer; font-size:1.2rem;" title="Delete">🗑️</button>
+                                <button onclick="editEvent('${event.date}')" style="background:none; border:none; color:#29C5F6; cursor:pointer; font-size:1.2rem;" title="Edit Event Summary">✏️</button>
+                                <button onclick="deleteEvent('${event.date}')" style="background:none; border:none; color:#ff5252; cursor:pointer; font-size:1.2rem;" title="Delete Event">🗑️</button>
+                            </td>
+                        </tr>
+                        <tr id="breakdown-${event.date}" style="display:none; background: rgba(0,0,0,0.3);">
+                            <td colspan="6" style="padding: 15px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                    <div style="font-size:0.8rem; color:#888;">Individual Instance Breakdown:</div>
+                                    <button onclick="addOverflow('${event.date}', '${event.worldName.replace(/'/g, "\\'")}')" class="btn-cc btn-small" style="background:rgba(179, 106, 244, 0.1); color:#B36AF4; border-color:#B36AF4; margin:0;">+ Add Overflow Instance</button>
+                                </div>
+                                ${event.instances.sort((a,b) => new Date(a.startTime) - new Date(b.startTime)).map((inst, idx) => {
+                                    const label = idx === 0 ? "MAIN HUB" : `OVERFLOW #${idx}`;
+                                    const labelColor = idx === 0 ? "var(--primary-purple)" : "#888";
+                                    return `
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid rgba(255,255,255,0.05);">
+                                            <div style="display:flex; flex-direction:column; gap:2px;">
+                                                <div style="font-family:monospace; font-size:0.75rem;">
+                                                    <span style="color:var(--primary-blue);">${inst.instanceId}</span>
+                                                </div>
+                                                <span style="font-size:0.6rem; font-weight:900; color:${labelColor}; letter-spacing:1px;">${label}</span>
+                                            </div>
+                                            <div style="font-size:0.8rem;">
+                                                Peak: <span style="color:#00e676;">${inst.peakCapacity}</span> | 
+                                                Uniq: <span style="color:#B36AF4;">${inst.uniqueUsers}</span> | 
+                                                ${inst.totalDuration || 0}m
+                                            </div>
+                                            <div style="display:flex; gap:10px;">
+                                                <button onclick="editLog(${inst.id})" style="background:none; border:none; color:#29C5F6; cursor:pointer; font-size:1rem;" title="Edit This Instance">✏️</button>
+                                                <button onclick="deleteLog(${inst.id})" style="background:none; border:none; color:#ff5252; cursor:pointer; font-size:1rem;" title="Delete This Instance">🗑️</button>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
                             </td>
                         </tr>
                     `;
@@ -314,6 +372,38 @@
     }
     loadGlobalStats();
 
+    function toggleBreakdown(date) {
+        const el = document.getElementById(`breakdown-${date}`);
+        el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+    }
+
+    function addOverflow(date, worldName) {
+        // Find the primary log for this date to copy its exact times
+        const logs = allLogs.filter(l => new Date(l.startTime).toISOString().split('T')[0] === date);
+        
+        let startTime, endTime;
+
+        if (logs.length > 0) {
+            // Use the times from the first (master) log of that night
+            startTime = logs[0].startTime;
+            endTime = logs[0].endTime;
+        } else {
+            // Fallback only if no logs are found
+            startTime = `${date}T20:00`;
+            endTime = `${date}T23:59`;
+        }
+        
+        openLogModal({
+            worldName: worldName,
+            startTime: startTime,
+            endTime: endTime,
+            peakCapacity: 0,
+            uniqueUsers: 0,
+            isEventSession: true
+        });
+        document.getElementById('modal-title').innerText = "Add Overflow Instance";
+    }
+
     function openLogModal(log = null) {
         const modal = document.getElementById('log-modal');
         const form = document.getElementById('log-form');
@@ -323,8 +413,8 @@
         document.getElementById('log-id').value = "";
         
         if (log) {
-            title.innerText = "Edit Event Log";
-            document.getElementById('log-id').value = log.id;
+            title.innerText = log.id ? "Edit Event Log" : "Add Manual Entry";
+            document.getElementById('log-id').value = log.id || "";
             document.getElementById('log-worldName').value = log.worldName;
             document.getElementById('log-startTime').value = new Date(log.startTime).toISOString().slice(0, 16);
             if (log.endTime) document.getElementById('log-endTime').value = new Date(log.endTime).toISOString().slice(0, 16);
@@ -345,6 +435,41 @@
     function editLog(id) {
         const log = allLogs.find(l => l.id === id);
         if (log) openLogModal(log);
+    }
+
+    function editEvent(date) {
+        // Find logs for this date
+        const logs = allLogs.filter(l => new Date(l.startTime).toISOString().split('T')[0] === date);
+        if (logs.length === 0) return;
+
+        // Group the data for the modal
+        const summary = {
+            id: logs[0].id, // Use the first log as the primary for the update
+            worldName: logs[0].worldName,
+            startTime: logs[0].startTime,
+            endTime: logs[0].endTime,
+            peakCapacity: logs.reduce((acc, curr) => acc + curr.peakCapacity, 0),
+            uniqueUsers: logs.reduce((acc, curr) => acc + curr.uniqueUsers, 0),
+            isEventSession: logs.some(l => l.isEventSession),
+            isMulti: logs.length > 1
+        };
+
+        openLogModal(summary);
+        if (summary.isMulti) {
+            document.getElementById('modal-title').innerText = "Edit Grouped Event";
+            showNotify("Note: This will update the total stats for this event date.");
+        }
+    }
+
+    async function deleteEvent(date) {
+        if (!confirm("Are you sure you want to delete ALL logs for this date?")) return;
+        const logs = allLogs.filter(l => new Date(l.startTime).toISOString().split('T')[0] === date);
+        try {
+            for (const log of logs) {
+                await fetch(`/api/stats/instances/${log.id}`, { method: 'DELETE' });
+            }
+            loadGlobalStats();
+        } catch (err) { alert("Failed to delete."); }
     }
 
     // Handle Form Submission

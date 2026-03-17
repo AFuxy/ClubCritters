@@ -13,9 +13,7 @@ const Settings = sequelize.define('Settings', {
     eventEndTime: { type: DataTypes.DATE },
     forceOffline: { type: DataTypes.BOOLEAN, defaultValue: false },
     instanceUrl: { type: DataTypes.STRING },
-    vrcCookie: { type: DataTypes.TEXT }, // Persist VRChat session
-    instanceEmptySince: { type: DataTypes.DATE }, // Track when instance first hit 0 players
-    currentInstanceLogId: { type: DataTypes.INTEGER }
+    vrcCookie: { type: DataTypes.TEXT } // Persist VRChat session
 });
 
 // 2. Roster (DJs/Staff)
@@ -103,13 +101,15 @@ const ApplicationSubmission = sequelize.define('ApplicationSubmission', {
 const InstanceLog = sequelize.define('InstanceLog', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     instanceId: { type: DataTypes.STRING },
+    instanceUrl: { type: DataTypes.STRING }, // Store the full URL for tracking
     worldName: { type: DataTypes.STRING, defaultValue: 'Club Critters Hub' },
     startTime: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     endTime: { type: DataTypes.DATE },
     peakCapacity: { type: DataTypes.INTEGER, defaultValue: 0 },
     uniqueUsers: { type: DataTypes.INTEGER, defaultValue: 0 },
     totalDuration: { type: DataTypes.INTEGER }, // Stored in minutes
-    isEventSession: { type: DataTypes.BOOLEAN, defaultValue: false } 
+    isEventSession: { type: DataTypes.BOOLEAN, defaultValue: false },
+    isActive: { type: DataTypes.BOOLEAN, defaultValue: true } // New field to track active status
 });
 
 // 10. VRChat Group Audit (Automated Moderation)
@@ -126,6 +126,14 @@ const VrcGroupAudit = sequelize.define('VrcGroupAudit', {
     alertSent: { type: DataTypes.BOOLEAN, defaultValue: false }
 });
 
+// 11. Visitor tracking for unique users
+const InstanceVisitor = sequelize.define('InstanceVisitor', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    instanceLogId: { type: DataTypes.INTEGER, references: { model: InstanceLog, key: 'id' } },
+    vrcUserId: { type: DataTypes.STRING },
+    vrcUsername: { type: DataTypes.STRING }
+});
+
 // Relationships
 Roster.hasMany(Schedule, { foreignKey: 'performerId' });
 Schedule.belongsTo(Roster, { foreignKey: 'performerId' });
@@ -135,6 +143,9 @@ Archive.belongsTo(Roster, { foreignKey: 'performerId' });
 
 AppSlot.hasMany(ApplicationSubmission, { foreignKey: 'slotId' });
 ApplicationSubmission.belongsTo(AppSlot, { foreignKey: 'slotId' });
+
+InstanceLog.hasMany(InstanceVisitor, { foreignKey: 'instanceLogId' });
+InstanceVisitor.belongsTo(InstanceLog, { foreignKey: 'instanceLogId' });
 
 async function initDB() {
     try {
@@ -147,4 +158,4 @@ async function initDB() {
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, InstanceVisitor, initDB };

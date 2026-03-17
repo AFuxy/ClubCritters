@@ -286,6 +286,68 @@ app.post('/api/vrchat/verify', isStaff, async (req, res) => {
     res.json(result);
 });
 
+// Multi-Instance Management
+app.get('/api/vrchat/instances', isStaff, async (req, res) => {
+    try {
+        const activeInstances = await InstanceLog.findAll({ where: { isActive: true } });
+        res.json(activeInstances);
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/vrchat/instances/start', isHostOrOwner, async (req, res) => {
+    try {
+        const { instanceUrl, isEventSession } = req.body;
+        if (!instanceUrl) return res.status(400).json({ error: 'URL required' });
+
+        // Extract ID for identification
+        let instanceId = instanceUrl;
+        if (instanceUrl.includes('worldId=')) {
+            const url = new URL(instanceUrl);
+            instanceId = `${url.searchParams.get('worldId')}:${url.searchParams.get('instanceId')}`;
+        }
+
+        // Check if already active
+        const existing = await InstanceLog.findOne({ where: { instanceId, isActive: true } });
+        if (existing) return res.json({ success: true, message: 'Already tracking' });
+
+        // Fetch basic world info for the log
+        const worldData = await getInstanceData(instanceUrl);
+
+        const newLog = await InstanceLog.create({
+            instanceId,
+            instanceUrl,
+            worldName: (worldData && worldData.name) ? worldData.name : 'Club Critters Hub',
+            isEventSession: isEventSession || false,
+            startTime: new Date(),
+            isActive: true
+        });
+
+        res.json({ success: true, instance: newLog });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.delete('/api/vrchat/instances/:id/stop', isHostOrOwner, async (req, res) => {
+    try {
+        const log = await InstanceLog.findByPk(req.params.id);
+        if (!log) return res.status(404).json({ error: 'Log not found' });
+
+        const now = new Date();
+        const durationMins = Math.floor((now - new Date(log.startTime)) / 60000);
+
+        // Finalize the log
+        await log.update({ 
+            isActive: false, 
+            endTime: now, 
+            totalDuration: durationMins 
+        });
+
+        // Optional: Trigger VRC API to close instance if desired
+        // await closeGroupInstance(log.instanceUrl);
+
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
 app.post('/api/settings/update', isStaff, async (req, res) => {
     try {
         const { eventStartTime, eventEndTime, forceOffline, instanceUrl } = req.body;
@@ -294,6 +356,29 @@ app.post('/api/settings/update', isStaff, async (req, res) => {
 
         let settings = await Settings.findOne();
         if (!settings) settings = await Settings.create({});
+
+        // If a new instanceUrl is provided via legacy settings, we can auto-start it
+        if (instanceUrl && instanceUrl !== settings.instanceUrl) {
+            // Auto-start tracking for this new URL
+            let instanceId = instanceUrl;
+            if (instanceUrl.includes('worldId=')) {
+                const url = new URL(instanceUrl);
+                instanceId = `${url.searchParams.get('worldId')}:${url.searchParams.get('instanceId')}`;
+            }
+
+            const existing = await InstanceLog.findOne({ where: { instanceId, isActive: true } });
+            if (!existing) {
+                const worldData = await getInstanceData(instanceUrl);
+                await InstanceLog.create({
+                    instanceId,
+                    instanceUrl,
+                    worldName: (worldData && worldData.name) ? worldData.name : 'Club Critters Hub',
+                    isEventSession: (new Date() >= new Date(eventStartTime || settings.eventStartTime) && new Date() < new Date(eventEndTime || settings.eventEndTime)),
+                    startTime: new Date(),
+                    isActive: true
+                });
+            }
+        }
 
         const updateData = { instanceUrl };
         if (isFullAdmin) {
@@ -448,10 +533,60 @@ app.get('/api/archives/my', isAuthenticated, async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
+app.get('/api/archives/all', isAuthenticated, isHostOrOwner, async (req, res) => {
+    try {
+        const archives = await Archive.findAll({ include: [Roster], order: [['date', 'DESC']] });
+        res.json(archives);
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
 app.post('/api/archives/add', isAuthenticated, async (req, res) => {
     try {
         const { title, date, genre, linkUrl } = req.body;
         await Archive.create({ performerId: req.user.discordId, title, date, genre, linkUrl });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.patch('/api/archives/:id', isAuthenticated, async (req, res) => {
+    try {
+        const { title, date, genre, linkUrl } = req.body;
+        const archive = await Archive.findByPk(req.params.id);
+        if (!archive) return res.status(404).json({ error: 'Archive not found' });
+
+        const userType = (req.user?.type || "").toLowerCase();
+        const isHostOrOwner = userType.includes('host') || userType.includes('owner');
+        
+        if (archive.performerId !== req.user.discordId && !isHostOrOwner) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        await archive.update({ title, date, genre, linkUrl });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.delete('/api/archives/:id', isAuthenticated, async (req, res) => {
+    try {
+        const archive = await Archive.findByPk(req.params.id);
+        if (!archive) return res.status(404).json({ error: 'Archive not found' });
+
+        const userType = (req.user?.type || "").toLowerCase();
+        const isHostOrOwner = userType.includes('host') || userType.includes('owner');
+        
+        if (archive.performerId !== req.user.discordId && !isHostOrOwner) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        await archive.destroy();
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// --- GALLERY ROUTES ---
+app.delete('/api/gallery/:id', isAuthenticated, isHostOrOwner, async (req, res) => {
+    try {
+        await Gallery.destroy({ where: { id: req.params.id } });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
@@ -555,7 +690,8 @@ app.post('/api/stats/instances/add', isAuthenticated, isHostOrOwner, async (req,
             uniqueUsers,
             totalDuration: duration,
             isEventSession,
-            instanceId: 'manual-entry'
+            instanceId: 'manual-entry',
+            isActive: false // Manual entries are historical, never active
         });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
@@ -676,24 +812,36 @@ app.get('/api/public/vrc-status', async (req, res) => {
     try {
         const settings = await Settings.findOne();
         const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
-        
-        // Always fetch group stats to show community activity
         const groupStats = await getGroupStats(groupId);
         
         if (!settings || settings.forceOffline) {
             return res.json({ active: false, count: 0, capacity: 0, groupStats });
         }
         
-        let data = null;
-        if (settings.instanceUrl && settings.instanceUrl.includes("worldId=")) {
-            data = await getInstanceData(settings.instanceUrl);
-        } else {
-            // Default to fetching from the Club Critters Group
-            data = await getGroupInstanceData(groupId);
+        // AGGREGATE ALL ACTIVE INSTANCES
+        const activeLogs = await InstanceLog.findAll({ where: { isActive: true } });
+        let aggregateData = { active: false, count: 0, capacity: 0, groupStats };
+
+        if (activeLogs.length > 0) {
+            aggregateData.active = true;
+            for (const log of activeLogs) {
+                let vrcData = null;
+                if (log.instanceUrl && log.instanceUrl.includes("worldId=")) {
+                    vrcData = await getInstanceData(log.instanceUrl);
+                } else {
+                    // Fetch specifically for this instance ID from the group
+                    const groupInstances = await getGroupInstanceData(groupId);
+                    vrcData = groupInstances.find(i => i.location === log.instanceId);
+                }
+                
+                if (vrcData && vrcData.active) {
+                    aggregateData.count += vrcData.count;
+                    aggregateData.capacity += vrcData.capacity;
+                }
+            }
         }
         
-        const finalData = { ...data, groupStats };
-        res.json(finalData);
+        res.json(aggregateData);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
@@ -701,14 +849,44 @@ app.get('/api/public/events', async (req, res) => {
     try {
         const { Op } = require('sequelize');
         const logs = await InstanceLog.findAll({
-            where: { 
-                isEventSession: true,
-                endTime: { [Op.ne]: null } // Only show finished events
-            },
+            where: { isEventSession: true },
             order: [['startTime', 'DESC']],
-            limit: 50
+            limit: 100
         });
-        res.json(logs);
+
+        // GROUP LOGS BY DAY (to treat multiple instances as one event)
+        const groupedEvents = [];
+        const dateMap = new Map();
+
+        logs.forEach(log => {
+            const dateKey = new Date(log.startTime).toISOString().split('T')[0];
+            if (!dateMap.has(dateKey)) {
+                const entry = {
+                    worldName: log.worldName,
+                    startTime: log.startTime,
+                    peakCapacity: log.peakCapacity,
+                    uniqueUsers: log.uniqueUsers,
+                    totalDuration: log.totalDuration || 0,
+                    isGrouped: false,
+                    instances: [log] // Start with the first instance
+                };
+                dateMap.set(dateKey, entry);
+                groupedEvents.push(entry);
+            } else {
+                const existing = dateMap.get(dateKey);
+                // Aggregation logic for the same day
+                existing.peakCapacity += log.peakCapacity;
+                existing.uniqueUsers += log.uniqueUsers;
+                existing.isGrouped = true;
+                existing.instances.push(log); // Add this overflow to the list
+                // Use the longest duration of the set
+                if ((log.totalDuration || 0) > existing.totalDuration) {
+                    existing.totalDuration = log.totalDuration;
+                }
+            }
+        });
+
+        res.json(groupedEvents.slice(0, 50));
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
@@ -788,7 +966,7 @@ app.get('/performer/:id', async (req, res) => {
 });
 
 app.get('/apply', (req, res) => { res.render('apply', { user: req.user || null }); });
-app.get('/gallery', (req, res) => { res.render('gallery'); });
+app.get('/gallery', (req, res) => { res.render('gallery', { user: req.user || null }); });
 app.get('/flyer', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'flyer.html')); });
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
