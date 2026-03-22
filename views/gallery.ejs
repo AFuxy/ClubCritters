@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/cdn/css/main.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/events.css">
 
     <style>
         body {
@@ -157,7 +158,11 @@
     <div class="gallery-container">
         <a href="/" class="btn-cc nav-pill-cc">← Back to Hub</a>
 
-        <h1 id="main-title" style="margin-top: 40px;">MOMENTS</h1>
+        <div class="logo-container" style="text-align: center;">
+            <img class="logo" src="/cdn/logos/club/HeadOnly.png" alt="Little Critters Logo"> 
+        </div>
+
+        <h1 id="main-title" style="margin-top: 20px;">MOMENTS</h1>
         <p id="sub-title">Club Critters Photo Gallery</p>
 
         <div id="loading-gallery" style="text-align: center; margin-top: 100px;">
@@ -177,6 +182,7 @@
         <img id="lightbox-img" src="">
     </div>
 
+    <script src="/cdn/js/theme-engine.js"></script>
     <script>
         async function initGallery() {
             // Track View
@@ -253,6 +259,16 @@
         }
 
         initGallery();
+
+        async function initGlobal() {
+            try {
+                const res = await fetch('/api/public/settings');
+                const settings = await res.json();
+                window.applyGlobalSettings(settings);
+            } catch (e) {}
+        }
+
+        initGlobal();
     </script>
 </body>
 </html>

@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="cdn/css/main.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/events.css">
     <link rel="preconnect" href="https://docs.google.com">
     <link rel="preconnect" href="https://sheets.googleapis.com">
 
@@ -81,6 +82,22 @@
 
         </div>
 
+    <script src="cdn/js/theme-engine.js"></script>
     <script src="cdn/js/main.js"></script>
+
+    <!-- SLEEK MOTION TOGGLE -->
+    <button id="motion-toggle-btn" 
+            onclick="window.toggleMotion()"
+            style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; 
+                   display: none;
+                   background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); 
+                   border: 1px solid rgba(255,255,255,0.1); color: #888; 
+                   padding: 8px 15px; border-radius: 30px; font-size: 0.7rem; 
+                   font-weight: 900; letter-spacing: 1px; text-transform: uppercase;
+                   cursor: pointer; transition: all 0.3s ease; opacity: 0.6;"
+            onmouseover="this.style.opacity='1'; this.style.borderColor='var(--primary-blue)'; this.style.color='#fff';"
+            onmouseout="this.style.opacity='0.6'; this.style.borderColor='rgba(255,255,255,0.1)'; this.style.color='#888';">
+        🌑 Disable Effects
+    </button>
 </body>
 </html>

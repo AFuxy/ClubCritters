@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/cdn/css/main.css">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/events.css">
     
     <% 
         function parseColor(val) {
@@ -358,6 +359,7 @@
         </div>
     </div>
 
+    <script src="/cdn/js/theme-engine.js"></script>
     <script>
         // --- TIMEZONE LOGIC ---
         const eventStartTime = "<%= eventStartTime %>";
@@ -421,7 +423,16 @@
             }).catch(() => {});
         }
 
+        async function initGlobal() {
+            try {
+                const res = await fetch('/api/public/settings');
+                const settings = await res.json();
+                window.applyGlobalSettings(settings);
+            } catch (e) {}
+        }
+
         updateLocalTime();
+        initGlobal();
     </script>
 
 </body>

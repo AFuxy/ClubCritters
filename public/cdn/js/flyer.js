@@ -25,6 +25,7 @@ async function initFlyer() {
         const schedule = await schRes.json();
         const roster = await rosRes.json();
         const settings = await setRes.json();
+        window.applyGlobalSettings(settings);
 
         if (!schedule || schedule.length === 0) return;
 
@@ -107,5 +108,4 @@ function downloadFlyer() {
     });
 }
 
-
-initFlyer();
+    initFlyer();

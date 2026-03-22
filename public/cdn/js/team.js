@@ -61,6 +61,7 @@ async function init() {
             const schedule = await schRes.json();
             const settings = await setRes.json();
             
+            window.applyGlobalSettings(settings);
             processStatus(settings, schedule);
             processRoster(roster);
         }

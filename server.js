@@ -350,7 +350,7 @@ app.delete('/api/vrchat/instances/:id/stop', isHostOrOwner, async (req, res) => 
 
 app.post('/api/settings/update', isStaff, async (req, res) => {
     try {
-        const { eventStartTime, eventEndTime, forceOffline, instanceUrl } = req.body;
+        const { eventStartTime, eventEndTime, forceOffline, instanceUrl, eventTheme, eventLogo } = req.body;
         const userType = (req.user?.type || "").toLowerCase();
         const isFullAdmin = userType.includes('host') || userType.includes('owner');
 
@@ -380,7 +380,7 @@ app.post('/api/settings/update', isStaff, async (req, res) => {
             }
         }
 
-        const updateData = { instanceUrl };
+        const updateData = { instanceUrl, eventTheme, eventLogo };
         if (isFullAdmin) {
             updateData.eventStartTime = eventStartTime;
             updateData.eventEndTime = eventEndTime;

@@ -21,6 +21,8 @@ async function initEvents() {
             const events = await eventRes.json();
             const settings = await setRes.json();
 
+            window.applyGlobalSettings(settings);
+
             if (events.length === 0) {
                 loadingView.classList.add('hidden');
                 emptyMsg.classList.remove('hidden');
@@ -133,6 +135,6 @@ function toggleBreakdown(el) {
     el.innerText = isVisible 
         ? `🔍 View ${breakdown.querySelectorAll('.instance-row').length} Instances` 
         : `➖ Hide Instances`;
-}
+    }
 
-initEvents();
+    initEvents();

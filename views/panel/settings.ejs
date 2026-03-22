@@ -62,7 +62,29 @@
                 <input type="datetime-local" id="event-end" <%= canManageAll ? '' : 'disabled' %>>
             </div>
         </div>
-        <div class="form-group">
+
+        <div class="grid-2" style="margin-top: 15px;">
+            <div class="form-group">
+                <label>Event Theme (CSS Class)</label>
+                <select id="event-theme-select" onchange="toggleCustomTheme()" <%= canManageAll ? '' : 'disabled' %>>
+                    <option value="">Default (Club Critters)</option>
+                    <option value="theme-halloween">🎃 Halloween</option>
+                    <option value="theme-christmas">🎄 Christmas</option>
+                    <option value="theme-pride">🌈 Pride</option>
+                    <option value="theme-valentines">💖 Valentine's</option>
+                    <option value="theme-summer">☀️ Summer/Beach</option>
+                    <option value="theme-rain">🌧️ Tropical Rain</option>
+                    <option value="custom">Custom Class...</option>
+                </select>
+                <input type="text" id="event-theme-custom" placeholder="e.g. theme-anniversary" class="hidden" style="margin-top: 5px;">
+            </div>
+            <div class="form-group">
+                <label>Custom Event Logo URL</label>
+                <input type="text" id="event-logo" placeholder="/cdn/logos/club/SpecialLogo.png" <%= canManageAll ? '' : 'disabled' %>>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
             <label>VRChat Instance URL / Override</label>
             <input type="text" id="instance-url" placeholder="https://vrchat.com/home/launch?worldId=...">
             <p style="font-size: 0.7rem; color: #666; margin-top: 5px;">Tip: Leave empty to auto-track the group's active instance (set in .env).</p>
@@ -74,7 +96,7 @@
         <button class="btn-cc btn-primary" style="width: 100%;" onclick="saveSettings()">Update Global Settings</button>
         
         <% if (!canManageAll) { %>
-            <p style="font-size: 0.75rem; color: #666; margin-top: 15px;">Note: You can only update the VRChat Instance URL. Only Hosts and Owners can change event times.</p>
+            <p style="font-size: 0.75rem; color: #666; margin-top: 15px;">Note: You can only update the VRChat Instance URL. Only Hosts and Owners can change event times and themes.</p>
         <% } %>
     </div>
     <!-- MULTI-INSTANCE TRACKING -->
@@ -111,7 +133,18 @@
     const eventEndInput = document.getElementById('event-end');
     const instanceUrlInput = document.getElementById('instance-url');
     const forceOfflineInput = document.getElementById('force-offline');
+    const eventThemeSelect = document.getElementById('event-theme-select');
+    const eventThemeCustom = document.getElementById('event-theme-custom');
+    const eventLogoInput = document.getElementById('event-logo');
     const instancesList = document.getElementById('active-instances-list');
+
+    function toggleCustomTheme() {
+        if (eventThemeSelect.value === 'custom') {
+            eventThemeCustom.classList.remove('hidden');
+        } else {
+            eventThemeCustom.classList.add('hidden');
+        }
+    }
 
     async function loadSettings() {
         try {
@@ -123,6 +156,20 @@
                 if (settings.eventEndTime) eventEndInput.value = settings.eventEndTime.slice(0, 16);
                 instanceUrlInput.value = settings.instanceUrl || '';
                 if (forceOfflineInput) forceOfflineInput.checked = settings.forceOffline;
+
+                // Handle Theme selection
+                const predefinedThemes = ['theme-halloween', 'theme-christmas', 'theme-pride', 'theme-valentines', 'theme-summer', 'theme-rain'];
+                if (!settings.eventTheme) {
+                    eventThemeSelect.value = "";
+                } else if (predefinedThemes.includes(settings.eventTheme)) {
+                    eventThemeSelect.value = settings.eventTheme;
+                } else {
+                    eventThemeSelect.value = "custom";
+                    eventThemeCustom.value = settings.eventTheme;
+                    eventThemeCustom.classList.remove('hidden');
+                }
+                
+                eventLogoInput.value = settings.eventLogo || '';
             }
         } catch (e) { console.error("Error loading settings:", e); }
         
@@ -262,6 +309,9 @@
 
     async function saveSettings() {
         try {
+            let theme = eventThemeSelect.value;
+            if (theme === 'custom') theme = eventThemeCustom.value.trim();
+
             const response = await fetch('/api/settings/update', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -269,7 +319,9 @@
                     eventStartTime: eventStartInput.value,
                     eventEndTime: eventEndInput.value,
                     instanceUrl: instanceUrlInput.value,
-                    forceOffline: forceOfflineInput ? forceOfflineInput.checked : false
+                    forceOffline: forceOfflineInput ? forceOfflineInput.checked : false,
+                    eventTheme: theme,
+                    eventLogo: eventLogoInput.value.trim()
                 })
             });
             if (response.ok) {

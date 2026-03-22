@@ -91,6 +91,7 @@ async function initArchive() {
             localStorage.setItem(CACHE_KEY_TIMESTAMP, Date.now());
 
             checkLiveStatus(settings, schedule, roster);
+            window.applyGlobalSettings(settings);
             processData(roster, archives);
             revealContent();
         }

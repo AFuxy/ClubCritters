@@ -168,6 +168,10 @@ function processSettings(data) {
     eventEndTime = data.eventEndTime;
     forceOffline = data.forceOffline;
     vrcInstanceUrl = data.instanceUrl || "";
+
+    if (window.applyGlobalSettings) {
+        window.applyGlobalSettings(data);
+    }
 }
 
 // ==========================================

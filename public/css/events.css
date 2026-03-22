@@ -1,0 +1,307 @@
+/* =========================================
+   CLUB CRITTERS - SPECIAL EVENT THEMES
+   ========================================= */
+
+/* LOGO GLOW EFFECTS (BASE) */
+.logo:not(.custom-logo) {
+    filter: drop-shadow(0 0 15px var(--primary-blue));
+    animation: theme-logo-pulse 3s infinite alternate ease-in-out;
+}
+
+@keyframes theme-logo-pulse {
+    0% {
+        filter: drop-shadow(0 0 10px var(--primary-blue));
+        transform: scale(1);
+    }
+    100% {
+        filter: drop-shadow(0 0 25px var(--primary-purple));
+        transform: scale(1.02);
+    }
+}
+
+/* HALLOWEEN THEME 🎃 */
+body.theme-halloween {
+    --primary-blue: #ff7700;
+    --primary-purple: #9900ff;
+    --primary-gradient: linear-gradient(45deg, #ff7700, #9900ff);
+    --dark-bg: #050505;
+    --card-bg: #0f0f0f;
+}
+body.theme-halloween h1 {
+    filter: drop-shadow(0 0 10px rgba(255, 119, 0, 0.5));
+}
+body.theme-halloween .status-live {
+    border-color: #ff7700;
+    color: #ff7700;
+    background: rgba(255, 119, 0, 0.1);
+}
+
+/* CHRISTMAS THEME 🎄 */
+body.theme-christmas {
+    --primary-blue: #00ccff; /* Icy Cyan */
+    --primary-purple: #ffffff; /* Snow White */
+    --primary-gradient: linear-gradient(135deg, #00ccff, #ffffff);
+    --dark-bg: #000c14; /* Deep Winter Night */
+    position: relative;
+}
+
+/* Frosty Atmosphere */
+body.theme-christmas::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -1;
+    background: 
+        radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.1), transparent 50%),
+        radial-gradient(circle at 20% 80%, rgba(0, 204, 255, 0.05), transparent 40%);
+    pointer-events: none;
+}
+
+body.theme-christmas h1 {
+    filter: drop-shadow(0 0 15px rgba(0, 204, 255, 0.6));
+}
+
+/* FIX: Ensure button text is readable on white/cyan gradient */
+body.theme-christmas .btn-primary,
+body.theme-christmas .nav-pill-cc.active {
+    color: #000c14 !important; /* Deep Blue text for contrast */
+}
+
+body.theme-christmas .status-live {
+    border-color: #00ccff;
+    color: #00ccff;
+    background: rgba(0, 204, 255, 0.1);
+}
+
+/* FIX: Christmas badge contrast */
+body.theme-christmas .featured-badge {
+    color: #000c14 !important;
+}
+
+/* PRIDE THEME 🌈 */
+body.theme-pride {
+    --primary-blue: #004DFF;
+    --primary-purple: #732982;
+    --primary-gradient: linear-gradient(
+        to right, 
+        #E40303, #FF8C00, #FFED00, #008026, #004DFF, #732982
+    );
+    background-color: var(--dark-bg);
+    position: relative;
+}
+
+/* HIGH-PERFORMANCE RAINBOW LAYER */
+body.theme-pride::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -1;
+    background: 
+        radial-gradient(circle at 20% 20%, rgba(228, 3, 3, 0.15), transparent 40%),
+        radial-gradient(circle at 80% 20%, rgba(255, 140, 0, 0.15), transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(0, 128, 38, 0.1), transparent 50%),
+        radial-gradient(circle at 20% 80%, rgba(0, 77, 255, 0.15), transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(115, 41, 130, 0.15), transparent 40%);
+    pointer-events: none;
+    animation: pride-bg-fade 8s ease-in-out infinite alternate;
+}
+
+@keyframes pride-bg-fade {
+    0%   { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+body.theme-pride.body-centered h1 {
+    /* Only force centering on pages that are explicitly centered (like Hub) */
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+body.theme-pride h1 {
+    background: linear-gradient(to right, 
+        #E40303 0%, #FF8C00 20%, #FFED00 40%, #008026 60%, #004DFF 80%, #732982 100%
+    ) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    color: transparent !important;
+    background-size: 100% 100% !important;
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.2));
+}
+
+body.theme-pride .btn-primary, 
+body.theme-pride .btn-cc.active,
+body.theme-pride .nav-pill-cc.active {
+    background: linear-gradient(to right, 
+        #E40303 0%, #FF8C00 20%, #FFED00 40%, #008026 60%, #004DFF 80%, #732982 100%
+    ) !important;
+    background-size: 100% 100% !important;
+    color: white !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    
+    /* FIX: Remove forced 100% width so genre pills and other small buttons don't stretch */
+    width: auto; 
+}
+
+body.theme-pride .status-live {
+    border-image: var(--primary-gradient) 1;
+    border-width: 2px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    animation: pulse 1.5s infinite; /* Keep the standard live pulse, but remove pride-flow */
+}
+
+/* PRIDE LOGO PULSE - OPTIMIZED */
+body.theme-pride .logo:not(.custom-logo) {
+    will-change: transform, filter;
+    animation: 
+        pride-logo-hue 6s linear infinite,
+        pride-logo-scale 3s ease-in-out infinite alternate;
+}
+
+
+@keyframes pride-logo-hue {
+    0%   { filter: drop-shadow(0 0 15px #E40303); }
+    16%  { filter: drop-shadow(0 0 15px #FF8C00); }
+    33%  { filter: drop-shadow(0 0 15px #FFED00); }
+    50%  { filter: drop-shadow(0 0 15px #008026); }
+    66%  { filter: drop-shadow(0 0 15px #004DFF); }
+    83%  { filter: drop-shadow(0 0 15px #732982); }
+    100% { filter: drop-shadow(0 0 15px #E40303); }
+}
+
+@keyframes pride-logo-scale {
+    0%   { transform: scale(1); }
+    100% { transform: scale(1.04); }
+}
+
+@keyframes pride-flow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+
+
+
+
+/* VALENTINES THEME 💖 */
+body.theme-valentines {
+    --primary-blue: #ff4d94;
+    --primary-purple: #ff0000;
+    --primary-gradient: linear-gradient(45deg, #ff4d94, #ff0000);
+    --dark-bg: #1a000a;
+}
+
+/* SUMMER THEME ☀️ */
+body.theme-summer {
+    --primary-blue: #ffd700; /* Golden Sand */
+    --primary-purple: #008080; /* Tropical Teal */
+    --primary-gradient: linear-gradient(to right, #ffd700, #008080);
+    --dark-bg: #001a1a; /* Deep Water */
+    position: relative;
+}
+
+/* REDUCED MOTION / ACCESSIBILITY */
+body.disable-motion *,
+body.disable-motion ::before,
+body.disable-motion ::after {
+    animation: none !important;
+    transition: none !important;
+}
+body.disable-motion .snowflake,
+body.disable-motion .rain-drop {
+    display: none !important;
+}
+
+/* Tropical Atmosphere */
+body.theme-summer::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -1;
+    background: 
+        radial-gradient(circle at 80% 10%, rgba(255, 215, 0, 0.15), transparent 40%), /* Sun */
+        radial-gradient(circle at 20% 90%, rgba(0, 128, 128, 0.1), transparent 50%); /* Water Reflection */
+    pointer-events: none;
+}
+
+body.theme-summer h1 {
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.4));
+}
+
+body.theme-summer .status-live {
+    border-color: #ffd700;
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.1);
+}
+
+/* TROPICAL RAIN THEME 🌧️ */
+body.theme-rain {
+    --primary-blue: #2e7d32; /* Forest Green */
+    --primary-purple: #0288d1; /* Rainy Blue */
+    --primary-gradient: linear-gradient(to right, #2e7d32, #0288d1);
+    --dark-bg: #0a140a; /* Dark Forest */
+    position: relative;
+}
+
+body.theme-rain::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -1;
+    background: 
+        radial-gradient(circle at 50% 50%, rgba(2, 136, 209, 0.05), transparent 60%),
+        radial-gradient(circle at 20% 20%, rgba(46, 125, 50, 0.1), transparent 40%);
+    pointer-events: none;
+}
+
+body.theme-rain h1 {
+    filter: drop-shadow(0 0 10px rgba(46, 125, 50, 0.5));
+}
+
+body.theme-rain .status-live {
+    border-color: #2e7d32;
+    color: #2e7d32;
+    background: rgba(46, 125, 50, 0.1);
+}
+
+/* --- ON-SCREEN PARTICLE EFFECTS --- */
+
+/* SNOWFLAKE PARTICLES */
+.snowflake {
+    position: fixed;
+    top: -10px;
+    background: #fff;
+    border-radius: 50%;
+    z-index: 100;
+    pointer-events: none;
+    filter: blur(1px);
+    animation: snow-fall linear infinite;
+}
+
+@keyframes snow-fall {
+    0% { transform: translateY(0) translateX(0); }
+    100% { transform: translateY(105vh) translateX(var(--drift)); }
+}
+
+/* RAIN PARTICLES */
+.rain-drop {
+    position: fixed;
+    top: -100px;
+    width: 2px;
+    height: 80px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.4));
+    z-index: 100;
+    pointer-events: none;
+    animation: rain-fall linear infinite;
+}
+
+@keyframes rain-fall {
+    0% { transform: translateY(0) rotate(10deg); }
+    100% { transform: translateY(110vh) rotate(10deg); }
+}
+
+
+
+

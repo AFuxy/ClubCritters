@@ -13,6 +13,8 @@ const Settings = sequelize.define('Settings', {
     eventEndTime: { type: DataTypes.DATE },
     forceOffline: { type: DataTypes.BOOLEAN, defaultValue: false },
     instanceUrl: { type: DataTypes.STRING },
+    eventTheme: { type: DataTypes.STRING }, // CSS class for special events
+    eventLogo: { type: DataTypes.STRING }, // Custom logo URL for special events
     vrcCookie: { type: DataTypes.TEXT } // Persist VRChat session
 });
 
