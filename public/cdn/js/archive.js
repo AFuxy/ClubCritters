@@ -202,7 +202,7 @@ function processData(roster, archives) {
         return {
             id: arc.id,
             dj: arc.djName,
-            image: ros ? ros.image : "cdn/logos/club/HeadOnly.png",
+            image: ros ? ros.image : "/cdn/logos/club/HeadOnly.png",
             color: ros ? ros.color : "#29C5F6",
             title: arc.title,
             date: arc.date,

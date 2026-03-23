@@ -11,6 +11,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
 const Settings = sequelize.define('Settings', {
     eventStartTime: { type: DataTypes.DATE },
     eventEndTime: { type: DataTypes.DATE },
+    eventTitle: { type: DataTypes.STRING }, // e.g. "Neon Nights"
     forceOffline: { type: DataTypes.BOOLEAN, defaultValue: false },
     instanceUrl: { type: DataTypes.STRING },
     eventTheme: { type: DataTypes.STRING }, // CSS class for special events

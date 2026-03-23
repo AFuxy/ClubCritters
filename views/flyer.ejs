@@ -1,18 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flyer Generator - Club Critters</title>
-    <link rel="stylesheet" href="cdn/css/main.css">
-    <link rel="stylesheet" href="/css/events.css">
-    <script src="/cdn/js/theme-engine.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="icon" type="image/png" href="cdn/logos/club/HeadOnly.png">
-</head>
+<%- include('partials/head', { title: 'Flyer Generator', page: 'flyer' }) %>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <body class="body-centered">
 
     <div class="container" style="max-width: 900px;">
+        <%- include('partials/nav', { page: 'flyer' }) %>
+        
         <h1>Flyer Generator</h1>
         
         <div class="flyer-controls">
@@ -44,7 +38,7 @@
 
             <div class="flyer-footer-area">
                 <div class="footer-logos">
-                    <img src="cdn/logos/club/HeadOnly.png" class="footer-icon">
+                    <img src="/cdn/logos/club/HeadOnly.png" class="footer-icon">
                 </div>
                 <span class="footer-url">critters.club</span>
             </div>
@@ -52,7 +46,8 @@
         </div>
     </div>
 
-    <script src="cdn/js/flyer.js"></script>
+    <script src="/cdn/js/theme-engine.js"></script>
+    <script src="/cdn/js/flyer.js"></script>
     
     <script>
         function updateTitle() {

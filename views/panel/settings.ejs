@@ -52,6 +52,11 @@
         <% const userType = user.type.toLowerCase(); %>
         <% const canManageAll = userType.includes('host') || userType.includes('owner'); %>
 
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>Event Title</label>
+            <input type="text" id="event-title" placeholder="e.g. Neon Nights / Summer Splash" <%= canManageAll ? '' : 'disabled' %>>
+        </div>
+
         <div class="grid-2">
             <div class="form-group">
                 <label>Event Start (UTC)</label>
@@ -131,6 +136,7 @@
 <script>
     const eventStartInput = document.getElementById('event-start');
     const eventEndInput = document.getElementById('event-end');
+    const eventTitleInput = document.getElementById('event-title');
     const instanceUrlInput = document.getElementById('instance-url');
     const forceOfflineInput = document.getElementById('force-offline');
     const eventThemeSelect = document.getElementById('event-theme-select');
@@ -154,6 +160,7 @@
             if (settings) {
                 if (settings.eventStartTime) eventStartInput.value = settings.eventStartTime.slice(0, 16);
                 if (settings.eventEndTime) eventEndInput.value = settings.eventEndTime.slice(0, 16);
+                if (eventTitleInput) eventTitleInput.value = settings.eventTitle || '';
                 instanceUrlInput.value = settings.instanceUrl || '';
                 if (forceOfflineInput) forceOfflineInput.checked = settings.forceOffline;
 
@@ -318,6 +325,7 @@
                 body: JSON.stringify({
                     eventStartTime: eventStartInput.value,
                     eventEndTime: eventEndInput.value,
+                    eventTitle: eventTitleInput ? eventTitleInput.value.trim() : '',
                     instanceUrl: instanceUrlInput.value,
                     forceOffline: forceOfflineInput ? forceOfflineInput.checked : false,
                     eventTheme: theme,

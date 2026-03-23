@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/head', { title: 'Set Archive', page: 'archive', description: 'Missed a night? Listen back to every DJ set from Club Critters history.', themeColor: '#B36AF4' }) %>
+<body>
+
+    <div class="container">
+        <%- include('partials/nav', { page: 'archive' }) %>
+
+        <div class="logo-container">
+            <img src="/cdn/logos/club/HeadOnly.png" alt="Logo" class="logo">
+        </div>
+
+        <h1>Set Archive</h1>
+        <p id="status-subtext">Listen back to previous nights</p>
+        <div id="loading-view">
+            <div class="spinner"></div>
+            <p>Loading Archive...</p>
+        </div>
+
+        <div id="archive-view" class="hidden">
+            
+            <div class="genre-filter-container" id="genre-filters"></div>
+
+            <div class="search-container">
+                <input type="text" id="search-input" class="search-bar" placeholder="Search sets...">
+            </div>
+
+            <div id="archive-list" class="set-list">
+                </div>
+
+        </div>
+        
+        <p id="empty-msg" class="hidden" style="color:#666;">No archives found.</p>
+
+    </div>
+
+    <script src="/cdn/js/theme-engine.js"></script>
+    <script src="/cdn/js/archive.js"></script>
+</body>
+</html>

@@ -169,6 +169,11 @@ function processSettings(data) {
     forceOffline = data.forceOffline;
     vrcInstanceUrl = data.instanceUrl || "";
 
+    const mainTitle = document.getElementById('main-title');
+    if (mainTitle) {
+        mainTitle.innerText = data.eventTitle || "Club Critters";
+    }
+
     if (window.applyGlobalSettings) {
         window.applyGlobalSettings(data);
     }
@@ -371,7 +376,7 @@ function renderFeaturedSets(sets) {
             <a href="${set.link}" target="_blank" onclick="trackClick('archive_click', '${set.id}', 'featured_set')" style="text-decoration:none;">
                 <div class="featured-card">
                     <div class="featured-badge">LATEST SET</div>
-                    <img src="${set.djImage || 'cdn/logos/club/HeadOnly.png'}" class="featured-img">
+                    <img src="${set.djImage || '/cdn/logos/club/HeadOnly.png'}" class="featured-img">
                     <div class="featured-info">
                         <h3>${set.title} <span style="font-size:0.7rem; opacity:0.6; border:1px solid #444; padding:2px 5px; border-radius:4px; margin-left:5px; vertical-align:middle;">${set.genre}</span></h3>
                         <p>By <strong>${set.djName}</strong> • ${displayDate}</p>

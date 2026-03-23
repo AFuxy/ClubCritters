@@ -1,197 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Club Critters - Join the Team</title>
+<%- include('partials/head', { title: 'Join the Team', page: 'apply', description: 'Join the Club Critters Crew! View our current open applications for DJs, Staff, and more.' }) %>
+<style>
+    body {
+        background: radial-gradient(circle at top, rgba(41, 197, 246, 0.1), transparent 50%), var(--dark-bg);
+    }
+
+    .app-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 30px;
+        margin-top: 50px;
+        width: 100%;
+    }
+
+    .app-card {
+        background: rgba(21, 30, 41, 0.6);
+        backdrop-filter: blur(10px);
+        border-radius: 24px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(255,255,255,0.08);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        text-align: left;
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    .app-card.revealed { opacity: 1; transform: translateY(0); }
+    .app-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        border-color: var(--primary-blue);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px rgba(41, 197, 246, 0.2);
+    }
+
+    .app-image-container {
+        height: 200px;
+        position: relative;
+        background: linear-gradient(to bottom, #000, #0b1016);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
     
-    <link rel="icon" type="image/png" href="/cdn/logos/club/HeadOnly.png">
-    <meta name="theme-color" content="#29C5F6">
+    .app-image-container::after {
+        content: '';
+        position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
+        background: linear-gradient(to top, rgba(11, 16, 22, 1), transparent);
+    }
 
-    <!-- SEO & Embedding -->
-    <meta name="description" content="Join the Club Critters Crew! View our current open applications for DJs, Staff, and more.">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Club Critters - Recruitment">
-    <meta property="og:description" content="Explore open roles and apply to join our VRChat community team.">
-    <meta property="og:image" content="https://critters.club/cdn/logos/club/HeadOnly.png">
-    <meta name="twitter:card" content="summary_large_image">
+    .app-img {
+        width: 110px; height: 110px;
+        object-fit: cover;
+        filter: drop-shadow(0 0 15px rgba(41, 197, 246, 0.6));
+        z-index: 1;
+        transition: transform 0.5s ease;
+    }
+    .app-card:hover .app-img { transform: rotate(5deg) scale(1.1); }
 
-    <link rel="stylesheet" href="/cdn/css/main.css">
-    <link rel="stylesheet" href="/css/components.css">
-    <link rel="stylesheet" href="/css/theme.css">
-    <link rel="stylesheet" href="/css/events.css">
+    .status-badge {
+        position: absolute; top: 20px; right: 20px;
+        padding: 6px 14px; border-radius: 30px;
+        font-size: 0.75rem; font-weight: 900;
+        text-transform: uppercase; letter-spacing: 1.5px; z-index: 5;
+    }
+    .status-open { background: #00e676; color: black; box-shadow: 0 0 20px rgba(0, 230, 118, 0.5); }
+    .status-closed { background: #ff5252; color: white; box-shadow: 0 0 15px rgba(255, 82, 82, 0.3); }
 
-    <style>
-        body {
-            background: radial-gradient(circle at top, rgba(41, 197, 246, 0.1), transparent 50%), var(--dark-bg);
-        }
+    .deadline-badge {
+        position: absolute; top: 20px; left: 20px;
+        background: rgba(0,0,0,0.7); color: #fff;
+        padding: 6px 14px; border-radius: 30px;
+        font-size: 0.7rem; font-weight: 800;
+        backdrop-filter: blur(8px); z-index: 5;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
 
-        .app-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 30px;
-            margin-top: 50px;
-            width: 100%;
-        }
+    .app-content {
+        padding: 30px; flex-grow: 1;
+        display: flex; flex-direction: column;
+        background: rgba(21, 30, 41, 0.4);
+    }
+    .app-content h2 {
+        margin: 0; font-size: 1.6rem;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text; background-clip: text;
+        color: transparent; text-transform: uppercase;
+        font-weight: 900; letter-spacing: 1px;
+    }
+    .app-content p {
+        color: #ccc; font-size: 0.95rem;
+        line-height: 1.7; margin: 20px 0 30px 0;
+        flex-grow: 1;
+    }
 
-        .app-card {
-            background: rgba(21, 30, 41, 0.6);
-            backdrop-filter: blur(10px);
-            border-radius: 24px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid rgba(255,255,255,0.08);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            text-align: left;
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        .app-card.revealed { opacity: 1; transform: translateY(0); }
-        .app-card:hover {
-            transform: translateY(-10px) scale(1.02);
-            border-color: var(--primary-blue);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px rgba(41, 197, 246, 0.2);
-        }
+    #main-title {
+        font-size: 4rem; text-align: center;
+        margin-bottom: 0; font-weight: 900;
+        filter: drop-shadow(0 0 20px rgba(41, 197, 246, 0.3));
+    }
 
-        .app-image-container {
-            height: 200px;
-            position: relative;
-            background: linear-gradient(to bottom, #000, #0b1016);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        
-        .app-image-container::after {
-            content: '';
-            position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
-            background: linear-gradient(to top, rgba(11, 16, 22, 1), transparent);
-        }
+    #status-subtext {
+        text-align: center; font-size: 1.2rem;
+        letter-spacing: 5px; text-transform: uppercase;
+        opacity: 0.6; margin-top: 10px;
+    }
 
-        .app-img {
-            width: 110px; height: 110px;
-            object-fit: cover;
-            filter: drop-shadow(0 0 15px rgba(41, 197, 246, 0.6));
-            z-index: 1;
-            transition: transform 0.5s ease;
-        }
-        .app-card:hover .app-img { transform: rotate(5deg) scale(1.1); }
+    /* INTERNAL FORM STYLES */
+    .internal-form-container {
+        max-width: 800px; margin: 50px auto;
+        background: var(--card-bg); padding: 40px;
+        border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
 
-        .status-badge {
-            position: absolute; top: 20px; right: 20px;
-            padding: 6px 14px; border-radius: 30px;
-            font-size: 0.75rem; font-weight: 900;
-            text-transform: uppercase; letter-spacing: 1.5px; z-index: 5;
-        }
-        .status-open { background: #00e676; color: black; box-shadow: 0 0 20px rgba(0, 230, 118, 0.5); }
-        .status-closed { background: #ff5252; color: white; box-shadow: 0 0 15px rgba(255, 82, 82, 0.3); }
+    .form-header {
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 20px; margin-bottom: 30px;
+    }
+    .form-header h2 { margin: 0; color: var(--primary-blue); font-size: 2rem; font-weight: 900; }
 
-        .deadline-badge {
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(0,0,0,0.7); color: #fff;
-            padding: 6px 14px; border-radius: 30px;
-            font-size: 0.7rem; font-weight: 800;
-            backdrop-filter: blur(8px); z-index: 5;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+    .form-group { margin-bottom: 25px; }
+    .form-group label {
+        display: block; margin-bottom: 10px;
+        font-weight: 600; color: #fff;
+        font-size: 0.9rem; text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .form-group input, .form-group textarea, .form-group select {
+        width: 100%; background: rgba(0,0,0,0.4);
+        border: 1px solid rgba(255,255,255,0.1); padding: 15px;
+        border-radius: 12px; color: #fff;
+        font-family: inherit; font-size: 1rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-sizing: border-box;
+    }
+    
+    .form-group select {
+        appearance: none; cursor: pointer;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2329C5F6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 20px center;
+        background-size: 16px; padding-right: 45px;
+    }
 
-        .app-content {
-            padding: 30px; flex-grow: 1;
-            display: flex; flex-direction: column;
-            background: rgba(21, 30, 41, 0.4);
-        }
-        .app-content h2 {
-            margin: 0; font-size: 1.6rem;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text; background-clip: text;
-            color: transparent; text-transform: uppercase;
-            font-weight: 900; letter-spacing: 1px;
-        }
-        .app-content p {
-            color: #ccc; font-size: 0.95rem;
-            line-height: 1.7; margin: 20px 0 30px 0;
-            flex-grow: 1;
-        }
+    .form-group select option { background-color: #151e29; color: #fff; padding: 10px; }
 
-        #main-title {
-            font-size: 4rem; text-align: center;
-            margin-bottom: 0; font-weight: 900;
-            filter: drop-shadow(0 0 20px rgba(41, 197, 246, 0.3));
-        }
+    .form-group input:hover, .form-group textarea:hover, .form-group select:hover {
+        border-color: rgba(41, 197, 246, 0.4);
+        background: rgba(41, 197, 246, 0.05);
+    }
 
-        #status-subtext {
-            text-align: center; font-size: 1.2rem;
-            letter-spacing: 5px; text-transform: uppercase;
-            opacity: 0.6; margin-top: 10px;
-        }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+        outline: none; border-color: var(--primary-blue);
+        background: rgba(0,0,0,0.6);
+        box-shadow: 0 0 20px rgba(41, 197, 246, 0.2), inset 0 0 10px rgba(41, 197, 246, 0.1);
+        transform: translateY(-2px);
+    }
 
-        /* INTERNAL FORM STYLES */
-        .internal-form-container {
-            max-width: 800px; margin: 50px auto;
-            background: var(--card-bg); padding: 40px;
-            border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
-        .form-header {
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding-bottom: 20px; margin-bottom: 30px;
-        }
-        .form-header h2 { margin: 0; color: var(--primary-blue); font-size: 2rem; font-weight: 900; }
-
-        .form-group { margin-bottom: 25px; }
-        .form-group label {
-            display: block; margin-bottom: 10px;
-            font-weight: 600; color: #fff;
-            font-size: 0.9rem; text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .form-group input, .form-group textarea, .form-group select {
-            width: 100%; background: rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.1); padding: 15px;
-            border-radius: 12px; color: #fff;
-            font-family: inherit; font-size: 1rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-sizing: border-box;
-        }
-        
-        .form-group select {
-            appearance: none; cursor: pointer;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2329C5F6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-            background-repeat: no-repeat; background-position: right 20px center;
-            background-size: 16px; padding-right: 45px;
-        }
-
-        .form-group select option { background-color: #151e29; color: #fff; padding: 10px; }
-
-        .form-group input:hover, .form-group textarea:hover, .form-group select:hover {
-            border-color: rgba(41, 197, 246, 0.4);
-            background: rgba(41, 197, 246, 0.05);
-        }
-
-        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
-            outline: none; border-color: var(--primary-blue);
-            background: rgba(0,0,0,0.6);
-            box-shadow: 0 0 20px rgba(41, 197, 246, 0.2), inset 0 0 10px rgba(41, 197, 246, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-
-        @media (max-width: 768px) {
-            #main-title { font-size: 2.5rem; }
-            .app-grid { grid-template-columns: 1fr; }
-            .form-row { grid-template-columns: 1fr; }
-            .internal-form-container { padding: 25px; border-radius: 20px; }
-        }
-    </style>
-</head>
+    @media (max-width: 768px) {
+        #main-title { font-size: 2.5rem; }
+        .app-grid { grid-template-columns: 1fr; }
+        .form-row { grid-template-columns: 1fr; }
+        .internal-form-container { padding: 25px; border-radius: 20px; }
+    }
+</style>
 <body>
 
     <div class="container" style="max-width: 1100px;">
-        <a href="/" class="btn-cc nav-pill-cc">← Back to Hub</a>
+        <%- include('partials/nav', { page: 'apply' }) %>
 
         <div id="selection-view">
             <div class="logo-container" style="margin-top: 30px;">
@@ -241,7 +220,7 @@
                 <% } else { %>
                     <div style="text-align: center; padding: 40px 0;">
                         <p style="color: #888; margin-bottom: 30px;">You must be logged in with Discord to apply.</p>
-                        <a id="login-redirect-btn" href="/auth/discord" class="btn-cc btn-primary">Login with Discord</a>
+                        <a id="login-redirect-btn" href="/auth/discord?returnTo=/apply" class="btn-cc btn-primary">Login with Discord</a>
                     </div>
                 <% } %>
             </div>

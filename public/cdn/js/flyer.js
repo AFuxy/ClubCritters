@@ -27,6 +27,10 @@ async function initFlyer() {
         const settings = await setRes.json();
         window.applyGlobalSettings(settings);
 
+        if (settings && settings.eventTitle && !document.getElementById('custom-title').value) {
+            document.getElementById('flyer-subtitle').innerText = settings.eventTitle.toUpperCase();
+        }
+
         if (!schedule || schedule.length === 0) return;
 
         const offset = parseInt(tzSelect.value); 
@@ -49,7 +53,7 @@ async function initFlyer() {
             let baseTime = timeRaw.split('-')[0].trim(); 
             const displayTime = applyTimezone(baseTime, offset);
             const genre = item.genre || ""; 
-            const imgUrl = item.performer.image || "cdn/logos/club/HeadOnly.png";
+            const imgUrl = item.performer.image || "/cdn/logos/club/HeadOnly.png";
 
             const alignClass = (i % 2 === 0) ? 'logo-is-right' : 'logo-is-left';
 

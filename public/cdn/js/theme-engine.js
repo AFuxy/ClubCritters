@@ -33,19 +33,8 @@ window.applyGlobalSettings = function(data) {
             logoImg.src = data.eventLogo;
             logoImg.classList.add('custom-logo');
         } else {
-            // Restore default logo
-            const isSubfolder = window.location.pathname.includes('/events/') || 
-                               window.location.pathname.includes('/archive/') || 
-                               window.location.pathname.includes('/team/');
-            logoImg.src = isSubfolder ? "../cdn/logos/club/HeadOnly.png" : "cdn/logos/club/HeadOnly.png";
-            
-            // Special case for EJS views which use absolute paths
-            if (window.location.pathname.includes('/apply') || 
-                window.location.pathname.includes('/gallery') || 
-                window.location.pathname.includes('/performer/')) {
-                logoImg.src = "/cdn/logos/club/HeadOnly.png";
-            }
-
+            // Restore default logo - Use absolute path for all EJS views
+            logoImg.src = "/cdn/logos/club/HeadOnly.png";
             logoImg.classList.remove('custom-logo');
         }
     }

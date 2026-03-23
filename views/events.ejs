@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/head', { title: 'Past Events', page: 'events' }) %>
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+    .stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .stat-card h3 {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #888;
+        margin-bottom: 10px;
+    }
+    .stat-card .value {
+        font-size: 2rem;
+        font-weight: 900;
+        color: var(--primary-blue);
+    }
+    .event-card {
+        background: rgba(21, 30, 41, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        margin-bottom: 15px;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s;
+    }
+    .event-card:hover {
+        transform: scale(1.02);
+        background: rgba(21, 30, 41, 0.8);
+    }
+    .event-info h3 {
+        margin: 0;
+        color: #fff;
+    }
+    .event-date {
+        font-size: 0.9rem;
+        color: var(--primary-purple);
+        margin-top: 4px;
+    }
+    .event-stats {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+    }
+    .badge-group {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .peak-badge {
+        background: rgba(0, 230, 118, 0.1);
+        color: #00e676;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+    .duration-text {
+        font-size: 0.8rem;
+        color: #666;
+    }
+    .breakdown-toggle {
+        font-size: 0.7rem;
+        color: #fff;
+        cursor: pointer;
+        margin-top: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(179, 106, 244, 0.15);
+        padding: 5px 12px;
+        border-radius: 20px;
+        border: 1px solid rgba(179, 106, 244, 0.3);
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        transition: all 0.2s;
+    }
+    .breakdown-toggle:hover {
+        background: rgba(179, 106, 244, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 0 10px rgba(179, 106, 244, 0.2);
+    }
+    .instance-breakdown {
+        width: 100%;
+        margin-top: 15px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(10px);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: none;
+        text-align: left;
+        box-sizing: border-box;
+    }
+    .instance-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.8rem;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .instance-row:last-child {
+        border-bottom: none;
+    }
+    .instance-name {
+        color: var(--primary-blue);
+        font-weight: 700;
+    }
+    .instance-data {
+        color: #888;
+        font-family: monospace;
+    }
+    .instance-data b {
+        color: #fff;
+    }
+</style>
+<body>
+
+    <div class="container">
+        <%- include('partials/nav', { page: 'events' }) %>
+
+        <div class="logo-container">
+            <img src="/cdn/logos/club/HeadOnly.png" alt="Logo" class="logo">
+        </div>
+
+        <h1>Past Events</h1>
+        <p id="status-subtext">By the numbers</p>
+
+        <div id="loading-view">
+            <div class="spinner"></div>
+            <p>Loading History...</p>
+        </div>
+
+        <div id="events-view" class="hidden">
+            <div class="stats-grid" id="global-stats">
+                <div class="stat-card">
+                    <h3>Total Events</h3>
+                    <div class="value" id="stat-total-events">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>All-Time Peak</h3>
+                    <div class="value" id="stat-all-time-peak" style="color: #00e676;">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Hours Live</h3>
+                    <div class="value" id="stat-total-hours" style="color: #B36AF4;">-</div>
+                </div>
+            </div>
+
+            <div id="event-list">
+                <!-- Events injected here -->
+            </div>
+        </div>
+        
+        <p id="empty-msg" class="hidden" style="color:#666; text-align: center;">No event history recorded yet.</p>
+
+    </div>
+
+    <script src="/cdn/js/theme-engine.js"></script>
+    <script src="/cdn/js/events.js"></script>
+</body>
+</html>
