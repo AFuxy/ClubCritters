@@ -34,7 +34,7 @@ router.get('/performer/:id', async (req, res) => {
         });
         let displayName = performer.name;
         if (performer.useDiscordName) { const member = await getGuildMember(performer.discordId); if (member) displayName = member.nickname; }
-        const archives = await Archive.findAll({ where: { performerId: performer.discordId }, order: [['date', 'DESC']] });
+        const archives = await Archive.findAll({ where: { performerId: performer.discordId }, order: [['date', 'DESC'], ['createdAt', 'DESC']] });
         
         performer.links = safeParseJSON(performer.links);
 
@@ -142,7 +142,7 @@ router.get('/api/public/roster', async (req, res) => {
 
 router.get('/api/public/archives', async (req, res) => { 
     try { 
-        const archives = await Archive.findAll({ include: [{ model: Roster, attributes: ['name', 'useDiscordName', 'imageUrl'] }], order: [['date', 'DESC']] }); 
+        const archives = await Archive.findAll({ include: [{ model: Roster, attributes: ['name', 'useDiscordName', 'imageUrl'] }], order: [['date', 'DESC'], ['createdAt', 'DESC']] }); 
         const mapped = await Promise.all(archives.map(async arc => { 
             let djName = arc.Roster.name; 
             if (arc.Roster.useDiscordName) { 

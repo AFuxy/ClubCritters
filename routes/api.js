@@ -307,14 +307,14 @@ router.delete('/apps/:id', isHostOrOwner, async (req, res) => {
 // --- ARCHIVE ROUTES ---
 router.get('/archives/my', isAuthenticated, async (req, res) => {
     try {
-        const archives = await Archive.findAll({ where: { performerId: req.user.discordId }, order: [['date', 'DESC']] });
+        const archives = await Archive.findAll({ where: { performerId: req.user.discordId }, order: [['date', 'DESC'], ['createdAt', 'DESC']] });
         res.json(archives);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
 router.get('/archives/all', isAuthenticated, isHostOrOwner, async (req, res) => {
     try {
-        const archives = await Archive.findAll({ include: [Roster], order: [['date', 'DESC']] });
+        const archives = await Archive.findAll({ include: [Roster], order: [['date', 'DESC'], ['createdAt', 'DESC']] });
         res.json(archives);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
