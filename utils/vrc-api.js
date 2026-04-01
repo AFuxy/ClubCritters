@@ -343,7 +343,12 @@ async function connectPipeline(location) {
     });
     
     pipeline.on('error', (err) => { 
-        console.error("[VRC API] Pipeline Error:", err.message); 
+        // 502/504 are common transient errors on VRChat's end, we don't need full error logs for them
+        if (err.message.includes('502') || err.message.includes('504')) {
+            console.warn(`[VRC API] 📡 Pipeline Transient Error (${err.message.split(' ').pop()}). Reconnecting in 10s...`);
+        } else {
+            console.error("[VRC API] Pipeline Error:", err.message); 
+        }
         pipelineConnected = false;
     });
 }

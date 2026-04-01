@@ -154,7 +154,7 @@ router.delete('/vrchat/instances/:id/stop', isHostOrOwner, async (req, res) => {
 
 router.post('/settings/update', isStaff, async (req, res) => {
     try {
-        const { eventStartTime, eventEndTime, eventTitle, forceOffline, instanceUrl, eventTheme, eventLogo } = req.body;
+        const { eventStartTime, eventEndTime, eventTitle, forceOffline, maintenanceMode, instanceUrl, eventTheme, eventLogo } = req.body;
         const userType = (req.user?.type || "").toLowerCase();
         const isFullAdmin = userType.includes('host') || userType.includes('owner');
 
@@ -166,8 +166,10 @@ router.post('/settings/update', isStaff, async (req, res) => {
             // Auto-start tracking for this new URL
             let instanceId = instanceUrl;
             if (instanceUrl.includes('worldId=')) {
-                const url = new URL(instanceUrl);
-                instanceId = `${url.searchParams.get('worldId')}:${url.searchParams.get('instanceId')}`;
+                try {
+                    const url = new URL(instanceUrl);
+                    instanceId = `${url.searchParams.get('worldId')}:${url.searchParams.get('instanceId')}`;
+                } catch (e) {}
             }
 
             const existing = await InstanceLog.findOne({ where: { instanceId, isActive: true } });
@@ -189,11 +191,15 @@ router.post('/settings/update', isStaff, async (req, res) => {
             updateData.eventStartTime = eventStartTime;
             updateData.eventEndTime = eventEndTime;
             updateData.forceOffline = forceOffline;
+            updateData.maintenanceMode = maintenanceMode;
         }
 
         await settings.update(updateData);
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) { 
+        console.error("Failed to update settings:", err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 // --- SCHEDULE ROUTES ---

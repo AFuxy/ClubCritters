@@ -16,7 +16,8 @@ const Settings = sequelize.define('Settings', {
     instanceUrl: { type: DataTypes.STRING },
     eventTheme: { type: DataTypes.STRING }, // CSS class for special events
     eventLogo: { type: DataTypes.STRING }, // Custom logo URL for special events
-    vrcCookie: { type: DataTypes.TEXT } // Persist VRChat session
+    vrcCookie: { type: DataTypes.TEXT }, // Persist VRChat session
+    maintenanceMode: { type: DataTypes.BOOLEAN, defaultValue: false }
 });
 
 // 2. Roster (DJs/Staff)

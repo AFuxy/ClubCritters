@@ -1,5 +1,10 @@
 const { ActivityType, ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getInstanceData, getGroupInstanceData, getGroupStats, autoAcceptFriends, updateBotPresence, connectPipeline, closeGroupInstance } = require('./vrc-api');
+const { 
+    getInstanceData, getGroupInstanceData, getGroupStats, autoAcceptFriends, 
+    updateBotPresence, connectPipeline, closeGroupInstance, 
+    getUserInfo, getGroupMembers, banGroupMember 
+} = require('./vrc-api');
+const { Settings, Schedule, Roster, InstanceLog, InstanceVisitor, VrcGroupAudit } = require('../db');
 const fs = require('fs');
 const path = require('path');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
@@ -9,8 +14,6 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
  */
 async function autoUpdateStatus(client) {
     if (!client || !client.user) return;
-
-    const { Settings, Schedule, Roster, InstanceLog, InstanceVisitor } = require('../db');
 
     try {
         const settings = await Settings.findOne();
@@ -308,13 +311,10 @@ async function joinGuild(client, userId, accessToken) {
     } catch (err) { return false; }
 }
 
-const { getUserInfo, getGroupMembers, banGroupMember } = require('./vrc-api');
-
 /**
  * Audit VRChat Group Members for suspicious/new accounts
  */
 async function auditGroupMembers(client) {
-    const { VrcGroupAudit } = require('../db');
     const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
     const logChannelId = process.env.VRC_GROUP_LOG_CH_ID;
     if (!logChannelId) return;

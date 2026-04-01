@@ -98,6 +98,11 @@
             <input type="checkbox" id="force-offline" style="width: auto;" <%= canManageAll ? '' : 'disabled' %>>
             <label style="margin: 0;">Force Site Offline</label>
         </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+            <input type="checkbox" id="maintenance-mode" style="width: auto;" <%= canManageAll ? '' : 'disabled' %>>
+            <label style="margin: 0; color: #ff9800;">🛠️ Maintenance Mode</label>
+            <p style="font-size: 0.7rem; color: #666; margin: 0; margin-left: auto;">Shuts down public hub but allows panel access.</p>
+        </div>
         <button class="btn-cc btn-primary" style="width: 100%;" onclick="saveSettings()">Update Global Settings</button>
         
         <% if (!canManageAll) { %>
@@ -139,6 +144,7 @@
     const eventTitleInput = document.getElementById('event-title');
     const instanceUrlInput = document.getElementById('instance-url');
     const forceOfflineInput = document.getElementById('force-offline');
+    const maintenanceModeInput = document.getElementById('maintenance-mode');
     const eventThemeSelect = document.getElementById('event-theme-select');
     const eventThemeCustom = document.getElementById('event-theme-custom');
     const eventLogoInput = document.getElementById('event-logo');
@@ -163,6 +169,7 @@
                 if (eventTitleInput) eventTitleInput.value = settings.eventTitle || '';
                 instanceUrlInput.value = settings.instanceUrl || '';
                 if (forceOfflineInput) forceOfflineInput.checked = settings.forceOffline;
+                if (maintenanceModeInput) maintenanceModeInput.checked = settings.maintenanceMode || false;
 
                 // Handle Theme selection
                 const predefinedThemes = ['theme-halloween', 'theme-christmas', 'theme-pride', 'theme-valentines', 'theme-summer', 'theme-rain'];
@@ -328,6 +335,7 @@
                     eventTitle: eventTitleInput ? eventTitleInput.value.trim() : '',
                     instanceUrl: instanceUrlInput.value,
                     forceOffline: forceOfflineInput ? forceOfflineInput.checked : false,
+                    maintenanceMode: maintenanceModeInput ? maintenanceModeInput.checked : false,
                     eventTheme: theme,
                     eventLogo: eventLogoInput.value.trim()
                 })

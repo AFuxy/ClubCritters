@@ -2,7 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
-const { Roster, initDB } = require('./db');
+const { Roster, Settings, initDB } = require('./db');
 const { getGuildMember, joinGuild } = require('./bot');
 require('dotenv').config();
 
@@ -105,6 +105,42 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// --- MAINTENANCE MIDDLEWARE ---
+let cachedMaintenance = { value: false, lastCheck: 0 };
+app.use(async (req, res, next) => {
+    try {
+        const now = Date.now();
+        // Cache setting for 60 seconds to reduce DB load
+        if (now - cachedMaintenance.lastCheck > 60000) {
+            const settings = await Settings.findOne();
+            cachedMaintenance = { value: settings?.maintenanceMode || false, lastCheck: now };
+        }
+
+        if (cachedMaintenance.value) {
+            // Define allowed paths during maintenance (auth, panel, assets)
+            const isAllowedPath = req.path.startsWith('/panel') || 
+                                 req.path.startsWith('/auth') || 
+                                 req.path.startsWith('/api') || 
+                                 req.path.startsWith('/cdn') || 
+                                 req.path.startsWith('/css') || 
+                                 req.path.startsWith('/js') || 
+                                 req.path.startsWith('/uploads');
+
+            // Allow staff to bypass maintenance (case-insensitive check)
+            const userType = (req.user?.type || "").toLowerCase();
+            const isStaff = ['owner', 'resident dj', 'event staff', 'staff'].some(role => userType.includes(role));
+
+            if (!isAllowedPath && !isStaff) {
+                return res.render('maintenance');
+            }
+        }
+        next();
+    } catch (err) {
+        console.error("Maintenance check error:", err);
+        next();
+    }
+});
 
 // --- ROUTES ---
 const authRoutes = require('./routes/auth');
