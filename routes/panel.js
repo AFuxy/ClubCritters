@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { isAuthenticated, isStaff } = require('../middleware/auth');
+const { isAuthenticated, isStaff, canAccessMascot } = require('../middleware/auth');
 
 // --- PANEL ROUTES ---
 
@@ -11,7 +11,15 @@ router.get('/roster', isAuthenticated, isStaff, (req, res) => { res.render('pane
 router.get('/apps', isAuthenticated, isStaff, (req, res) => { res.render('panel/apps', { user: req.user, page: 'apps' }); });
 router.get('/settings', isAuthenticated, isStaff, (req, res) => { res.render('panel/settings', { user: req.user, page: 'settings' }); });
 router.get('/stats', isAuthenticated, isStaff, (req, res) => { res.render('panel/stats', { user: req.user, page: 'stats' }); });
-router.get('/links', isAuthenticated, isStaff, (req, res) => { res.render('panel/links', { user: req.user, page: 'links', vrcGroupId: process.env.VRC_GROUPID || 'CLUBLC.9601' }); });
+router.get('/links', isAuthenticated, isStaff, (req, res) => { res.render('panel/links', { user: req.user, page: 'links', vrcGroupId: process.env.VRC_GROUPID || 'FURN.9601' }); });
 router.get('/archives', isAuthenticated, (req, res) => { res.render('panel/archives', { user: req.user, page: 'archives' }); });
+router.get('/mascot', isAuthenticated, canAccessMascot, (req, res) => { 
+    res.render('panel/mascot', { 
+        user: req.user, 
+        page: 'mascot',
+        mascotEmail: process.env.VRC_EMAIL || 'Not Configured',
+        mascotPassword: process.env.VRC_PASSWORD || 'Not Configured'
+    }); 
+});
 
 module.exports = router;

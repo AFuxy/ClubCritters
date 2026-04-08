@@ -7,7 +7,7 @@
         position: absolute;
         top: 100%;
         left: 0; right: 0;
-        background: #151e29;
+        background: var(--card-bg);
         border: 1px solid #333;
         border-radius: 8px;
         max-height: 200px;
@@ -89,13 +89,14 @@
     let editModeId = null;
 
     function parseColor(val) {
-        if (!val) return '#29C5F6';
+        if (!val) return 'var(--primary-blue)';
         if (val.startsWith('[') && val.endsWith(']')) {
             const colors = val.slice(1, -1).split(',').map(c => c.trim());
             return `linear-gradient(135deg, ${colors.join(', ')})`;
         }
         return val;
     }
+
 
     async function loadSchedulePage() {
         try {
@@ -175,7 +176,7 @@
                 `;
             }).join('');
         } catch (e) {
-            scheduleList.innerHTML = '<li style="color: #ff4444; text-align: center; padding: 20px;">Error loading schedule.</li>';
+            scheduleList.innerHTML = '<li style="color: var(--accent-red); text-align: center; padding: 20px;">Error loading schedule.</li>';
         }
     }
 

@@ -3,7 +3,7 @@
 <div class="staff-hub">
     <div class="staff-section">
         <h2>Roster Manager</h2>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage the Club Critters team. Only the Owner can delete users.</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage the Club FuRN team. Only the Owner can delete users.</p>
 
         <div id="roster-list" style="display: flex; flex-direction: column; gap: 15px;">
             <!-- Roster items will appear here -->
@@ -36,6 +36,7 @@
         <div class="form-group">
             <label>Role Type</label>
             <select id="edit-user-type">
+                <option value="Owner">Owner</option>
                 <option value="Host">Host</option>
                 <option value="Staff">Staff</option>
                 <option value="Resident">Resident</option>
@@ -43,9 +44,16 @@
             </select>
         </div>
 
-        <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
-            <input type="checkbox" id="edit-user-banned" style="width: auto;">
-            <label style="margin: 0; color: #ff4444;">Banned from Site Access</label>
+        <% if (user.type.toLowerCase().includes('owner')) { %>
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
+                <input type="checkbox" id="edit-user-mascot" style="width: auto; cursor: pointer;">
+                <label for="edit-user-mascot" style="margin: 0; color: var(--primary-purple); cursor: pointer;">Authorized Mascot Access</label>
+            </div>
+        <% } %>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+            <input type="checkbox" id="edit-user-banned" style="width: auto; cursor: pointer;">
+            <label for="edit-user-banned" style="margin: 0; color: var(--accent-red); cursor: pointer;">Banned from Site Access</label>
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -62,6 +70,7 @@
     const editTypeSelect = document.getElementById('edit-user-type');
     const editNameInput = document.getElementById('edit-user-name');
     const editBannedCheckbox = document.getElementById('edit-user-banned');
+    const editMascotCheckbox = document.getElementById('edit-user-mascot');
     
     const isOwner = <%= user.type.toLowerCase().includes('owner') %>;
     const FALLBACK_IMAGE = "/cdn/logos/club/HeadOnly.png";
@@ -88,17 +97,18 @@
                     `<button class="btn-cc btn-small btn-danger" onclick="deleteUser('${m.discordId}', '${m.name}')">Delete</button>` : 
                     '';
                 
-                const bannedBadge = m.isBanned ? '<span style="background: #ff4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 10px;">BANNED</span>' : '';
+                const bannedBadge = m.isBanned ? '<span style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 10px;">BANNED</span>' : '';
+                const mascotBadge = m.hasMascotAccess ? '<span style="background: var(--primary-purple); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px;">MASCOT</span>' : '';
 
                 return `
-                <div class="schedule-item" style="--sidebar-color: ${m.isBanned ? '#ff4444' : accent}; background: #151e29; padding: 15px; border-radius: 12px; opacity: ${m.isBanned ? '0.6' : '1'};">
+                <div class="schedule-item" style="--sidebar-color: ${m.isBanned ? 'var(--accent-red)' : accent}; background: var(--card-bg); padding: 15px; border-radius: 12px; opacity: ${m.isBanned ? '0.6' : '1'};">
                     <div style="flex: 1; display: flex; align-items: center; gap: 15px; padding-left: 10px;">
                         <img src="${m.imageUrl || FALLBACK_IMAGE}" 
                              onerror="this.src='${FALLBACK_IMAGE}'"
-                             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid; border-color: ${m.isBanned ? '#ff4444' : (isGradient ? 'var(--primary-blue)' : accent)};">
+                             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid; border-color: ${m.isBanned ? 'var(--accent-red)' : (isGradient ? 'var(--primary-blue)' : accent)};">
                         <div>
                             <strong style="font-size: 1.15rem; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent};">${m.name}</strong>
-                            ${bannedBadge}
+                            ${bannedBadge} ${mascotBadge}
                             <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 2px;">
                                 <span style="color: var(--primary-blue); font-weight: bold;">${m.type}</span> 
                                 ${m.title ? '• ' + m.title : ''}
@@ -106,23 +116,24 @@
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <button class="btn-cc btn-small btn-dark" onclick="openEditModal('${m.discordId}', '${m.name}', '${m.title || ''}', '${m.type}', ${m.isBanned})">Edit</button>
+                        <button class="btn-cc btn-small btn-dark" onclick="openEditModal('${m.discordId}', '${m.name}', '${m.title || ''}', '${m.type}', ${m.isBanned}, ${m.hasMascotAccess || false})">Edit</button>
                         ${deleteBtn}
                     </div>
                 </div>
                 `;
             }).join('');
         } catch (e) {
-            rosterList.innerHTML = '<p style="color: #ff4444; text-align: center;">Error loading roster.</p>';
+            rosterList.innerHTML = '<p style="color: var(--accent-red); text-align: center;">Error loading roster.</p>';
         }
     }
 
-    function openEditModal(id, name, title, type, isBanned = false) {
+    function openEditModal(id, name, title, type, isBanned = false, hasMascotAccess = false) {
         currentEditId = id;
         document.getElementById('edit-modal-title').innerText = `Edit ${name}`;
         editNameInput.value = name;
         editTitleInput.value = title;
         editBannedCheckbox.checked = isBanned;
+        if (editMascotCheckbox) editMascotCheckbox.checked = hasMascotAccess;
         if (Array.from(editTypeSelect.options).some(opt => opt.value === type)) {
             editTypeSelect.value = type;
         }
@@ -136,16 +147,23 @@
 
     async function saveUserEdit() {
         if (!currentEditId) return;
+        
+        const payload = { 
+            name: editNameInput.value.trim(),
+            title: editTitleInput.value.trim(), 
+            type: editTypeSelect.value,
+            isBanned: editBannedCheckbox.checked
+        };
+
+        if (editMascotCheckbox) {
+            payload.hasMascotAccess = editMascotCheckbox.checked;
+        }
+
         try {
             const res = await fetch(`/api/roster/${currentEditId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    name: editNameInput.value.trim(),
-                    title: editTitleInput.value.trim(), 
-                    type: editTypeSelect.value,
-                    isBanned: editBannedCheckbox.checked
-                })
+                body: JSON.stringify(payload)
             });
             if (res.ok) {
                 showNotify('User updated successfully!');

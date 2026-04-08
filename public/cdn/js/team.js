@@ -1,5 +1,5 @@
 /**
- * CLUB CRITTERS - TEAM LOGIC (V3.0 - MYSQL API)
+ * CLUB FuRN - TEAM LOGIC (V3.0 - MYSQL API)
  * Fetching from local Node.js backend.
  */
 
@@ -36,7 +36,7 @@ let isEventLive = false;
 
 async function init() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c TEAM V3 STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB FuRN %c TEAM V3 STARTUP ", logStyle.banner, logStyle.tag);
 
     // Track Page View
     fetch(API_TRACK, {

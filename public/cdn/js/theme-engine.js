@@ -1,5 +1,5 @@
 /**
- * CLUB CRITTERS - THEME & PARTICLE ENGINE
+ * CLUB FuRN - THEME & PARTICLE ENGINE
  * Centralized logic for global themes, snow, and rain effects.
  */
 

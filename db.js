@@ -31,6 +31,7 @@ const Roster = sequelize.define('Roster', {
     bio: { type: DataTypes.TEXT },
     useDiscordName: { type: DataTypes.BOOLEAN, defaultValue: false },
     isBanned: { type: DataTypes.BOOLEAN, defaultValue: false },
+    hasMascotAccess: { type: DataTypes.BOOLEAN, defaultValue: false },
     links: { type: DataTypes.JSON } // JSON storage for social links
 });
 
@@ -106,7 +107,7 @@ const InstanceLog = sequelize.define('InstanceLog', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     instanceId: { type: DataTypes.STRING },
     instanceUrl: { type: DataTypes.STRING }, // Store the full URL for tracking
-    worldName: { type: DataTypes.STRING, defaultValue: 'Club Critters Hub' },
+    worldName: { type: DataTypes.STRING, defaultValue: 'Club FuRN Hub' },
     startTime: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     endTime: { type: DataTypes.DATE },
     peakCapacity: { type: DataTypes.INTEGER, defaultValue: 0 },

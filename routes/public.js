@@ -72,7 +72,7 @@ router.get('/performer/:id', async (req, res) => {
 router.get('/login-error', (req, res) => { 
     res.render('error', {
         title: 'Team Access Required',
-        message: "This area is reserved for members of the Club Critters team. If you're interested in joining us as a performer or staff member, please check out our application page!",
+        message: "This area is reserved for members of the Club FuRN team. If you're interested in joining us as a performer or staff member, please check out our application page!",
         icon: '🔒',
         buttons: [
             { label: 'Apply to Join', link: '/apply', class: 'btn-primary' },
@@ -171,7 +171,7 @@ router.get('/api/public/apps', async (req, res) => {
 router.get('/api/public/vrc-status', async (req, res) => {
     try {
         const settings = await Settings.findOne();
-        const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
+        const groupId = process.env.VRC_GROUPID || "FURN.9601";
         const groupStats = await getGroupStats(groupId);
         
         if (!settings || settings.forceOffline) {

@@ -94,11 +94,11 @@
             appsList.innerHTML = slots.map(s => {
                 const isAutoClosed = s.autoCloseAt && new Date(s.autoCloseAt) < new Date();
                 const displayStatus = isAutoClosed ? 'CLOSED (AUTO)' : s.status.toUpperCase();
-                const typeLabel = s.isInternal ? `<span style="font-size:0.7rem; background:#29C5F6; color:#000; padding:2px 6px; border-radius:4px; margin-left:10px;">INTERNAL: ${s.roleType}</span>` : '';
+                const typeLabel = s.isInternal ? `<span style="font-size:0.7rem; background:var(--primary-blue); color:#000; padding:2px 6px; border-radius:4px; margin-left:10px;">INTERNAL: ${s.roleType}</span>` : '';
                 return `
-                <div class="schedule-item" style="border-left: 4px solid ${isAutoClosed || s.status === 'closed' ? '#ff5252' : '#00e676'}; background: #151e29; padding: 15px; border-radius: 12px;">
+                <div class="schedule-item" style="border-left: 4px solid ${isAutoClosed || s.status === 'closed' ? 'var(--accent-red)' : '#00e676'}; background: var(--card-bg); padding: 15px; border-radius: 12px;">
                     <div style="flex: 1;">
-                        <strong style="font-size: 1.1rem; color: ${isAutoClosed || s.status === 'closed' ? '#ff5252' : '#00e676'};">${s.roleName}${typeLabel} - ${displayStatus}</strong>
+                        <strong style="font-size: 1.1rem; color: ${isAutoClosed || s.status === 'closed' ? 'var(--accent-red)' : '#00e676'};">${s.roleName}${typeLabel} - ${displayStatus}</strong>
                         <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 5px;">${s.deadline ? 'Display: ' + s.deadline : ''}${s.autoCloseAt ? ' | Auto-Close: ' + new Date(s.autoCloseAt).toLocaleString() : ''}</span>
                     </div>
                     <div style="display: flex; gap: 10px;">

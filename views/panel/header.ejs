@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Club Critters - <%= page.charAt(0).toUpperCase() + page.slice(1) %></title>
+    <title>Club FuRN - <%= page.charAt(0).toUpperCase() + page.slice(1) %></title>
     
     <link rel="icon" type="image/png" href="/cdn/logos/club/HeadOnly.png">
-    <meta name="theme-color" content="#29C5F6">
+    <meta name="theme-color" content="#f2008d">
 
     <!-- SEO & Embedding -->
-    <meta name="description" content="Club Critters Secret Panel - DJ and Staff Management Hub.">
+    <meta name="description" content="Club FuRN Secret Panel - DJ and Staff Management Hub.">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Club Critters - Panel">
+    <meta property="og:title" content="Club FuRN - Panel">
     <meta property="og:description" content="Manage your DJ profile, archives, and club schedule.">
-    <meta property="og:image" content="https://critters.club/cdn/logos/club/HeadOnly.png">
+    <meta property="og:image" content="https://clubfurn.com/cdn/logos/club/HeadOnly.png">
     <meta name="twitter:card" content="summary">
 
     <link rel="stylesheet" href="/css/theme.css">
@@ -22,25 +22,53 @@
     <style>
         .nav-bar {
             width: 100%;
-            background: var(--card-bg);
+            background: rgba(21, 30, 41, 0.8);
+            backdrop-filter: blur(15px);
             margin-bottom: 40px;
             display: flex;
             justify-content: center;
             align-items: center;
             gap: 15px;
-            padding: 15px 20px;
-            border-bottom: 1px solid #333;
+            padding: 10px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
             box-sizing: border-box;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
-        .logout-link { color: #ff4444 !important; border-color: #ff444444 !important; }
-        .logout-link:hover { background: #ff4444 !important; color: white !important; }
+        .nav-logo {
+            height: 35px;
+            margin-right: auto;
+        }
+        .logout-link { 
+            margin-left: auto;
+            color: #ff4444 !important; 
+            border-color: rgba(255, 68, 68, 0.2) !important; 
+        }
+        .logout-link:hover { 
+            background: linear-gradient(45deg, #ff5252, #ff1744) !important; 
+            color: white !important; 
+            border-color: transparent !important;
+        }
+
+        @media (max-width: 800px) {
+            .nav-bar { flex-wrap: wrap; gap: 8px; padding: 15px; }
+            .nav-logo { display: none; }
+            .logout-link { margin-left: 0; }
+        }
     </style>
 </head>
 <body>
 
     <div class="nav-bar">
+        <img src="/cdn/logos/club/HeadOnly.png" alt="Logo" class="nav-logo">
+        
         <a href="/panel/profile" class="btn-cc nav-pill-cc <%= page === 'profile' ? 'active' : '' %>">👤 Profile</a>
         <a href="/panel/archives" class="btn-cc nav-pill-cc <%= page === 'archives' ? 'active' : '' %>">📂 My Archives</a>
+        
+        <% if (user.hasMascotAccess || user.type.toLowerCase().includes('owner')) { %>
+            <a href="/panel/mascot" class="btn-cc nav-pill-cc <%= page === 'mascot' ? 'active' : '' %>">🦊 Mascot</a>
+        <% } %>
         
         <% const userType = user.type.toLowerCase(); %>
         <% if (userType.includes('host') || userType.includes('staff') || userType.includes('owner')) { %>

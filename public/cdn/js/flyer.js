@@ -98,7 +98,7 @@ function downloadFlyer() {
     const timeStr = now.getHours() + "" + now.getMinutes();
     
     const tzLabel = tzSelect.options[tzSelect.selectedIndex].text.split(' ')[0];
-    const filename = `ClubCritters_Flyer_${dateStr}_${timeStr}_${tzLabel}.png`;
+    const filename = `ClubFuRN_Flyer_${dateStr}_${timeStr}_${tzLabel}.png`;
 
     html2canvas(canvasDiv, {
         scale: 2, 

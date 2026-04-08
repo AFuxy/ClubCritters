@@ -3,13 +3,20 @@
    ========================================= */
 :root {
     /* DYNAMIC VARIABLES (These change with Chameleon Mode) */
-    --primary-blue: #29C5F6;
-    --primary-purple: #B36AF4;
-    --primary-gradient: linear-gradient(45deg, #29C5F6, #B36AF4);
+    --primary-pink: #f2008d;
+    --primary-purple: #7e00fc;
+    --primary-orange: #ff7b2e;
+    --primary-green: #08ec7a;
+    --primary-magenta: #f16cf2;
 
-    /* STATIC VARIABLES (These ALWAYS stay Club Critters Brand) */
-    --static-blue: #29C5F6;
-    --static-purple: #B36AF4;
+    /* Primary Brand Mapping: Orange & Green */
+    --primary-blue: var(--primary-orange);
+    --primary-purple-legacy: var(--primary-green);
+    --primary-gradient: linear-gradient(45deg, var(--primary-orange), var(--primary-green));
+
+    /* STATIC VARIABLES (These ALWAYS stay Club FuRN Brand) */
+    --static-orange: #ff7b2e;
+    --static-green: #08ec7a;
 
     --dark-bg: #0b1016;
     --card-bg: #151e29;
@@ -56,7 +63,7 @@ body.body-centered {
 .logo {
     width: 200px; height: 200px;
     object-fit: cover;
-    filter: drop-shadow(0 0 10px rgba(41, 197, 246, 0.5));
+    filter: drop-shadow(0 0 10px rgba(255, 123, 46, 0.5));
 }
 
 h1 {

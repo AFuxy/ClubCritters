@@ -68,7 +68,7 @@ passport.use(new DiscordStrategy({
         // 2. Check if they are now in the guild
         const guildMember = await getGuildMember(profile.id);
         if (!guildMember) {
-            return done(null, false, { message: 'You must be in the Club Critters Discord to login.' });
+            return done(null, false, { message: 'You must be in the Club FuRN Discord to login.' });
         }
 
         // 3. Find or identify user

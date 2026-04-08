@@ -123,7 +123,7 @@ router.post('/vrchat/instances/start', isHostOrOwner, async (req, res) => {
         const newLog = await InstanceLog.create({
             instanceId,
             instanceUrl,
-            worldName: (worldData && worldData.name) ? worldData.name : 'Club Critters Hub',
+            worldName: (worldData && worldData.name) ? worldData.name : 'Club FuRN Hub',
             isEventSession: isEventSession || false,
             startTime: new Date(),
             isActive: true
@@ -178,7 +178,7 @@ router.post('/settings/update', isStaff, async (req, res) => {
                 await InstanceLog.create({
                     instanceId,
                     instanceUrl,
-                    worldName: (worldData && worldData.name) ? worldData.name : 'Club Critters Hub',
+                    worldName: (worldData && worldData.name) ? worldData.name : 'Club FuRN Hub',
                     isEventSession: (new Date() >= new Date(eventStartTime || settings.eventStartTime) && new Date() < new Date(eventEndTime || settings.eventEndTime)),
                     startTime: new Date(),
                     isActive: true
@@ -242,7 +242,7 @@ router.patch('/schedule/:id', isHostOrOwner, async (req, res) => {
 
 router.get('/roster/search', isStaff, async (req, res) => {
     try {
-        const members = await Roster.findAll({ attributes: ['discordId', 'name', 'type'] });
+        const members = await Roster.findAll({ attributes: ['discordId', 'name', 'type', 'hasMascotAccess'] });
         res.json(members);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
@@ -256,19 +256,50 @@ router.get('/roster/all', isStaff, async (req, res) => {
 
 router.patch('/roster/:id', isStaff, async (req, res) => {
     try {
-        const { title, type, name, isBanned } = req.body;
-        const updateData = { title, type };
+        const { title, type, name, isBanned, hasMascotAccess } = req.body;
         
-        // Only allow Host or Owner to change the stored name or ban status
+        const targetUser = await Roster.findByPk(req.params.id);
+        if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
         const userType = (req.user?.type || "").toLowerCase();
-        const canManageUser = userType.includes('host') || userType.includes('owner');
+        const isOwner = userType.includes('owner');
+        const isHost = userType.includes('host');
         
-        if (canManageUser) {
+        const targetType = (targetUser.type || "").toLowerCase();
+        const targetIsOwner = targetType.includes('owner');
+
+        // SECURITY: Non-owners cannot modify an Owner's account (except maybe their own title, but let's be strict)
+        if (targetIsOwner && !isOwner) {
+            return res.status(403).json({ error: 'You do not have permission to modify an Owner account.' });
+        }
+
+        const updateData = { title };
+        
+        // Role Change Logic
+        if (type && type !== targetUser.type) {
+            const newTypeLower = type.toLowerCase();
+            if (newTypeLower.includes('owner')) {
+                if (isOwner) updateData.type = type;
+                else return res.status(403).json({ error: 'Only Owners can grant the Owner role.' });
+            } else {
+                // demoting/changing role to non-owner
+                // isStaff middleware ensures they are at least Staff/Host/Owner
+                updateData.type = type;
+            }
+        }
+        
+        // Name and Ban status (Host or Owner only)
+        if (isHost || isOwner) {
             if (name) updateData.name = name;
             if (isBanned !== undefined) updateData.isBanned = isBanned;
         }
 
-        await Roster.update(updateData, { where: { discordId: req.params.id } });
+        // Mascot Access (Owner only)
+        if (isOwner && hasMascotAccess !== undefined) {
+            updateData.hasMascotAccess = hasMascotAccess;
+        }
+
+        await targetUser.update(updateData);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });

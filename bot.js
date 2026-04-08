@@ -115,7 +115,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     try {
                         const applicant = await client.users.fetch(submission.discordId);
                         await applicant.send({
-                            content: `✨ **Congratulations!** Your application for **${submission.AppSlot.roleName}** at Club Critters has been **ACCEPTED**! \n\nA staff member will be in touch shortly.`
+                            content: `✨ **Congratulations!** Your application for **${submission.AppSlot.roleName}** at Club FuRN has been **ACCEPTED**! \n\nA staff member will be in touch shortly.`
                         });
                     } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
 
@@ -178,7 +178,7 @@ client.on(Events.InteractionCreate, async interaction => {
                         components: [] 
                     });
                 } else if (action === 'ban') {
-                    const success = await banGroupMember(process.env.VRC_GROUPID || "CLUBLC.9601", vrcUserId);
+                    const success = await banGroupMember(process.env.VRC_GROUPID || "FURN.9601", vrcUserId);
                     if (success) {
                         await audit.update({ status: 'banned' });
                         originalEmbed.setColor('#ff4444');
@@ -236,7 +236,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 try {
                     const applicant = await client.users.fetch(submission.discordId);
                     await applicant.send({
-                        content: `📩 **Update on your application:** Your application for **${submission.AppSlot.roleName}** at Club Critters has been **DECLINED**. \n\n${dmReason}`
+                        content: `📩 **Update on your application:** Your application for **${submission.AppSlot.roleName}** at Club FuRN has been **DECLINED**. \n\n${dmReason}`
                     });
                 } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
 

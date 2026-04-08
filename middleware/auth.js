@@ -30,9 +30,17 @@ const isOwner = (req, res, next) => {
     res.status(403).json({ error: 'Owner access required' });
 };
 
+const canAccessMascot = (req, res, next) => {
+    if (req.isAuthenticated() && (req.user.hasMascotAccess || req.user.type.toLowerCase().includes('owner'))) {
+        return next();
+    }
+    res.status(403).json({ error: 'Mascot account access not authorized' });
+};
+
 module.exports = {
     isAuthenticated,
     isStaff,
     isHostOrOwner,
-    isOwner
+    isOwner,
+    canAccessMascot
 };

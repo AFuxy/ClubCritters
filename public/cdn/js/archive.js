@@ -1,5 +1,5 @@
 /**
- * CLUB CRITTERS - ARCHIVE LOGIC (V3.0 - MYSQL API)
+ * Club FuRN - ARCHIVE LOGIC (V3.0 - MYSQL API)
  * Fetching from local Node.js backend.
  */
 
@@ -22,8 +22,8 @@ const CACHE_KEY_TIMESTAMP = 'cc_archive_ts';
 //          CONSOLE THEME
 // ==========================================
 const logStyle = {
-    banner: "background: #B36AF4; color: #fff; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;",
-    tag: "background: #151e29; color: #B36AF4; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;",
+    banner: "background: #7e00fc; color: #fff; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;",
+    tag: "background: #151e29; color: #7e00fc; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;",
     success: "color: #00e676; font-weight: bold;",
     info: "color: #888; font-style: italic;",
 };
@@ -49,7 +49,7 @@ const listContainer = document.getElementById('archive-list');
 
 async function initArchive() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c ARCHIVE V3 STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c Club FuRN %c ARCHIVE V3 STARTUP ", logStyle.banner, logStyle.tag);
 
     // Track Page View
     fetch(API_TRACK, {
@@ -157,9 +157,9 @@ function updateSiteTheme(color) {
         root.style.setProperty('--primary-purple', solidColor);
         root.style.setProperty('--primary-gradient', gradientColor);
     } else {
-        root.style.setProperty('--primary-blue', '#29C5F6');
-        root.style.setProperty('--primary-purple', '#B36AF4');
-        root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-blue), var(--static-purple))');
+        root.style.setProperty('--primary-blue', 'var(--static-orange)');
+        root.style.setProperty('--primary-purple', 'var(--static-green)');
+        root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-orange), var(--static-green))');
     }
 }
 

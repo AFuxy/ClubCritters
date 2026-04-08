@@ -87,7 +87,7 @@ async function vrcFetch(url, options = {}) {
 
     const defaultHeaders = {
         'Cookie': authCookie || '',
-        'User-Agent': 'ClubCrittersHub/1.0.0'
+        'User-Agent': 'ClubFuRNHub/1.0.0'
     };
     
     options.headers = { ...defaultHeaders, ...options.headers };
@@ -155,7 +155,7 @@ async function loginVRC() {
                 headers: {
                     'Authorization': authHeader,
                     'Cookie': authCookie || '', 
-                    'User-Agent': 'ClubCrittersHub/1.0.0'
+                    'User-Agent': 'ClubFuRNHub/1.0.0'
                 }
             });
 
@@ -210,7 +210,7 @@ async function verifyVRC(code) {
     try {
         const res = await fetch('https://api.vrchat.cloud/api/1/auth/twofactorauth/emailotp/verify', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Cookie': pendingCookie, 'User-Agent': 'ClubCrittersHub/1.0.0' },
+            headers: { 'Content-Type': 'application/json', 'Cookie': pendingCookie, 'User-Agent': 'ClubFuRNHub/1.0.0' },
             body: JSON.stringify({ code })
         });
 
@@ -278,7 +278,7 @@ async function connectPipeline(location) {
 
     console.log("[VRC API] 📡 Connecting to Notification Pipeline...");
     pipeline = new WebSocket(`wss://pipeline.vrchat.cloud/?authToken=${vrcToken}`, {
-        headers: { 'User-Agent': 'ClubCrittersHub/1.0.0 (contact: site-admin)', 'Origin': 'https://vrchat.com' }
+        headers: { 'User-Agent': 'ClubFuRNHub/1.0.0 (contact: site-admin)', 'Origin': 'https://vrchat.com' }
     });
 
     pipeline.on('open', () => {
@@ -409,7 +409,7 @@ async function getGroupInstanceData(groupShortName) {
                     count: (inst.n_users !== undefined) ? inst.n_users : inst.nUsers,
                     capacity: inst.capacity,
                     location: inst.location || `${inst.worldId || inst.world_id}:${inst.instanceId || inst.instance_id}`,
-                    name: inst.name || inst.worldName || inst.world?.name || 'Club Critters Hub',
+                    name: inst.name || inst.worldName || inst.world?.name || 'Club FuRN Hub',
                     users: inst.users || [] // Include user list if API provides it
                 }));
             }
@@ -439,7 +439,7 @@ async function getInstanceData(instanceUrl) {
                 count: data.n_users, 
                 capacity: data.capacity, 
                 location: target,
-                name: data.name || data.worldName || 'Club Critters Hub',
+                name: data.name || data.worldName || 'Club FuRN Hub',
                 users: data.users || [] // Capture the player list
             };
             cache.specificInstance.set(instanceUrl, { data: result, timestamp: now });

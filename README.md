@@ -1,6 +1,6 @@
-# Club Critters Ecosystem
+# Club FuRN Ecosystem
 
-This platform is a comprehensive event management system for the Club Critters VRChat community. It replaces the legacy static site with a full-stack Node.js application, integrating Discord OAuth2 authentication, a role-based management panel, real-time engagement analytics, a community photo gallery, and a specialized VRChat-aware Discord bot.
+This platform is a comprehensive event management system for the Club FuRN VRChat community. It replaces the legacy static site with a full-stack Node.js application, integrating Discord OAuth2 authentication, a role-based management panel, real-time engagement analytics, a community photo gallery, and a specialized VRChat-aware Discord bot.
 
 ## 🏗 Architecture
 
@@ -31,7 +31,7 @@ SESSION_SECRET="your_random_secret_here"
 DB_HOST=localhost
 DB_USER=root
 DB_PASS=your_password
-DB_NAME=club_critters
+DB_NAME=club_furn
 
 # Discord API Configuration
 DISCORD_CLIENT_ID=your_client_id

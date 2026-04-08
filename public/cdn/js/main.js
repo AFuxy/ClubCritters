@@ -1,5 +1,6 @@
 /**
- * CLUB CRITTERS - MAIN APP LOGIC (V3.0 - MYSQL API)
+ * CLUB FuRN - MAIN APP LOGIC
+ (V3.0 - MYSQL API)
  * Fetching from local Node.js backend instead of Google Sheets.
  */
 
@@ -13,7 +14,7 @@ const API_ARCHIVES = "/api/public/archives";
 const API_VRC = "/api/public/vrc-status";
 const API_TRACK = "/api/stats/track";
 
-const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://critters.club";
+const shareMessageTemplate = "🔊 LIVE NOW: {dj} is playing {genre}! Join us: https://clubfurn.com";
 
 // Cache Keys
 const CACHE_KEY_SCHEDULE = 'cc_schedule_v3';
@@ -25,8 +26,8 @@ const CACHE_KEY_TIMESTAMP = 'cc_last_update_ts';
 //          CONSOLE THEME
 // ==========================================
 const logStyle = {
-    banner: "background: #29C5F6; color: #000; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;",
-    tag: "background: #151e29; color: #29C5F6; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;",
+    banner: "background: #f2008d; color: #fff; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;",
+    tag: "background: #151e29; color: #f2008d; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;",
     info: "color: #888; font-style: italic;",
     success: "color: #00e676; font-weight: bold;",
 };
@@ -95,7 +96,7 @@ function updateVrcUI() {
 
 async function init() {
     console.clear();
-    console.log("%c CLUB CRITTERS %c API V3 STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c Club FuRN %c API V3 STARTUP ", logStyle.banner, logStyle.tag);
 
     // Track Page View
     fetch(API_TRACK, {
@@ -171,7 +172,7 @@ function processSettings(data) {
 
     const mainTitle = document.getElementById('main-title');
     if (mainTitle) {
-        mainTitle.innerText = data.eventTitle || "Club Critters";
+        mainTitle.innerText = data.eventTitle || "Furry Rave Night";
     }
 
     if (window.applyGlobalSettings) {
@@ -263,9 +264,9 @@ function updateSiteTheme(color) {
         root.style.setProperty('--primary-purple', solidColor);
         root.style.setProperty('--primary-gradient', gradientColor);
     } else {
-        root.style.setProperty('--primary-blue', '#29C5F6');
-        root.style.setProperty('--primary-purple', '#B36AF4');
-        root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-blue), var(--static-purple))');
+        root.style.setProperty('--primary-blue', 'var(--static-orange)');
+        root.style.setProperty('--primary-purple', 'var(--static-green)');
+        root.style.setProperty('--primary-gradient', 'linear-gradient(45deg, var(--static-orange), var(--static-green))');
     }
 }
 
@@ -405,7 +406,7 @@ function trackClick(type, id, label) {
 // ==========================================
 
 function showOffline(message) {
-    document.title = "Club Critters - " + message.replace(/<[^>]*>?/gm, '');
+    document.title = "Furry Rave Night - " + message.replace(/<[^>]*>?/gm, '');
     document.body.classList.add('body-centered');
     if (archiveLink) archiveLink.classList.remove('hidden');
     if (galleryLink) galleryLink.classList.remove('hidden');
@@ -430,7 +431,7 @@ function renderEventView(isLive) {
     updateSiteTheme(null); 
 
     if (isLive) {
-        document.title = "Club Critters - LIVE NOW";
+        document.title = "Furry Rave Night - LIVE NOW";
         badgeContainer.innerHTML = '<div class="status-badge status-live">🔴 EVENT LIVE NOW <span id="vrc-player-count"></span></div>';
         subtext.innerText = "Tonight's Lineup";
 
@@ -457,7 +458,7 @@ function renderEventView(isLive) {
         }, 500);
 
     } else {
-        document.title = "Club Critters - UPCOMING";
+        document.title = "Furry Rave Night - UPCOMING";
         const d = new Date(eventStartTime);
         badgeContainer.innerHTML = `<div class="status-badge status-upcoming">📅 STARTING: ${d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})} <span id="vrc-player-count"></span></div>`;
         subtext.innerText = "Upcoming Schedule";

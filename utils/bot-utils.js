@@ -25,7 +25,7 @@ async function autoUpdateStatus(client) {
         let vrcPresenceDesc = '💤 Offline';
 
         // 1. Fetch general group activity
-        const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
+        const groupId = process.env.VRC_GROUPID || "FURN.9601";
         const groupData = await getGroupStats(groupId);
         let groupOnlineStr = (groupData && groupData.onlineMembers > 0) ? ` | 🟢 ${groupData.onlineMembers} Online` : "";
 
@@ -315,7 +315,7 @@ async function joinGuild(client, userId, accessToken) {
  * Audit VRChat Group Members for suspicious/new accounts
  */
 async function auditGroupMembers(client) {
-    const groupId = process.env.VRC_GROUPID || "CLUBLC.9601";
+    const groupId = process.env.VRC_GROUPID || "FURN.9601";
     const logChannelId = process.env.VRC_GROUP_LOG_CH_ID;
     if (!logChannelId) return;
 

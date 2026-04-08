@@ -1,0 +1,61 @@
+<%- include('header') %>
+
+<div class="staff-hub" style="display: flex; flex-direction: column; align-items: center;">
+    <div class="staff-section" style="max-width: 800px; width: 100%; text-align: center; border: 1px solid var(--primary-purple);">
+        <h1 style="color: var(--primary-purple); border: none; margin-bottom: 10px;">Kit Mascot Access</h1>
+        <p style="color: #888; margin-bottom: 30px;">Authorized performers can use this account for official Club FuRN events.</p>
+
+        <div style="background: rgba(0,0,0,0.3); padding: 30px; border-radius: 20px; text-align: left; margin-bottom: 30px;">
+            <h2 style="color: var(--primary-blue); font-size: 1.2rem; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">VRChat Credentials</h2>
+            
+            <div class="form-group">
+                <label>Username / Email</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" value="<%= mascotEmail %>" readonly style="flex: 1; background: rgba(0,0,0,0.5); border-color: #444; color: #fff;">
+                    <button class="btn-cc btn-small btn-dark" onclick="copyToClipboard('<%= mascotEmail %>')">📋 Copy</button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label>Password</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="password" id="vrc-pass" value="<%= mascotPassword %>" readonly style="flex: 1; background: rgba(0,0,0,0.5); border-color: #444; color: #fff;">
+                    <button class="btn-cc btn-small btn-dark" onclick="togglePass()">👁️ Show</button>
+                    <button class="btn-cc btn-small btn-dark" onclick="copyToClipboard('<%= mascotPassword %>')">📋 Copy</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="staff-section" style="background: rgba(255, 68, 68, 0.05); border: 1px solid rgba(255, 68, 68, 0.2); text-align: left; margin-bottom: 0;">
+            <h3 style="color: var(--accent-red); margin-top: 0;">⚠️ Security Guidelines</h3>
+            <ul style="color: #ccc; font-size: 0.9rem; line-height: 1.6; padding-left: 20px;">
+                <li>Never share these credentials outside of the authorized performer team.</li>
+                <li>Do not change the account password, email, or security settings.</li>
+                <li>Ensure you log out of the account after your performance is finished.</li>
+                <li>If 2FA is required, please contact the <strong>Owner</strong> on Discord immediately.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    function togglePass() {
+        const pass = document.getElementById('vrc-pass');
+        const btn = event.target;
+        if (pass.type === 'password') {
+            pass.type = 'text';
+            btn.innerText = '🔒 Hide';
+        } else {
+            pass.type = 'password';
+            btn.innerText = '👁️ Show';
+        }
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showNotify('Copied to clipboard!');
+        });
+    }
+</script>
+
+<%- include('footer') %>

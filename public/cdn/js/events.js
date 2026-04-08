@@ -1,5 +1,6 @@
 /**
- * CLUB CRITTERS - EVENT HISTORY LOGIC (V3.0)
+ * CLUB FuRN - EVENT HISTORY LOGIC
+ (V3.0)
  */
 
 const API_EVENTS = "/api/public/events";
