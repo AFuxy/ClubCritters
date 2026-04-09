@@ -34,7 +34,7 @@ window.applyGlobalSettings = function(data) {
             logoImg.classList.add('custom-logo');
         } else {
             // Restore default logo - Use absolute path for all EJS views
-            logoImg.src = "/cdn/logos/club/HeadOnly.png";
+            logoImg.src = "/cdn/logos/club/Logo.png";
             logoImg.classList.remove('custom-logo');
         }
     }

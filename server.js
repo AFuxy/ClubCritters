@@ -91,6 +91,13 @@ passport.use(new DiscordStrategy({
 
 app.set('view engine', 'ejs');
 app.set('trust proxy', 1);
+
+// Global Permissions Policy for Media Embeds
+app.use((req, res, next) => {
+    res.setHeader("Permissions-Policy", "autoplay=(self *), encrypted-media=(self *), picture-in-picture=(self *)");
+    next();
+});
+
 app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

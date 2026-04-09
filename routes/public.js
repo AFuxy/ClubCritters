@@ -249,7 +249,7 @@ router.get('/api/public/gallery', async (req, res) => {
         const photos = await Gallery.findAll({ order: [['timestamp', 'DESC']] });
         
         const mapped = await Promise.all(photos.map(async p => {
-            let uploader = { name: "Unknown", avatar: "/cdn/logos/club/HeadOnly.png" };
+            let uploader = { name: "Unknown", avatar: "/cdn/logos/club/Logo.png" };
             if (p.uploaderId) {
                 const member = await getGuildMember(p.uploaderId);
                 if (member) {

@@ -254,7 +254,7 @@
         
         <div class="profile-header">
             <div class="profile-img-wrap">
-                <img src="<%= performer.imageUrl || '/cdn/logos/club/HeadOnly.png' %>" class="profile-img" onerror="this.src='/cdn/logos/club/HeadOnly.png'">
+                <img src="<%= performer.imageUrl || '/cdn/logos/club/Logo.png' %>" class="profile-img" onerror="this.src='/cdn/logos/club/Logo.png'">
             </div>
             <div class="profile-info">
                 <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
@@ -340,8 +340,71 @@
                     <% } %>
                 </div>
             </div>
+
+            <% 
+                const mcEntry = Object.entries(links).find(([l]) => l.toLowerCase() === 'mixcloud');
+                const scEntry = Object.entries(links).find(([l]) => l.toLowerCase() === 'soundcloud');
+                const twEntry = Object.entries(links).find(([l]) => l.toLowerCase() === 'twitch');
+                const ytEntry = Object.entries(links).find(([l]) => l.toLowerCase() === 'youtube' || l.toLowerCase() === 'yt');
+            %>
+
+            <% if (mcEntry || scEntry) { %>
+                <div class="section-box" style="margin-top: 30px;">
+                    <h2>Featured Audio</h2>
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <% if (mcEntry) { %>
+                            <% 
+                                let mcPath = "/";
+                                try {
+                                    const mcUrl = new URL(mcEntry[1]);
+                                    mcPath = mcUrl.pathname;
+                                    if (!mcPath.endsWith('/')) mcPath += '/';
+                                } catch (e) { mcPath = mcEntry[1]; }
+                            %>
+                            <iframe width="100%" height="120" src="https://www.mixcloud.com/widget/iframe/?hide_cover=1&light=0&feed=<%= encodeURIComponent(mcPath) %>" 
+                                frameborder="0" 
+                                allow="autoplay; encrypted-media; picture-in-picture"
+                                loading="lazy"
+                                style="border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: #111;">
+                            </iframe>
+                        <% } %>
+
+                        <% if (scEntry) { %>
+                            <iframe width="100%" height="166" scrolling="no" frameborder="no" 
+                                allow="autoplay; encrypted-media; picture-in-picture" 
+                                loading="lazy"
+                                src="https://w.soundcloud.com/player/?url=<%= encodeURIComponent(scEntry[1]) %>&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false"
+                                style="border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: #111;">
+                            </iframe>
+                        <% } %>
+                    </div>
+                </div>
+            <% } %>
         </div>
     </div>
+
+    <% if (twEntry) { 
+        let twChannel = null;
+        try { 
+            const url = new URL(twEntry[1]);
+            const parts = url.pathname.split('/').filter(p => p);
+            if (parts.length > 0) twChannel = parts[0];
+        } catch(e){}
+        if (twChannel) {
+    %>
+        <div class="performer-container" style="margin-top: 0; margin-bottom: 60px; display: block;">
+            <div class="section-box">
+                <h2>Twitch Stream</h2>
+                <div style="aspect-ratio: 16/9; width: 100%; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+                    <iframe src="https://player.twitch.tv/?channel=<%= twChannel %>&parent=localhost&parent=clubfurn.com&muted=true&autoplay=false" 
+                        height="100%" width="100%" frameborder="0" scrolling="no" 
+                        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                        loading="lazy">
+                    </iframe>
+                </div>
+            </div>
+        </div>
+    <% } } %>
 
     <script src="/cdn/js/theme-engine.js"></script>
     <script>

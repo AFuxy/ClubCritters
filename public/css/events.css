@@ -2,20 +2,66 @@
    Club FuRN - SPECIAL EVENT THEMES
    ========================================= */
 
-/* LOGO GLOW EFFECTS (BASE) */
-.logo:not(.custom-logo) {
-    filter: drop-shadow(0 0 15px var(--primary-blue));
-    animation: theme-logo-pulse 3s infinite alternate ease-in-out;
+/* LOGO CONTAINER - Handles the Glow Aura */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    filter: drop-shadow(0 0 20px rgba(0,0,0,0)); /* Base */
+    animation: theme-container-glow 8s infinite alternate ease-in-out;
 }
 
-@keyframes theme-logo-pulse {
+/* THE COLORED LOGO - Uses Masking to 'Fill' the white image */
+.logo:not(.custom-logo), .nav-logo {
+    /* 1. Hide the white image pixels */
+    content: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"); 
+    
+    /* 2. Fill with Brand Gradient - Horizontal for clean look */
+    background: linear-gradient(90deg, #ff7b2e, #f2008d, #7e00fc, #08ec7a, #f16cf2, #ff7b2e);
+    background-size: 200% 100%;
+    
+    /* 3. Shape it with the Logo Mask */
+    -webkit-mask: url('/cdn/logos/club/Logo.png') no-repeat center / contain;
+    mask: url('/cdn/logos/club/Logo.png') no-repeat center / contain;
+
+    /* 4. Contrast Outline - Makes it pop against the glow */
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.8)) drop-shadow(0 0 2px rgba(0,0,0,0.5));
+
+    /* 5. Animation for the 'Liquid' fill movement */
+    animation: 
+        logo-liquid-flow 10s linear infinite,
+        theme-logo-breathe 8s infinite alternate ease-in-out;
+
+    width: 200px;
+    height: 200px;
+    display: block;
+}
+
+@keyframes logo-liquid-flow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+@keyframes theme-logo-breathe {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.04); }
+}
+
+@keyframes theme-container-glow {
     0% {
-        filter: drop-shadow(0 0 10px var(--primary-blue));
-        transform: scale(1);
+        filter: drop-shadow(0 0 15px var(--primary-orange)) drop-shadow(0 0 30px rgba(255, 123, 46, 0.3));
+    }
+    25% {
+        filter: drop-shadow(0 0 18px var(--primary-pink)) drop-shadow(0 0 35px rgba(242, 0, 141, 0.3));
+    }
+    50% {
+        filter: drop-shadow(0 0 22px var(--primary-purple)) drop-shadow(0 0 40px rgba(126, 0, 252, 0.3));
+    }
+    75% {
+        filter: drop-shadow(0 0 18px var(--primary-green)) drop-shadow(0 0 35px rgba(8, 236, 122, 0.3));
     }
     100% {
-        filter: drop-shadow(0 0 25px var(--primary-purple));
-        transform: scale(1.02);
+        filter: drop-shadow(0 0 15px var(--primary-magenta)) drop-shadow(0 0 30px rgba(241, 108, 242, 0.3));
     }
 }
 

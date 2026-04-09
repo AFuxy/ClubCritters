@@ -165,7 +165,7 @@ function renderCards(members, container) {
         card.onclick = () => window.location.href = `/performer/${member.discordId}`;
 
         card.innerHTML = `
-            <img src="${member.imageUrl || '/cdn/logos/club/HeadOnly.png'}" alt="${member.name}" class="dj-img">
+            <img src="${member.imageUrl || '/cdn/logos/club/Logo.png'}" alt="${member.name}" class="dj-img">
             <div class="dj-content">
                 <div class="dj-header"><h3>${member.name} ${playingBadge}</h3></div>
                 <span class="genre">${member.title || member.type}</span>

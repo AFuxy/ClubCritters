@@ -53,7 +53,7 @@ async function initFlyer() {
             let baseTime = timeRaw.split('-')[0].trim(); 
             const displayTime = applyTimezone(baseTime, offset);
             const genre = item.genre || ""; 
-            const imgUrl = item.performer.image || "/cdn/logos/club/HeadOnly.png";
+            const imgUrl = item.performer.image || "/cdn/logos/club/Logo.png";
 
             const alignClass = (i % 2 === 0) ? 'logo-is-right' : 'logo-is-left';
 
