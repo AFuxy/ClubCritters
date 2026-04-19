@@ -273,8 +273,7 @@ async function createApplicationTicket(submission, slot) {
         const channelName = `${appType}-${username}`.toLowerCase().replace(/[^\w-]/g, '');
 
         const channel = await guild.channels.create({
-            name: channelName, type: ChannelType.GuildText, parent: categoryId,
-            permissionOverwrites: [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }],
+            name: channelName, type: ChannelType.GuildText, parent: categoryId
         });
         await submission.update({ channelId: channel.id });
 
