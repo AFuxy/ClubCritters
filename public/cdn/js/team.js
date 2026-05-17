@@ -157,6 +157,9 @@ function renderCards(members, container) {
         const playingBadge = isActive ? `<span class="live-tag">ON AIR <div class="visualizer"><div class="viz-bar"></div><div class="viz-bar"></div><div class="viz-bar"></div></div></span>` : '';
         
         const processedColor = processColorValue(member.colorStyle);
+        const nameColor = processedColor || 'inherit';
+        const coloredName = `<span class="b2b-name-inline" style="--dj-color: ${nameColor}">${member.name}</span>`;
+
         const card = document.createElement('div');
         card.className = `dj-card ${isActive ? 'dj-active' : ''}`;
         if (processedColor) card.style.setProperty('--accent-color', processedColor);
@@ -167,7 +170,7 @@ function renderCards(members, container) {
         card.innerHTML = `
             <img src="${member.imageUrl || '/cdn/logos/club/Logo.png'}" alt="${member.name}" class="dj-img">
             <div class="dj-content">
-                <div class="dj-header"><h3>${member.name} ${playingBadge}</h3></div>
+                <div class="dj-header"><h3>${coloredName} ${playingBadge}</h3></div>
                 <span class="genre">${member.title || member.type}</span>
                 ${linksHtml}
             </div>`;

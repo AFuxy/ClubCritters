@@ -39,7 +39,19 @@ router.get('/performer/:id', async (req, res) => {
         performer.links = safeParseJSON(performer.links);
 
         const settings = await Settings.findOne();
-        const scheduleItem = await Schedule.findOne({ where: { performerId: performer.discordId }, include: [Roster] });
+        
+        // Find if they are in the current schedule (either as primary or in a B2B)
+        const { Op } = require('sequelize');
+        const scheduleItem = await Schedule.findOne({ 
+            include: [
+                { model: Roster },
+                { model: Roster, as: 'performers', where: { discordId: performer.discordId } }
+            ]
+        }).catch(() => {
+            // Fallback if the association where clause fails to find anything
+            return Schedule.findOne({ where: { performerId: performer.discordId }, include: [Roster] });
+        });
+
         let liveStatus = null; let activeSlot = null;
         if (settings && !settings.forceOffline && scheduleItem) {
             const now = new Date(); const start = new Date(settings.eventStartTime); const end = new Date(settings.eventEndTime);
@@ -87,30 +99,61 @@ router.get('/api/public/settings', async (req, res) => { try { const settings = 
 router.get('/api/public/schedule', async (req, res) => { 
     try { 
         const schedule = await Schedule.findAll({ 
-            include: [{ model: Roster, attributes: ['name', 'useDiscordName', 'colorStyle', 'imageUrl', 'links', 'discordId'] }], 
+            include: [
+                { model: Roster, attributes: ['name', 'useDiscordName', 'colorStyle', 'imageUrl', 'links', 'discordId'] },
+                { model: Roster, as: 'performers', attributes: ['name', 'useDiscordName', 'colorStyle', 'imageUrl', 'links', 'discordId'] }
+            ], 
             order: [['createdAt', 'ASC']] 
         }); 
         const mapped = await Promise.all(schedule.map(async item => { 
-            let displayName = item.Roster.name; 
-            if (item.Roster.useDiscordName) { 
-                const member = await getGuildMember(item.performerId); 
-                if (member) displayName = member.nickname; 
-            } 
-            return { 
-                id: item.id, 
-                timeSlot: item.timeSlot, 
-                genre: item.genre, 
-                performer: { 
+            // Fallback for single performer (legacy or primary)
+            let primaryPerformer = null;
+            if (item.Roster) {
+                let displayName = item.Roster.name; 
+                if (item.Roster.useDiscordName) { 
+                    const member = await getGuildMember(item.performerId); 
+                    if (member) displayName = member.nickname; 
+                } 
+                primaryPerformer = { 
                     discordId: item.Roster.discordId, 
                     name: displayName, 
                     color: item.Roster.colorStyle, 
                     image: item.Roster.imageUrl, 
                     links: safeParseJSON(item.Roster.links) 
-                } 
+                };
+            }
+
+            // Map multiple performers
+            const performers = await Promise.all((item.performers || []).map(async p => {
+                let pName = p.name;
+                if (p.useDiscordName) {
+                    const member = await getGuildMember(p.discordId);
+                    if (member) pName = member.nickname;
+                }
+                return {
+                    discordId: p.discordId,
+                    name: pName,
+                    color: p.colorStyle,
+                    image: p.imageUrl,
+                    links: safeParseJSON(p.links)
+                };
+            }));
+
+            return { 
+                id: item.id, 
+                timeSlot: item.timeSlot, 
+                genre: item.genre,
+                b2bName: item.b2bName,
+                b2bLogo: item.b2bLogo,
+                performer: primaryPerformer || (performers.length > 0 ? performers[0] : null),
+                performers: performers
             }; 
         })); 
         res.json(mapped); 
-    } catch (err) { res.status(500).json({ error: 'Failed' }); } 
+    } catch (err) { 
+        console.error("Public Schedule Error:", err);
+        res.status(500).json({ error: 'Failed' }); 
+    } 
 });
 
 router.get('/api/public/roster', async (req, res) => { 

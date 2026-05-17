@@ -42,7 +42,14 @@ const Schedule = sequelize.define('Schedule', {
         references: { model: Roster, key: 'discordId' }
     },
     timeSlot: { type: DataTypes.STRING }, // e.g. '20:00 - 21:00'
-    genre: { type: DataTypes.STRING }
+    genre: { type: DataTypes.STRING },
+    b2bName: { type: DataTypes.STRING }, // Optional name for B2B groups
+    b2bLogo: { type: DataTypes.STRING }  // Optional logo for B2B groups
+});
+
+// Join table for B2B support (Multiple performers per slot)
+const SchedulePerformers = sequelize.define('SchedulePerformers', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true }
 });
 
 // 4. Archives (Sets)
@@ -142,6 +149,10 @@ const InstanceVisitor = sequelize.define('InstanceVisitor', {
 // Relationships
 Roster.hasMany(Schedule, { foreignKey: 'performerId' });
 Schedule.belongsTo(Roster, { foreignKey: 'performerId' });
+
+// B2B Many-to-Many
+Schedule.belongsToMany(Roster, { through: SchedulePerformers, as: 'performers', foreignKey: 'scheduleId' });
+Roster.belongsToMany(Schedule, { through: SchedulePerformers, foreignKey: 'performerId' });
 
 Roster.hasMany(Archive, { foreignKey: 'performerId' });
 Archive.belongsTo(Roster, { foreignKey: 'performerId' });

@@ -48,12 +48,35 @@ async function initFlyer() {
         flyerLines.innerHTML = '';
         
         schedule.forEach((item, i) => {
-            const name = item.performer.name;
+            const hasPerformers = item.performers && item.performers.length > 0;
+            const isB2B = item.performers && item.performers.length > 1;
+            
+            let displayName = item.b2bName;
+            if (!displayName) {
+                if (isB2B) displayName = item.performers.map(p => p.name).join(' B2B ');
+                else displayName = item.performer ? item.performer.name : 'Unknown';
+            }
+            
             const timeRaw = item.timeSlot || "";
             let baseTime = timeRaw.split('-')[0].trim(); 
             const displayTime = applyTimezone(baseTime, offset);
             const genre = item.genre || ""; 
-            const imgUrl = item.performer.image || "/cdn/logos/club/Logo.png";
+            
+            // Handle Logos (Group logo or side-by-side logos)
+            let logoHtml = '';
+            if (item.b2bLogo) {
+                logoHtml = `<img src="${item.b2bLogo}" class="dj-logo-img" crossorigin="anonymous">`;
+            } else if (isB2B) {
+                logoHtml = `<div style="display: flex; gap: 8px; align-items: center; justify-content: center;">`;
+                item.performers.forEach((p, idx) => {
+                    const size = item.performers.length > 2 ? 60 : 80;
+                    logoHtml += `<img src="${p.image}" class="dj-logo-img" style="width: ${size}px; height: ${size}px; border: 2px solid rgba(255,255,255,0.2); margin: 0;" crossorigin="anonymous">`;
+                });
+                logoHtml += `</div>`;
+            } else {
+                const imgUrl = (item.performer ? item.performer.image : null) || "/cdn/logos/club/Logo.png";
+                logoHtml = `<img src="${imgUrl}" class="dj-logo-img" crossorigin="anonymous">`;
+            }
 
             const alignClass = (i % 2 === 0) ? 'logo-is-right' : 'logo-is-left';
 
@@ -61,11 +84,11 @@ async function initFlyer() {
                 <div class="flyer-row ${alignClass}">
                     <div class="dj-info-container">
                         <span class="flyer-time">${displayTime} ${tzLabel}</span>
-                        <span class="flyer-dj">${name}</span>
+                        <span class="flyer-dj" style="${displayName.length > 20 ? 'font-size: 1.5rem;' : ''}">${displayName}</span>
                         <span class="flyer-genre">${genre}</span>
                     </div>
                     <div class="dj-logo-container">
-                        <img src="${imgUrl}" class="dj-logo-img" crossorigin="anonymous">
+                        ${logoHtml}
                     </div>
                 </div>
             `;

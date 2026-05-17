@@ -35,16 +35,29 @@
         <% const canManage = userType.includes('host') || userType.includes('owner'); %>
 
         <% if (canManage) { %>
-            <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Start typing a name to see suggestions. Both DJs and Staff can be added.</p>
+            <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Search and add multiple performers for B2B sets. Both DJs and Staff can be added.</p>
             
             <div id="add-form" class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
-                <div class="form-group">
-                    <label>Search Performer Name</label>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Search & Add Performers</label>
                     <div class="autocomplete-container">
                         <input type="text" id="dj-search" placeholder="Type name..." autocomplete="off">
                         <div id="search-results" class="autocomplete-results"></div>
                     </div>
+                    <div id="selected-performers" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                        <!-- Selected performers as chips -->
+                    </div>
                 </div>
+
+                <div class="form-group">
+                    <label>B2B Group Name (Optional)</label>
+                    <input type="text" id="b2b-name" placeholder="e.g. Dynamic Duo">
+                </div>
+                <div class="form-group">
+                    <label>B2B Group Logo URL (Optional)</label>
+                    <input type="text" id="b2b-logo" placeholder="https://...">
+                </div>
+
                 <div class="form-group">
                     <label>Time Slot (UTC)</label>
                     <input type="text" id="time-slot" placeholder="20:00 - 21:00">
@@ -53,7 +66,7 @@
                     <label>Genre</label>
                     <input type="text" id="genre-input" placeholder="House / Trance">
                 </div>
-                <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px;">
+                <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px; grid-column: span 2;">
                     <button id="add-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addToSchedule()">Add to Lineup</button>
                     <button id="cancel-edit-btn" class="btn-cc btn-danger btn-small" style="margin: 0; display: none;" onclick="cancelEdit()">Cancel</button>
                 </div>
@@ -75,9 +88,12 @@
 <script>
     const djSearch = document.getElementById('dj-search');
     const searchResults = document.getElementById('search-results');
+    const selectedContainer = document.getElementById('selected-performers');
     const scheduleList = document.getElementById('schedule-list');
     const timeInput = document.getElementById('time-slot');
     const genreInput = document.getElementById('genre-input');
+    const b2bNameInput = document.getElementById('b2b-name');
+    const b2bLogoInput = document.getElementById('b2b-logo');
     const addBtn = document.getElementById('add-btn');
     const cancelEditBtn = document.getElementById('cancel-edit-btn');
     const managerTitle = document.getElementById('manager-title');
@@ -85,7 +101,7 @@
     const canManage = <%= canManage %>;
 
     let allMembers = [];
-    let selectedMemberId = null;
+    let selectedPerformers = []; // Array of {id, name}
     let editModeId = null;
 
     function parseColor(val) {
@@ -115,10 +131,13 @@
                 searchResults.style.display = 'none';
                 return;
             }
-            const filtered = allMembers.filter(m => m.name.toLowerCase().includes(query));
+            const filtered = allMembers.filter(m => 
+                m.name.toLowerCase().includes(query) && 
+                !selectedPerformers.some(p => p.id === m.discordId)
+            );
             if (filtered.length > 0) {
                 searchResults.innerHTML = filtered.map(m => `
-                    <div class="result-item" onclick="selectMember('${m.discordId}', '${m.name}')">
+                    <div class="result-item" onclick="addPerformerChip('${m.discordId}', '${m.name}')">
                         ${m.name} <span>(${m.type})</span>
                     </div>
                 `).join('');
@@ -129,10 +148,25 @@
         });
     }
 
-    function selectMember(id, name) {
-        selectedMemberId = id;
-        djSearch.value = name;
+    function addPerformerChip(id, name) {
+        selectedPerformers.push({id, name});
+        djSearch.value = '';
         searchResults.style.display = 'none';
+        renderChips();
+    }
+
+    function removePerformerChip(id) {
+        selectedPerformers = selectedPerformers.filter(p => p.id !== id);
+        renderChips();
+    }
+
+    function renderChips() {
+        selectedContainer.innerHTML = selectedPerformers.map(p => `
+            <div class="nav-pill-cc" style="display: flex; align-items: center; gap: 8px; background: rgba(41, 197, 246, 0.1); border-color: var(--primary-blue); color: #fff; padding: 5px 12px;">
+                ${p.name}
+                <span onclick="removePerformerChip('${p.id}')" style="cursor: pointer; opacity: 0.6; font-size: 1.2rem;">&times;</span>
+            </div>
+        `).join('');
     }
 
     document.addEventListener('click', (e) => {
@@ -146,20 +180,39 @@
             const res = await fetch('/api/schedule');
             const schedule = await res.json();
             
+            // Store schedule globally so we can access it by ID for editing
+            window.currentSchedule = schedule;
+
             if (schedule.length === 0) {
                 scheduleList.innerHTML = '<li style="color: #666; text-align: center; padding: 20px;">No DJs scheduled yet.</li>';
                 return;
             }
 
             scheduleList.innerHTML = schedule.map(item => {
-                const accent = parseColor(item.Roster.colorStyle);
+                const hasPerformers = item.performers && item.performers.length > 0;
+                const isB2B = item.performers && item.performers.length > 1;
+                
+                // Improved name logic: prefer b2bName, then joined performer names, then primary roster name, then "Unknown"
+                let displayName = item.b2bName;
+                if (!displayName) {
+                    if (hasPerformers) displayName = item.performers.map(p => p.name).join(' B2B ');
+                    else if (item.Roster) displayName = item.Roster.name;
+                    else displayName = 'Unknown Performer';
+                }
+
+                // Accent color: prefer primary roster, then first performer, then default
+                let colorVal = null;
+                if (item.Roster && item.Roster.colorStyle) colorVal = item.Roster.colorStyle;
+                else if (hasPerformers && item.performers[0].colorStyle) colorVal = item.performers[0].colorStyle;
+                
+                const accent = parseColor(colorVal);
                 const isGradient = accent.includes('gradient');
                 
                 let controls = '';
                 if (canManage) {
                     controls = `
                     <div style="display: flex; gap: 10px; align-items: center; padding-right: 10px;">
-                        <button class="btn-cc btn-small btn-dark" onclick="startEdit(${item.id}, '${item.timeSlot}', '${item.genre}')">Edit</button>
+                        <button class="btn-cc btn-small btn-dark" onclick="startEdit(${item.id})">Edit</button>
                         <button class="btn-cc btn-small btn-danger" onclick="deleteSlot(${item.id})">Remove</button>
                     </div>`;
                 }
@@ -168,14 +221,16 @@
                 <li class="schedule-item" style="--sidebar-color: ${accent};">
                     <div style="flex: 1; min-width: 200px; padding-left: 15px;">
                         <span style="display: block; font-weight: bold; color: var(--primary-blue); font-size: 0.85rem;">${item.timeSlot}</span>
-                        <span style="font-size: 1.2rem; font-weight: 900; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent}; display: inline-block;">${item.Roster.name}</span>
+                        <span style="font-size: 1.2rem; font-weight: 900; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent}; display: inline-block;">${displayName}</span>
                         <span style="color: #888; font-size: 0.85rem; display: block;">${item.genre}</span>
+                        ${isB2B && item.b2bName ? `<span style="font-size: 0.7rem; color: #666; display: block;">${item.performers.map(p => p.name).join(' & ')}</span>` : ''}
                     </div>
                     ${controls}
                 </li>
                 `;
             }).join('');
         } catch (e) {
+            console.error(e);
             scheduleList.innerHTML = '<li style="color: var(--accent-red); text-align: center; padding: 20px;">Error loading schedule.</li>';
         }
     }
@@ -183,23 +238,27 @@
     async function addToSchedule() {
         if (!canManage) return;
         if (editModeId) return finishEdit();
-        if (!selectedMemberId) {
-            const match = allMembers.find(m => m.name.toLowerCase() === djSearch.value.trim().toLowerCase());
-            if (match) selectedMemberId = match.discordId;
-        }
-        if (!selectedMemberId) return showNotify('Please select a valid user from the suggestions!', 'error');
+        
+        if (selectedPerformers.length === 0) return showNotify('Please select at least one performer!', 'error');
         if (!timeInput.value.trim()) return showNotify('Please enter a Time Slot!', 'error');
+
         try {
             const res = await fetch('/api/schedule/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ performerId: selectedMemberId, timeSlot: timeInput.value.trim(), genre: genreInput.value.trim() })
+                body: JSON.stringify({ 
+                    performerIds: selectedPerformers.map(p => p.id), 
+                    timeSlot: timeInput.value.trim(), 
+                    genre: genreInput.value.trim(),
+                    b2bName: b2bNameInput.value.trim(),
+                    b2bLogo: b2bLogoInput.value.trim()
+                })
             });
             if (res.ok) {
                 showNotify(`Added to the lineup!`);
-                djSearch.value = ''; timeInput.value = ''; genreInput.value = ''; selectedMemberId = null;
+                cancelEdit();
                 renderSchedule();
-            } else { showNotify('Failed to add DJ to database.', 'error'); }
+            } else { showNotify('Failed to add to database.', 'error'); }
         } catch (e) { showNotify('Network error occurred.', 'error'); }
     }
 
@@ -212,26 +271,46 @@
         } catch (e) { showNotify('Error deleting slot', 'error'); }
     }
 
-    function startEdit(id, time, genre) {
+    function startEdit(id) {
         if (!canManage) return;
+        const item = window.currentSchedule.find(s => s.id === id);
+        if (!item) return;
+
         editModeId = id;
-        timeInput.value = time;
-        genreInput.value = genre;
+        timeInput.value = item.timeSlot || '';
+        genreInput.value = item.genre || '';
+        b2bNameInput.value = item.b2bName || '';
+        b2bLogoInput.value = item.b2bLogo || '';
+        
+        selectedPerformers = (item.performers || []).map(p => ({
+            id: p.discordId,
+            name: p.name
+        }));
+        
+        renderChips();
+
         managerTitle.innerText = "Editing Slot";
         addBtn.innerText = "Save Changes";
         cancelEditBtn.style.display = "inline-block";
-        djSearch.disabled = true;
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async function finishEdit() {
         if (!canManage) return;
         if (!timeInput.value.trim()) return showNotify('Time slot cannot be empty!', 'error');
+        if (selectedPerformers.length === 0) return showNotify('Please select at least one performer!', 'error');
+
         try {
             const res = await fetch(`/api/schedule/${editModeId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ timeSlot: timeInput.value.trim(), genre: genreInput.value.trim() })
+                body: JSON.stringify({ 
+                    timeSlot: timeInput.value.trim(), 
+                    genre: genreInput.value.trim(),
+                    b2bName: b2bNameInput.value.trim(),
+                    b2bLogo: b2bLogoInput.value.trim(),
+                    performerIds: selectedPerformers.map(p => p.id)
+                })
             });
             if (res.ok) { showNotify('Slot updated successfully!'); cancelEdit(); renderSchedule(); }
         } catch (e) { showNotify('Error updating slot', 'error'); }
@@ -239,7 +318,9 @@
 
     function cancelEdit() {
         editModeId = null;
-        timeInput.value = ''; genreInput.value = ''; djSearch.value = ''; djSearch.disabled = false; selectedMemberId = null;
+        timeInput.value = ''; genreInput.value = ''; djSearch.value = ''; b2bNameInput.value = ''; b2bLogoInput.value = '';
+        selectedPerformers = [];
+        renderChips();
         managerTitle.innerText = "Live Lineup Manager";
         addBtn.innerText = "Add to Lineup";
         cancelEditBtn.style.display = "none";

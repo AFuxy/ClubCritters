@@ -184,6 +184,19 @@ function processSettings(data) {
 //          HELPER FUNCTIONS
 // ==========================================
 
+function flattenColors(colorArr) {
+    let flat = [];
+    colorArr.forEach(c => {
+        if (!c) return;
+        if (c.startsWith('[') && c.endsWith(']')) {
+            flat.push(...c.slice(1, -1).split(',').map(s => s.trim()));
+        } else {
+            flat.push(c);
+        }
+    });
+    return flat;
+}
+
 function processDjTime(timeStr) {
     if (!timeStr || !eventStartTime) return null;
     const times = timeStr.match(/(\d{1,2}):(\d{2})/g);
@@ -475,7 +488,21 @@ function renderEventView(isLive) {
         const timeData = processDjTime(item.timeSlot);
         const isActive = (isLive && timeData && now >= timeData.startObj && now < timeData.endObj);
         
-        const processedColor = processColorValue(item.performer.color);
+        const performers = item.performers || [];
+        const isB2B = performers.length > 1;
+        const displayName = item.b2bName || (isB2B ? performers.map(p => p.name).join(' B2B ') : (item.performer ? item.performer.name : 'Unknown'));
+        
+        // Handle Color Style
+        let colorVal = item.performer ? item.performer.color : null;
+        if (isB2B) {
+            const allColors = performers.map(p => p.color).filter(Boolean);
+            if (allColors.length > 0) {
+                const flatColors = flattenColors(allColors);
+                if (flatColors.length === 1) colorVal = flatColors[0];
+                else colorVal = `[${flatColors.join(', ')}]`;
+            }
+        }
+        let processedColor = processColorValue(colorVal);
 
         if (isActive) {
             updateSiteTheme(processedColor);
@@ -483,32 +510,80 @@ function renderEventView(isLive) {
         
         let shareButton = '';
         if (isActive) {
-            const safeShareText = shareMessageTemplate.replace("{dj}", item.performer.name).replace("{genre}", item.genre).replace(/'/g, "\\'");
+            const shareDjName = item.b2bName || (performers.length > 0 ? performers.map(p => p.name).join(' & ') : (item.performer ? item.performer.name : 'Unknown'));
+            const safeShareText = shareMessageTemplate.replace("{dj}", shareDjName).replace("{genre}", item.genre).replace(/'/g, "\\'");
             shareButton = `<button class="btn-cc btn-small btn-dark" onclick="copyToClipboard('${safeShareText}', this)">🔗 Share</button>`;
         }
         
         const liveTag = isActive ? `<span class="live-tag">ON AIR <div class="visualizer"><div class="viz-bar"></div><div class="viz-bar"></div><div class="viz-bar"></div></div></span>` : '';
         
-        const links = item.performer.links || {};
-        let linksHtml = Object.keys(links).length > 0 ? '<div class="social-tags">' + Object.keys(links).map(k => `<a href="${links[k]}" target="_blank" class="social-tag" onclick="trackSocialClick(event, '${item.performer.discordId}')">${k}</a>`).join('') + '</div>' : '';
+        // --- LOGO RENDERING (OPTION B: FLOATING ROW) ---
+        let logoHtml = '';
+        let floatingRowHtml = '';
+        
+        if (item.b2bLogo) {
+            logoHtml = `<img src="${item.b2bLogo}" alt="${displayName}" class="dj-img">`;
+        } else if (isB2B) {
+            // Option B: No left logo, horizontal row instead
+            floatingRowHtml = `<div class="b2b-floating-row">` + 
+                performers.map(p => `<img src="${p.image}" class="b2b-float-img" title="${p.name}">`).join('') + 
+                `</div>`;
+        } else {
+            logoHtml = `<img src="${item.performer ? item.performer.image : '/cdn/logos/club/Logo.png'}" alt="${displayName}" class="dj-img">`;
+        }
+
+        // --- TITLE RENDERING (BETTER SEPARATION) ---
+        let displayNameHtml = '';
+        if (item.b2bName) {
+            displayNameHtml = `<span class="b2b-group-title">${item.b2bName}</span>`;
+        } else if (isB2B) {
+            displayNameHtml = performers.map((p, idx) => {
+                const color = processColorValue(p.color) || 'inherit';
+                return `<span class="b2b-name-inline" style="--dj-color: ${color}">${p.name}</span>`;
+            }).join(' <span class="b2b-label-sep">B2B</span> ');
+        } else if (item.performer) {
+            const color = processColorValue(item.performer.color) || 'inherit';
+            displayNameHtml = `<span class="b2b-name-inline" style="--dj-color: ${color}">${item.performer.name}</span>`;
+        } else {
+            displayNameHtml = 'Unknown';
+        }
+
+        // B2B Members area
+        let membersHtml = '';
+        if (isB2B) {
+            membersHtml = `<div class="b2b-members">` + performers.map(p => {
+                const links = p.links || {};
+                const pLinksHtml = Object.keys(links).map(k => `<a href="${links[k]}" target="_blank" class="social-tag b2b-mini-link" onclick="trackSocialClick(event, '${p.discordId}')" title="${k}">${k}</a>`).join('');
+                return `<div class="b2b-member">
+                    <img src="${p.image}" class="b2b-mini-img">
+                    <span class="b2b-mini-name">${p.name}</span>
+                    <div class="social-tags" style="margin-top: 0; display: inline-flex; gap: 4px;">${pLinksHtml}</div>
+                </div>`;
+            }).join('') + `</div>`;
+        } else if (item.performer) {
+            const links = item.performer.links || {};
+            const linksHtml = Object.keys(links).length > 0 ? '<div class="social-tags">' + Object.keys(links).map(k => `<a href="${links[k]}" target="_blank" class="social-tag" onclick="trackSocialClick(event, '${item.performer.discordId}')">${k}</a>`).join('') + '</div>' : '';
+            membersHtml = linksHtml;
+        }
 
         const card = document.createElement('div');
-        card.className = `dj-card ${isActive ? 'dj-active' : ''}`; 
+        card.className = `dj-card ${isActive ? 'dj-active' : ''} ${isB2B ? 'dj-card-b2b' : ''}`; 
         
         if (processedColor) card.style.setProperty('--accent-color', processedColor);
 
         card.innerHTML = `
-            <img src="${item.performer.image}" alt="${item.performer.name}" class="dj-img">
+            ${logoHtml}
             <div class="dj-content">
+                ${floatingRowHtml}
                 <div class="dj-header">
-                    <h3>${item.performer.name} ${liveTag}</h3>
+                    <h3>${displayNameHtml} ${liveTag}</h3>
                     <div style="display:flex; align-items:center; gap:10px;">
                         ${shareButton}
                         <span class="time">${timeData ? timeData.displayString : item.timeSlot}</span>
                     </div>
                 </div>
                 <span class="genre">${item.genre}</span>
-                ${linksHtml}
+                ${membersHtml}
             </div>
         `;
         djContainer.appendChild(card);

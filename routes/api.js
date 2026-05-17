@@ -205,17 +205,42 @@ router.post('/settings/update', isStaff, async (req, res) => {
 // --- SCHEDULE ROUTES ---
 router.get('/schedule', async (req, res) => {
     try {
-        const schedule = await Schedule.findAll({ include: [Roster], order: [['createdAt', 'ASC']] });
+        const schedule = await Schedule.findAll({ 
+            include: [
+                { model: Roster }, 
+                { model: Roster, as: 'performers' }
+            ], 
+            order: [['createdAt', 'ASC']] 
+        });
         res.json(schedule);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
 router.post('/schedule/add', isHostOrOwner, async (req, res) => {
     try {
-        const { performerId, timeSlot, genre } = req.body;
-        await Schedule.create({ performerId, timeSlot, genre });
+        const { performerId, performerIds, timeSlot, genre, b2bName, b2bLogo } = req.body;
+        
+        // performerId is still supported for single DJ (legacy/fallback)
+        const slot = await Schedule.create({ 
+            performerId: performerId || (performerIds && performerIds.length === 1 ? performerIds[0] : null), 
+            timeSlot, 
+            genre,
+            b2bName,
+            b2bLogo
+        });
+
+        // Handle multiple performers for B2B
+        if (performerIds && Array.isArray(performerIds) && performerIds.length > 0) {
+            await slot.setPerformers(performerIds);
+        } else if (performerId) {
+            await slot.setPerformers([performerId]);
+        }
+
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) { 
+        console.error("Schedule Add Error:", err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 router.post('/schedule/clear', isHostOrOwner, async (req, res) => {
@@ -234,8 +259,22 @@ router.delete('/schedule/:id', isHostOrOwner, async (req, res) => {
 
 router.patch('/schedule/:id', isHostOrOwner, async (req, res) => {
     try {
-        const { timeSlot, genre } = req.body;
-        await Schedule.update({ timeSlot, genre }, { where: { id: req.params.id } });
+        const { timeSlot, genre, b2bName, b2bLogo, performerIds } = req.body;
+        const slot = await Schedule.findByPk(req.params.id);
+        if (!slot) return res.status(404).json({ error: 'Slot not found' });
+
+        await slot.update({ 
+            timeSlot, 
+            genre,
+            b2bName,
+            b2bLogo,
+            performerId: (performerIds && performerIds.length === 1) ? performerIds[0] : slot.performerId
+        });
+
+        if (performerIds && Array.isArray(performerIds)) {
+            await slot.setPerformers(performerIds);
+        }
+
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
