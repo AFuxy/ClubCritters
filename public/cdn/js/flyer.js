@@ -65,17 +65,17 @@ async function initFlyer() {
             // Handle Logos (Group logo or side-by-side logos)
             let logoHtml = '';
             if (item.b2bLogo) {
-                logoHtml = `<img src="${item.b2bLogo}" class="dj-logo-img" crossorigin="anonymous">`;
+                logoHtml = `<img src="${item.b2bLogo}" class="dj-logo-img" >`;
             } else if (isB2B) {
                 logoHtml = `<div style="display: flex; gap: 8px; align-items: center; justify-content: center;">`;
                 item.performers.forEach((p, idx) => {
                     const size = item.performers.length > 2 ? 60 : 80;
-                    logoHtml += `<img src="${p.image}" class="dj-logo-img" style="width: ${size}px; height: ${size}px; border: 2px solid rgba(255,255,255,0.2); margin: 0;" crossorigin="anonymous">`;
+                    logoHtml += `<img src="${p.image}" class="dj-logo-img">`;
                 });
                 logoHtml += `</div>`;
             } else {
                 const imgUrl = (item.performer ? item.performer.image : null) || "/cdn/logos/club/Logo.png";
-                logoHtml = `<img src="${imgUrl}" class="dj-logo-img" crossorigin="anonymous">`;
+                logoHtml = `<img src="${imgUrl}" class="dj-logo-img" >`;
             }
 
             const alignClass = (i % 2 === 0) ? 'logo-is-right' : 'logo-is-left';

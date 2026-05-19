@@ -554,7 +554,8 @@ h1 {
     height: 1040px;
     margin: 0 auto;
     background-image: url('../logos/club/flyer.png');
-    background-size: cover;
+    background-size: contain;
+    background-repeat: round;
     position: relative;
     font-family: 'Segoe UI', sans-serif;
     color: white;
@@ -584,7 +585,7 @@ h1 {
 /* --- HEADER --- */
 .flyer-header-area {
     position: absolute;
-    top: 13%; 
+    top: 15%; 
     width: 100%;
     text-align: center;
     z-index: 10;
@@ -607,7 +608,7 @@ h1 {
 
 #flyer-box {
     position: absolute;
-    top: 23%;
+    top: 25%;
     left: 10%;
     width: 80%;
     height: 60%;
