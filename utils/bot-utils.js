@@ -162,21 +162,30 @@ async function autoUpdateStatus(client) {
                 statusText = `🔊 Club is LIVE!${vrcStats}`;
                 statusIcon = 'online';
                 vrcPresenceStatus = 'join me'; // Blue
-                vrcPresenceDesc = `🔊 LIVE! Invite Me to join ${vrcStats}`;
+                vrcPresenceDesc = `🔊 LIVE! Invite Me to join${vrcStats}`;
             } else if (now < start) {
                 const timeDiff = start - now;
                 const totalMinutes = Math.floor(timeDiff / (1000 * 60));
                 const hours = Math.floor(totalMinutes / 60);
-                const mins = totalMinutes % 60;
 
                 statusIcon = 'online';
                 vrcPresenceStatus = 'active'; // Green
                 
-                let timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-                if (totalMinutes < 1) timeStr = "SOON";
-
-                statusText = `⏳ Starting in ${timeStr}${vrcStats}`;
-                vrcPresenceDesc = `⏳ Starts in ${timeStr} ${vrcStats}`;
+                if (hours < 48) {
+                    let timeStr = "";
+                    if (hours >= 1) {
+                        timeStr = `${hours}h`;
+                    } else if (totalMinutes >= 1) {
+                        timeStr = `${totalMinutes}m`;
+                    } else {
+                        timeStr = "SOON";
+                    }
+                    statusText = `⏳ Starting in ${timeStr}${vrcStats}`;
+                    vrcPresenceDesc = `⏳ Starts in ${timeStr}${vrcStats}`;
+                } else {
+                    statusText = `📜 Lineup is LIVE!${vrcStats}`;
+                    vrcPresenceDesc = `📜 Lineup is LIVE!${vrcStats}`;
+                }
             } else {
                 statusText = `🌙 Thanks for coming!${groupOnlineStr}`;
                 statusIcon = 'dnd';
