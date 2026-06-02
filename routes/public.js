@@ -22,6 +22,7 @@ router.get('/team', (req, res) => { res.render('team', { user: req.user || null,
 router.get('/gallery', (req, res) => { res.render('gallery', { user: req.user || null, page: 'gallery' }); });
 router.get('/apply', (req, res) => { res.render('apply', { user: req.user || null, page: 'apply' }); });
 router.get('/flyer', (req, res) => { res.render('flyer', { user: req.user || null, page: 'flyer' }); });
+router.get('/overlay', (req, res) => { res.render('overlay', { layout: false }); });
 
 router.get('/performer/:id', async (req, res) => {
     try {
@@ -335,6 +336,104 @@ router.post('/api/public/apps/submit', async (req, res) => {
     } catch (err) {
         console.error("Submission Error:", err);
         res.status(500).json({ error: 'Failed to submit application.' });
+    }
+});
+
+router.get('/api/public/overlay-data', async (req, res) => {
+    try {
+        const settings = await Settings.findOne();
+        const schedule = await Schedule.findAll({
+            include: [
+                { model: Roster, attributes: ['name', 'useDiscordName', 'colorStyle', 'imageUrl', 'links', 'discordId'] },
+                { model: Roster, as: 'performers', attributes: ['name', 'useDiscordName', 'colorStyle', 'imageUrl', 'links', 'discordId'] }
+            ],
+            order: [['createdAt', 'ASC']]
+        });
+
+        const now = new Date();
+        const start = settings ? new Date(settings.eventStartTime) : null;
+        const end = settings ? new Date(settings.eventEndTime) : null;
+
+        let currentDJ = null;
+        let upNext = [];
+
+        if (settings && !settings.forceOffline && start && end && now >= start && now < end) {
+            // Find current DJ based on timeSlot
+            for (let i = 0; i < schedule.length; i++) {
+                const item = schedule[i];
+                const times = item.timeSlot.match(/(\d{1,2}):(\d{2})/g);
+                if (times && times.length >= 2) {
+                    const djStart = new Date(start); const [sh, sm] = times[0].split(':').map(Number); djStart.setUTCHours(sh, sm, 0, 0);
+                    const djEnd = new Date(start); const [eh, em] = times[1].split(':').map(Number); djEnd.setUTCHours(eh, em, 0, 0);
+                    if (sh < start.getUTCHours() - 6) { djStart.setDate(djStart.getDate() + 1); djEnd.setDate(djEnd.getDate() + 1); } else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
+                    
+                    if (now >= djStart && now < djEnd) {
+                        currentDJ = item;
+                        // Get next 2
+                        upNext = schedule.slice(i + 1, i + 3);
+                        break;
+                    }
+                }
+            }
+        } else if (settings && start && now < start) {
+            // Pre-event: show first 2 as upNext
+            upNext = schedule.slice(0, 2);
+        }
+
+        const mapPerformer = async (item) => {
+            if (!item) return null;
+            let performers = await Promise.all((item.performers || []).map(async p => {
+                let pName = p.name;
+                if (p.useDiscordName) {
+                    const member = await getGuildMember(p.discordId);
+                    if (member) pName = member.nickname;
+                }
+                return { name: pName, color: p.colorStyle, image: p.imageUrl, links: safeParseJSON(p.links) };
+            }));
+
+            return {
+                id: item.id,
+                timeSlot: item.timeSlot,
+                genre: item.genre,
+                b2bName: item.b2bName,
+                b2bLogo: item.b2bLogo,
+                performers: performers
+            };
+        };
+
+        const mappedCurrent = await mapPerformer(currentDJ);
+        const mappedNext = await Promise.all(upNext.map(mapPerformer));
+
+        // VRC Status
+        const groupId = process.env.VRC_GROUPID || "FURN.9601";
+        const activeLogs = await InstanceLog.findAll({ where: { isActive: true } });
+        let vrcStatus = { count: 0, capacity: 0, active: activeLogs.length > 0 };
+
+        if (vrcStatus.active) {
+            for (const log of activeLogs) {
+                let vrcData = null;
+                if (log.instanceUrl && log.instanceUrl.includes("worldId=")) {
+                    vrcData = await getInstanceData(log.instanceUrl);
+                } else {
+                    const groupInstances = await getGroupInstanceData(groupId);
+                    vrcData = groupInstances.find(i => i.location === log.instanceId);
+                }
+                if (vrcData && vrcData.active) {
+                    vrcStatus.count += vrcData.count;
+                    vrcStatus.capacity += vrcData.capacity;
+                }
+            }
+        }
+
+        res.json({
+            currentDJ: mappedCurrent,
+            upNext: mappedNext,
+            vrcStatus,
+            eventTitle: settings ? settings.eventTitle : "Club FuRN"
+        });
+    } catch (err) {
+        console.error("Overlay Data Error:", err);
+        res.status(500).json({ error: 'Failed' });
     }
 });
 
