@@ -246,6 +246,63 @@
         .profile-info h1 { font-size: 2.5rem; white-space: normal; }
         .archive-row { flex-direction: column; align-items: flex-start; gap: 15px; }
     }
+
+    /* VRChat Status Badge styling */
+    .vrc-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 20px;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    .vrc-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .vrc-status-dot.pulse {
+        animation: status-pulse 1.8s infinite ease-in-out;
+    }
+
+    @keyframes status-pulse {
+        0% {
+            transform: scale(0.9);
+            box-shadow: 0 0 0 0 var(--pulse-color);
+        }
+        70% {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 6px rgba(0, 0, 0, 0);
+        }
+        100% {
+            transform: scale(0.9);
+            box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+        }
+    }
+
+    .vrc-status-text-msg {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.6);
+        font-style: italic;
+        margin-left: 10px;
+        background: rgba(255,255,255,0.03);
+        padding: 4px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.05);
+        display: inline-block;
+        vertical-align: middle;
+        max-width: 250px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 </style>
 <body style="--accent-gradient: <%= accent %>;">
 
@@ -280,6 +337,15 @@
                         </span>
                     <% } %>
                 </span>
+                
+                <% if (performer.vrcUserId) { %>
+                    <div id="vrc-status-container" style="margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span class="vrc-status-badge" style="color: #888; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                            <span class="vrc-status-dot" style="background: #888;"></span>
+                            🦊 VRChat: <%= performer.vrcDisplayName %> (Loading...)
+                        </span>
+                    </div>
+                <% } %>
             </div>
         </div>
     </div>
@@ -296,6 +362,7 @@
                 <h2>Connect</h2>
                 <div class="social-list">
                     <% const links = performer.links || {}; %>
+
                     <% if (Object.keys(links).length > 0) { %>
                         <% Object.keys(links).forEach(label => { 
                             const lowerLabel = label.toLowerCase();
@@ -470,6 +537,106 @@
             }).catch(() => {});
         }
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        async function loadVrcStatus() {
+            const container = document.getElementById('vrc-status-container');
+            if (!container) return;
+
+            try {
+                const res = await fetch('/api/public/vrc-performer-status/<%= performer.discordId %>');
+                const data = await res.json();
+
+                if (!data.linked) {
+                    container.style.display = 'none';
+                    return;
+                }
+
+                if (data.apiOffline) {
+                    container.innerHTML = `
+                        <span class="vrc-status-badge" style="color: #888; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                            <span class="vrc-status-dot" style="background: #888;"></span>
+                            🦊 VRChat: ${escapeHtml(data.displayName || '<%= performer.vrcDisplayName || "" %>')} (Offline API)
+                        </span>
+                    `;
+                    return;
+                }
+
+                if (data.error) {
+                    container.innerHTML = `
+                        <span class="vrc-status-badge" style="color: #ff5555; background: rgba(255,85,85,0.1); border: 1px solid rgba(255,85,85,0.25);">
+                            <span class="vrc-status-dot" style="background: #ff5555;"></span>
+                            🦊 VRChat: Error
+                        </span>
+                    `;
+                    return;
+                }
+
+                const status = (data.status || 'offline').toLowerCase();
+                let statusText = 'Offline';
+                let statusColor = '#888888';
+                let statusBg = 'rgba(255,255,255,0.03)';
+                let statusBorder = 'rgba(255,255,255,0.08)';
+                let pulseColor = '';
+
+                if (status === 'active' || status === 'online') {
+                    statusText = 'Online';
+                    statusColor = '#2bce73';
+                    statusBg = 'rgba(43, 206, 115, 0.1)';
+                    statusBorder = 'rgba(43, 206, 115, 0.25)';
+                    pulseColor = 'rgba(43, 206, 115, 0.4)';
+                } else if (status === 'join me') {
+                    statusText = 'Join Me';
+                    statusColor = '#00ffd5';
+                    statusBg = 'rgba(0, 255, 213, 0.1)';
+                    statusBorder = 'rgba(0, 255, 213, 0.25)';
+                    pulseColor = 'rgba(0, 255, 213, 0.4)';
+                } else if (status === 'ask me') {
+                    statusText = 'Ask Me';
+                    statusColor = '#e5a93b';
+                    statusBg = 'rgba(229, 169, 59, 0.1)';
+                    statusBorder = 'rgba(229, 169, 59, 0.25)';
+                    pulseColor = 'rgba(229, 169, 59, 0.4)';
+                } else if (status === 'busy') {
+                    statusText = 'Busy';
+                    statusColor = '#ff5353';
+                    statusBg = 'rgba(255, 83, 83, 0.1)';
+                    statusBorder = 'rgba(255, 83, 83, 0.25)';
+                    pulseColor = 'rgba(255, 83, 83, 0.4)';
+                }
+
+                const pulseClass = pulseColor ? 'pulse' : '';
+                const styleAttr = pulseColor ? `style="background: ${statusColor}; --pulse-color: ${pulseColor};"` : `style="background: ${statusColor};"`;
+
+                let tooltip = data.statusDescription ? `title="${escapeHtml(data.statusDescription)}"` : '';
+                let statusMsg = data.statusDescription ? `<span class="vrc-status-text-msg" title="${escapeHtml(data.statusDescription)}">"${escapeHtml(data.statusDescription)}"</span>` : '';
+
+                container.innerHTML = `
+                    <span class="vrc-status-badge" style="color: ${statusColor}; background: ${statusBg}; border: 1px solid ${statusBorder};" ${tooltip}>
+                        <span class="vrc-status-dot ${pulseClass}" ${styleAttr}></span>
+                        🦊 VRChat: ${escapeHtml(data.displayName)} - ${statusText}
+                    </span>
+                    ${statusMsg}
+                `;
+            } catch (e) {
+                console.error("Error loading VRChat status:", e);
+                container.innerHTML = `
+                    <span class="vrc-status-badge" style="color: #888; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                        <span class="vrc-status-dot" style="background: #888;"></span>
+                        🦊 VRChat: Status Unavailable
+                    </span>
+                `;
+            }
+        }
+
         async function initGlobal() {
             try {
                 const res = await fetch('/api/public/settings');
@@ -480,6 +647,9 @@
 
         updateLocalTime();
         initGlobal();
+        <% if (performer.vrcUserId) { %>
+            loadVrcStatus();
+        <% } %>
     </script>
 
 </body>

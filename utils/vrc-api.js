@@ -10,6 +10,10 @@ let dbCookieLoaded = false;
 let cooldownUntil = 0; 
 let lastPresence = { status: null, description: null }; 
 
+// IN-MEMORY USER INFO CACHE FOR PUBLIC PROFILE LOOKUPS
+const userInfoCache = {};
+const USER_INFO_CACHE_TTL = 120000; // 2 minutes (in milliseconds)
+
 // --- PIPELINE (WEBSOCKET) ---
 let pipeline = null;
 let pipelineConnected = false;
@@ -473,12 +477,31 @@ async function getGroupStats(groupShortName) {
  * Fetch detailed information about a user
  */
 async function getUserInfo(userId) {
+    const now = Date.now();
+    // Check cache first
+    if (userInfoCache[userId] && (now - userInfoCache[userId].timestamp < USER_INFO_CACHE_TTL)) {
+        return userInfoCache[userId].data;
+    }
+
     if (!authCookie) await loginVRC();
     if (!authCookie) return null;
     try {
         const res = await vrcFetch(`https://api.vrchat.cloud/api/1/users/${userId}`);
-        if (res.ok) return await res.json();
+        if (res.ok) {
+            const data = await res.json();
+            // Cache successful response
+            userInfoCache[userId] = {
+                data,
+                timestamp: now
+            };
+            return data;
+        }
     } catch (e) {}
+    
+    // Return stale cache if request fails (resilience)
+    if (userInfoCache[userId]) {
+        return userInfoCache[userId].data;
+    }
     return null;
 }
 

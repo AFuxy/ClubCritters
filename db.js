@@ -34,7 +34,6 @@ const Roster = sequelize.define('Roster', {
     hasMascotAccess: { type: DataTypes.BOOLEAN, defaultValue: false },
     links: { type: DataTypes.JSON }, // JSON storage for social links
     vrcUserId: { type: DataTypes.STRING, allowNull: true },
-    vrcUsername: { type: DataTypes.STRING, allowNull: true },
     vrcDisplayName: { type: DataTypes.STRING, allowNull: true }
 });
 

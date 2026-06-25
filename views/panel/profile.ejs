@@ -366,7 +366,7 @@
                 } else {
                     document.getElementById('vrc-avatar').src = data.thumbnailUrl || '/cdn/logos/club/Logo.png';
                     document.getElementById('vrc-display-name').innerText = data.displayName;
-                    document.getElementById('vrc-username').innerText = `@${data.username} (${data.id})`;
+                    document.getElementById('vrc-username').innerText = data.id;
                     
                     const rolesList = document.getElementById('vrc-roles-list');
                     if (data.roles && data.roles.length > 0) {

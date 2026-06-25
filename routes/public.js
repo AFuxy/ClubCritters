@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Roster, Settings, Schedule, Archive, Gallery, AppSlot, ApplicationSubmission, InstanceLog, sequelize } = require('../db');
 const { getGuildMember } = require('../bot');
-const { getInstanceData, getGroupInstanceData, getGroupStats } = require('../utils/vrc-api');
+const { getInstanceData, getGroupInstanceData, getGroupStats, getUserInfo, getVrcStatus } = require('../utils/vrc-api');
 
 // Helper to handle Sequelize/MySQL/MariaDB JSON parsing inconsistencies
 const safeParseJSON = (data) => {
@@ -97,6 +97,36 @@ router.get('/login-error', (req, res) => {
 // --- PUBLIC API ROUTES ---
 
 router.get('/api/public/settings', async (req, res) => { try { const settings = await Settings.findOne(); res.json(settings); } catch (err) { res.status(500).json({ error: 'Failed' }); } });
+
+router.get('/api/public/vrc-performer-status/:id', async (req, res) => {
+    try {
+        const performer = await Roster.findByPk(req.params.id);
+        if (!performer || !performer.vrcUserId) {
+            return res.json({ linked: false });
+        }
+
+        const vrcStatus = getVrcStatus();
+        if (vrcStatus !== 'Connected') {
+            return res.json({ linked: true, apiOffline: true });
+        }
+
+        const vrcUser = await getUserInfo(performer.vrcUserId);
+        if (!vrcUser) {
+            return res.json({ linked: true, error: 'User not found' });
+        }
+
+        res.json({
+            linked: true,
+            displayName: vrcUser.displayName,
+            status: vrcUser.status || 'offline',
+            statusDescription: vrcUser.statusDescription || ""
+        });
+    } catch (err) {
+        console.error("Failed to fetch performer VRC status:", err);
+        res.status(500).json({ error: 'Failed' });
+    }
+});
+
 router.get('/api/public/schedule', async (req, res) => { 
     try { 
         const schedule = await Schedule.findAll({ 
