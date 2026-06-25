@@ -77,6 +77,50 @@
         <button class="btn-cc btn-small btn-dark" style="width: auto;" onclick="addLinkRow()">+ Add Link</button>
     </div>
 
+    <!-- VRCHAT ACCOUNT LINKING -->
+    <div class="form-group" style="padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 20px; margin-bottom: 25px;">
+        <label style="color: var(--primary-purple); font-size: 1rem; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            🦊 VRChat Profile Integration
+        </label>
+        
+        <div id="vrc-loading" style="display:none; text-align: center; padding: 20px; background: rgba(0,0,0,0.1); border-radius: 10px; margin-bottom: 15px;">
+            <div class="spinner" style="margin: 0 auto 10px auto; border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--primary-purple); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite;"></div>
+            <p style="font-size: 0.85rem; color: #888; margin: 0;">Loading VRChat connection...</p>
+        </div>
+
+        <!-- LINKING FORM (Visible when no vrcUserId is set) -->
+        <div id="vrc-link-container" style="display: <%= user.vrcUserId ? 'none' : 'block' %>; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px dashed #444; margin-bottom: 15px;">
+            <p style="font-size: 0.8rem; color: #aaa; margin-top: 0; margin-bottom: 12px;">Link your VRChat account to view your details and sync group roles (e.g. Performer, Staff, VIP).</p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <input type="text" id="vrc-profile-input" placeholder="VRChat Profile URL or User ID (usr_...)" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                <button class="btn-cc btn-primary btn-small" style="width: auto; margin: 0;" onclick="linkVrcAccount()">Link Account</button>
+            </div>
+            <p style="font-size: 0.7rem; color: #666; margin-top: 5px; margin-bottom: 0;">Example: https://vrchat.com/home/user/usr_c1644b5b-3ca4-45b4-97c6-a2a0de70d469</p>
+        </div>
+
+        <!-- ACTIVE LINK (Visible when vrcUserId is set) -->
+        <div id="vrc-active-container" style="display: <%= user.vrcUserId ? 'block' : 'none' %>; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px solid rgba(179, 106, 244, 0.2); margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <img id="vrc-avatar" src="/cdn/logos/club/Logo.png" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #444;">
+                <div style="flex: 1;">
+                    <strong id="vrc-display-name" style="color: var(--primary-purple); font-size: 1.05rem;">Loading VRChat Profile...</strong>
+                    <span id="vrc-username" style="display: block; font-size: 0.75rem; color: #888; margin-top: 2px;">usr_...</span>
+                </div>
+                <div>
+                    <button class="btn-cc btn-secondary btn-small" style="margin: 0; background: rgba(179, 106, 244, 0.2); border-color: rgba(179, 106, 244, 0.4);" onclick="syncVrcRoles()">🔄 Sync Roles</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <label style="font-size: 0.75rem; color: #666; margin-bottom: 5px;">Linked Group Roles</label>
+                <div id="vrc-roles-list" style="display: flex; flex-wrap: wrap; gap: 5px;">
+                    <span style="font-size: 0.7rem; color: #555;">No roles found.</span>
+                </div>
+                <p style="font-size: 0.7rem; color: #666; margin-top: 8px; margin-bottom: 0;">Need to change your linked VRChat account? Please contact an Event Host or Owner.</p>
+            </div>
+        </div>
+    </div>
+
     <button class="btn-cc btn-primary" style="width: 100%;" onclick="saveProfile()">Save Changes</button>
     <p id="status-msg" style="margin-top: 15px; font-size: 0.9rem;"></p>
 </div>
@@ -294,6 +338,115 @@
             else showNotify("Failed to update profile.", "error");
         } catch (err) { showNotify("Network error occurred.", "error"); }
     }
+    // --- VRCHAT ACCOUNT LINKING LOGIC ---
+
+    async function loadVrcDetails() {
+        const hasVrc = "<%= user.vrcUserId ? 'yes' : 'no' %>" === 'yes' || document.getElementById('vrc-active-container').style.display === 'block';
+        if (!hasVrc) return;
+
+        const loading = document.getElementById('vrc-loading');
+        const activeContainer = document.getElementById('vrc-active-container');
+        
+        loading.style.display = 'block';
+        
+        try {
+            const res = await fetch('/api/profile/vrc-details');
+            const data = await res.json();
+            
+            loading.style.display = 'none';
+            
+            if (data.linked) {
+                activeContainer.style.display = 'block';
+                document.getElementById('vrc-link-container').style.display = 'none';
+                
+                if (data.error) {
+                    document.getElementById('vrc-display-name').innerText = 'Unresolved Account';
+                    document.getElementById('vrc-username').innerText = data.vrcUserId;
+                    document.getElementById('vrc-roles-list').innerHTML = `<span style="font-size: 0.7rem; color: var(--accent-red);">${data.error}</span>`;
+                } else {
+                    document.getElementById('vrc-avatar').src = data.thumbnailUrl || '/cdn/logos/club/Logo.png';
+                    document.getElementById('vrc-display-name').innerText = data.displayName;
+                    document.getElementById('vrc-username').innerText = `@${data.username} (${data.id})`;
+                    
+                    const rolesList = document.getElementById('vrc-roles-list');
+                    if (data.roles && data.roles.length > 0) {
+                        rolesList.innerHTML = data.roles.map(r => `
+                            <span style="font-size: 0.65rem; background: rgba(179, 106, 244, 0.15); border: 1px solid rgba(179, 106, 244, 0.4); padding: 2px 8px; border-radius: 4px; color: var(--primary-purple);">${r}</span>
+                        `).join('');
+                    } else {
+                        rolesList.innerHTML = `<span style="font-size: 0.7rem; color: #888;">In Group: ${data.inGroup ? 'Yes (No Roles)' : 'No'}</span>`;
+                    }
+                }
+            } else {
+                activeContainer.style.display = 'none';
+                document.getElementById('vrc-link-container').style.display = 'block';
+            }
+        } catch (e) {
+            loading.style.display = 'none';
+            console.error("Failed to load VRChat details:", e);
+        }
+    }
+
+    async function linkVrcAccount() {
+        const input = document.getElementById('vrc-profile-input').value.trim();
+        if (!input) return showNotify('Please enter a VRChat profile URL or User ID', 'error');
+
+        const loading = document.getElementById('vrc-loading');
+        loading.style.display = 'block';
+
+        try {
+            const res = await fetch('/api/profile/link-vrc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vrcInput: input })
+            });
+            const data = await res.json();
+            loading.style.display = 'none';
+
+            if (res.ok && data.success) {
+                showNotify('VRChat account linked successfully!');
+                document.getElementById('vrc-link-container').style.display = 'none';
+                document.getElementById('vrc-active-container').style.display = 'block';
+                loadVrcDetails();
+            } else {
+                showNotify(data.error || 'Failed to link VRChat account.', 'error');
+            }
+        } catch (e) {
+            loading.style.display = 'none';
+            showNotify('Network error linking account.', 'error');
+        }
+    }
+
+    async function syncVrcRoles() {
+        const loading = document.getElementById('vrc-loading');
+        loading.style.display = 'block';
+
+        try {
+            const res = await fetch('/api/profile/sync-vrc-roles', {
+                method: 'POST'
+            });
+            const data = await res.json();
+            loading.style.display = 'none';
+
+            if (res.ok && data.success) {
+                let msg = 'Roles synced successfully!';
+                if (data.added.length > 0) msg += ` Added: ${data.added.join(', ')}`;
+                if (data.removed.length > 0) msg += ` Removed: ${data.removed.join(', ')}`;
+                if (data.added.length === 0 && data.removed.length === 0) msg += ' Already in sync.';
+                
+                showNotify(msg);
+                loadVrcDetails();
+            } else {
+                showNotify(data.error || 'Failed to sync VRChat roles.', 'error');
+            }
+        } catch (e) {
+            loading.style.display = 'none';
+            showNotify('Network error syncing roles.', 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadVrcDetails);
+
     updatePreview();
 </script>
 

@@ -32,7 +32,10 @@ const Roster = sequelize.define('Roster', {
     useDiscordName: { type: DataTypes.BOOLEAN, defaultValue: false },
     isBanned: { type: DataTypes.BOOLEAN, defaultValue: false },
     hasMascotAccess: { type: DataTypes.BOOLEAN, defaultValue: false },
-    links: { type: DataTypes.JSON } // JSON storage for social links
+    links: { type: DataTypes.JSON }, // JSON storage for social links
+    vrcUserId: { type: DataTypes.STRING, allowNull: true },
+    vrcUsername: { type: DataTypes.STRING, allowNull: true },
+    vrcDisplayName: { type: DataTypes.STRING, allowNull: true }
 });
 
 // 3. Event Schedule (The "wipeable" table)

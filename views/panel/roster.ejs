@@ -44,6 +44,17 @@
             </select>
         </div>
 
+        <% if (isUpperStaff) { %>
+            <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <label>Linked VRChat User ID / Profile URL</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                    <input type="text" id="edit-user-vrc" placeholder="usr_... or VRChat Profile URL" style="flex: 1; margin-bottom: 0;">
+                    <button type="button" class="btn-cc btn-secondary btn-small" style="width: auto; margin: 0; background: rgba(179, 106, 244, 0.2); border-color: rgba(179, 106, 244, 0.4);" onclick="syncMemberVrcRoles()">Sync Roles</button>
+                </div>
+                <p id="edit-user-vrc-info" style="font-size: 0.75rem; color: #888; margin-top: 5px; margin-bottom: 0;"></p>
+            </div>
+        <% } %>
+
         <% if (user.type.toLowerCase().includes('owner')) { %>
             <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
                 <input type="checkbox" id="edit-user-mascot" style="width: auto; cursor: pointer;">
@@ -94,11 +105,14 @@
                 const accent = parseColor(m.colorStyle);
                 const isGradient = accent.includes('gradient');
                 const deleteBtn = isOwner && !m.type.toLowerCase().includes('owner') ? 
-                    `<button class="btn-cc btn-small btn-danger" onclick="deleteUser('${m.discordId}', '${m.name}')">Delete</button>` : 
+                    `<button class="btn-cc btn-small btn-danger" onclick="deleteUser('${m.discordId}', '${escapeHtml(m.name)}')">Delete</button>` : 
                     '';
                 
                 const bannedBadge = m.isBanned ? '<span style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 10px;">BANNED</span>' : '';
                 const mascotBadge = m.hasMascotAccess ? '<span style="background: var(--primary-purple); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px;">MASCOT</span>' : '';
+                const vrcBadge = m.vrcUserId ? 
+                    `<span style="display: block; font-size: 0.75rem; color: var(--primary-purple); margin-top: 5px; font-weight: 500;">🦊 VRChat: ${escapeHtml(m.vrcDisplayName)} (@${escapeHtml(m.vrcUsername)})</span>` : 
+                    '';
 
                 return `
                 <div class="schedule-item" style="--sidebar-color: ${m.isBanned ? 'var(--accent-red)' : accent}; background: var(--card-bg); padding: 15px; border-radius: 12px; opacity: ${m.isBanned ? '0.6' : '1'};">
@@ -107,16 +121,17 @@
                              onerror="this.src='${FALLBACK_IMAGE}'"
                              style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid; border-color: ${m.isBanned ? 'var(--accent-red)' : (isGradient ? 'var(--primary-blue)' : accent)};">
                         <div>
-                            <strong style="font-size: 1.15rem; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent};">${m.name}</strong>
+                            <strong style="font-size: 1.15rem; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent};">${escapeHtml(m.name)}</strong>
                             ${bannedBadge} ${mascotBadge}
                             <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 2px;">
                                 <span style="color: var(--primary-blue); font-weight: bold;">${m.type}</span> 
-                                ${m.title ? '• ' + m.title : ''}
+                                ${m.title ? '• ' + escapeHtml(m.title) : ''}
                             </span>
+                            ${vrcBadge}
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <button class="btn-cc btn-small btn-dark" onclick="openEditModal('${m.discordId}', '${m.name}', '${m.title || ''}', '${m.type}', ${m.isBanned}, ${m.hasMascotAccess || false})">Edit</button>
+                        <button class="btn-cc btn-small btn-dark" onclick="openEditModal('${m.discordId}', '${escapeHtml(m.name)}', '${escapeHtml(m.title || '')}', '${m.type}', ${m.isBanned}, ${m.hasMascotAccess || false}, '${m.vrcUserId || ''}', '${escapeHtml(m.vrcDisplayName || '')}', '${escapeHtml(m.vrcUsername || '')}')">Edit</button>
                         ${deleteBtn}
                     </div>
                 </div>
@@ -127,7 +142,12 @@
         }
     }
 
-    function openEditModal(id, name, title, type, isBanned = false, hasMascotAccess = false) {
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    function openEditModal(id, name, title, type, isBanned = false, hasMascotAccess = false, vrcUserId = '', vrcDisplayName = '', vrcUsername = '') {
         currentEditId = id;
         document.getElementById('edit-modal-title').innerText = `Edit ${name}`;
         editNameInput.value = name;
@@ -137,6 +157,20 @@
         if (Array.from(editTypeSelect.options).some(opt => opt.value === type)) {
             editTypeSelect.value = type;
         }
+
+        const editVrcInput = document.getElementById('edit-user-vrc');
+        const editVrcInfo = document.getElementById('edit-user-vrc-info');
+        if (editVrcInput) {
+            editVrcInput.value = vrcUserId || '';
+            if (vrcUserId) {
+                editVrcInfo.innerText = `Linked: ${vrcDisplayName || 'Unresolved'} (@${vrcUsername || 'unknown'})`;
+                editVrcInfo.style.color = 'var(--primary-purple)';
+            } else {
+                editVrcInfo.innerText = 'Not linked to VRChat';
+                editVrcInfo.style.color = '#666';
+            }
+        }
+
         editModal.style.display = 'flex';
     }
 
@@ -159,6 +193,11 @@
             payload.hasMascotAccess = editMascotCheckbox.checked;
         }
 
+        const editVrcInput = document.getElementById('edit-user-vrc');
+        if (editVrcInput) {
+            payload.vrcUserId = editVrcInput.value.trim();
+        }
+
         try {
             const res = await fetch(`/api/roster/${currentEditId}`, {
                 method: 'PATCH',
@@ -169,8 +208,35 @@
                 showNotify('User updated successfully!');
                 closeEditModal();
                 loadRoster();
-            } else { showNotify('Failed to update user.', 'error'); }
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                showNotify(errData.error || 'Failed to update user.', 'error');
+            }
         } catch (e) { showNotify('Network error occurred.', 'error'); }
+    }
+
+    async function syncMemberVrcRoles() {
+        if (!currentEditId) return;
+        showNotify('Syncing VRChat roles...');
+        try {
+            const res = await fetch(`/api/roster/${currentEditId}/sync-vrc-roles`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                let msg = 'Roles synced successfully!';
+                if (data.added.length > 0) msg += ` Added: ${data.added.join(', ')}`;
+                if (data.removed.length > 0) msg += ` Removed: ${data.removed.join(', ')}`;
+                if (data.added.length === 0 && data.removed.length === 0) msg += ' Already in sync.';
+                showNotify(msg);
+                loadRoster();
+                closeEditModal();
+            } else {
+                showNotify(data.error || 'Failed to sync VRChat roles.', 'error');
+            }
+        } catch (e) {
+            showNotify('Network error syncing roles.', 'error');
+        }
     }
 
     async function deleteUser(id, name) {

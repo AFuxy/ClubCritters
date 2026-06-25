@@ -578,4 +578,64 @@ async function closeGroupInstance(location) {
     }
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember };
+async function getGroupMember(groupShortName, userId) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return null;
+    const groupId = await getGroupId(groupShortName);
+    if (!groupId) return null;
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}`);
+        if (res.ok) return await res.json();
+    } catch (e) {
+        console.error("[VRC API] Error fetching group member:", e);
+    }
+    return null;
+}
+
+async function getGroupRoles(groupShortName) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return [];
+    const groupId = await getGroupId(groupShortName);
+    if (!groupId) return [];
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/roles`);
+        if (res.ok) return await res.json();
+    } catch (e) {
+        console.error("[VRC API] Error fetching group roles:", e);
+    }
+    return [];
+}
+
+async function addGroupMemberRole(groupShortName, userId, roleId) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return false;
+    const groupId = await getGroupId(groupShortName);
+    if (!groupId) return false;
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}/roles/${roleId}`, {
+            method: 'PUT'
+        });
+        return res.ok;
+    } catch (e) {
+        console.error("[VRC API] Error adding group member role:", e);
+        return false;
+    }
+}
+
+async function removeGroupMemberRole(groupShortName, userId, roleId) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return false;
+    const groupId = await getGroupId(groupShortName);
+    if (!groupId) return false;
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}/roles/${roleId}`, {
+            method: 'DELETE'
+        });
+        return res.ok;
+    } catch (e) {
+        console.error("[VRC API] Error removing group member role:", e);
+        return false;
+    }
+}
+
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole };
