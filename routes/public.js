@@ -21,6 +21,7 @@ router.get('/events', (req, res) => { res.render('events', { user: req.user || n
 router.get('/team', (req, res) => { res.render('team', { user: req.user || null, page: 'team' }); });
 router.get('/gallery', (req, res) => { res.render('gallery', { user: req.user || null, page: 'gallery' }); });
 router.get('/apply', (req, res) => { res.render('apply', { user: req.user || null, page: 'apply' }); });
+router.get('/rules', (req, res) => { res.render('rules', { user: req.user || null, page: 'rules' }); });
 router.get('/flyer', (req, res) => { res.render('flyer', { user: req.user || null, page: 'flyer' }); });
 router.get('/overlay', (req, res) => { res.render('overlay', { layout: false }); });
 

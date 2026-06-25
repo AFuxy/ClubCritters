@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/head', { 
+    title: 'Rules & Code of Conduct', 
+    page: 'rules',
+    description: 'Code of Conduct, AI Music Policy, VRChat rules, and Twitch guidelines for Club FuRN staff and performers.'
+}) %>
+<style>
+    .container {
+        max-width: 1200px !important;
+    }
+
+    .rules-container {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 40px;
+        margin: 40px auto 60px auto;
+        max-width: 1200px;
+        width: 100%;
+        text-align: left;
+        box-sizing: border-box;
+    }
+
+    .rules-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: sticky;
+        top: 40px;
+        align-self: start;
+    }
+
+    .tab-btn {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        color: #aaa;
+        padding: 16px 24px;
+        border-radius: 12px;
+        cursor: pointer;
+        text-align: left;
+        font-size: 0.95rem;
+        font-weight: 600;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .tab-btn:hover {
+        background: rgba(255, 255, 255, 0.07);
+        color: #fff;
+        transform: translateX(5px);
+    }
+
+    .tab-btn.active {
+        background: linear-gradient(135deg, var(--primary-blue), #B36AF4);
+        border-color: transparent;
+        color: #fff;
+        box-shadow: 0 10px 20px rgba(41, 197, 246, 0.25);
+    }
+
+    .rules-content {
+        background: var(--card-bg, rgba(21, 30, 41, 0.6));
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 20px;
+        padding: 40px;
+        min-height: 500px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        box-sizing: border-box;
+    }
+
+    .tab-content {
+        display: none;
+        animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .rules-content h2 {
+        font-size: 1.8rem;
+        margin-top: 0;
+        margin-bottom: 25px;
+        color: #fff;
+        font-weight: 900;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 15px;
+        letter-spacing: 0.5px;
+    }
+
+    .rules-content h3 {
+        font-size: 1.25rem;
+        color: var(--primary-blue);
+        margin-top: 30px;
+        margin-bottom: 15px;
+        font-weight: 700;
+    }
+
+    .rules-content p {
+        color: #ccc;
+        line-height: 1.7;
+        font-size: 0.95rem;
+        margin-bottom: 15px;
+    }
+
+    .rules-content ul {
+        color: #ccc;
+        line-height: 1.7;
+        font-size: 0.95rem;
+        margin-bottom: 20px;
+        padding-left: 20px;
+    }
+
+    .rules-content li {
+        margin-bottom: 8px;
+    }
+
+    .rule-card {
+        background: rgba(0,0,0,0.25);
+        border: 1px solid rgba(255,255,255,0.03);
+        border-radius: 12px;
+        padding: 22px;
+        margin-bottom: 20px;
+        transition: border-color 0.3s;
+    }
+
+    .rule-card:hover {
+        border-color: rgba(41, 197, 246, 0.2);
+    }
+
+    .rule-card h4 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        color: #fff;
+        font-size: 1.05rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .rule-card p {
+        margin: 0;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        color: #aaa;
+    }
+
+    .rule-card blockquote {
+        margin: 10px 0 0 0;
+        padding-left: 15px;
+        border-left: 3px solid rgba(255, 255, 255, 0.15);
+        color: #888;
+        font-size: 0.85rem;
+    }
+
+    /* Policy blocks */
+    .policy-allowed {
+        border-left: 4px solid #2bce73;
+        background: rgba(43, 206, 115, 0.04);
+        padding: 20px 25px;
+        border-radius: 0 12px 12px 0;
+        margin-bottom: 25px;
+        border-top: 1px solid rgba(43, 206, 115, 0.1);
+        border-right: 1px solid rgba(43, 206, 115, 0.1);
+        border-bottom: 1px solid rgba(43, 206, 115, 0.1);
+    }
+    
+    .policy-prohibited {
+        border-left: 4px solid #ff5353;
+        background: rgba(255, 83, 83, 0.04);
+        padding: 20px 25px;
+        border-radius: 0 12px 12px 0;
+        margin-bottom: 25px;
+        border-top: 1px solid rgba(255, 83, 83, 0.1);
+        border-right: 1px solid rgba(255, 83, 83, 0.1);
+        border-bottom: 1px solid rgba(255, 83, 83, 0.1);
+    }
+
+    .policy-header {
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    @media (max-width: 1000px) {
+        .rules-container {
+            grid-template-columns: 1fr;
+            gap: 25px;
+            width: 95%;
+        }
+        .rules-sidebar {
+            flex-direction: row;
+            flex-wrap: wrap;
+            position: relative;
+            top: 0;
+        }
+        .tab-btn {
+            flex: 1;
+            min-width: 160px;
+            justify-content: center;
+            padding: 12px 20px;
+            font-size: 0.9rem;
+        }
+        .rules-content {
+            padding: 25px;
+        }
+    }
+</style>
+<body>
+
+    <div class="container">
+        <%- include('partials/nav', { page: 'rules' }) %>
+
+        <div class="logo-container">
+            <img src="/cdn/logos/club/Logo.png" class="logo" alt="Logo">
+        </div>
+
+        <h1>Rules & Policies</h1>
+        <p id="status-subtext">Guidelines for Performer & Staff Participation</p>
+
+        <div class="rules-container">
+            <!-- Sidebar Navigation -->
+            <div class="rules-sidebar">
+                <button class="tab-btn active" id="btn-coc" onclick="switchTab('coc')">
+                    <span>🛡️</span> Code of Conduct
+                </button>
+                <button class="tab-btn" id="btn-ai" onclick="switchTab('ai')">
+                    <span>🤖</span> AI Music Policy
+                </button>
+                <button class="tab-btn" id="btn-vrchat" onclick="switchTab('vrchat')">
+                    <span>🦊</span> VRChat Rules
+                </button>
+                <button class="tab-btn" id="btn-twitch" onclick="switchTab('twitch')">
+                    <span>🟪</span> Twitch Guidelines
+                </button>
+            </div>
+
+            <!-- Rules Content Display -->
+            <div class="rules-content">
+                
+                <!-- 🛡️ STAFF & PERFORMER CODE OF CONDUCT -->
+                <div id="tab-coc" class="tab-content active">
+                    <h2>Staff & Performer Code of Conduct</h2>
+                    <p>By accepting a staff, volunteer, or performer role with Club FuRN, you agree to uphold this Code of Conduct. Failure to do so may result in immediate dismissal from your role.</p>
+
+                    <div class="rule-card">
+                        <h4>1. Representation of the Group 👔</h4>
+                        <p>Staff, volunteers, and performers are representatives of the community. Your behavior reflects on the group both in VRChat and in public spaces. Conduct that brings embarrassment, reputational harm, or negative attention may result in removal from your role. This applies to behavior during events, in public worlds, and on social media.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>2. Public & Social Media Conduct 📱</h4>
+                        <p>Do not post content that associates the group with harassment, hate speech, illegal activity, or abusive behavior. Avoid public posts, streams, or commentary that could reasonably damage the group’s reputation. <em>Note: Personal accounts are considered public-facing if your affiliation is known.</em></p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>3. Professionalism at Events 🎪</h4>
+                        <p>Remain calm, respectful, and approachable during events. Follow event plans, staff coordination, and moderator instructions. Do not abuse authority, play favorites, or use your role to intimidate others. Personal conflicts must not be handled publicly or during live events.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>4. Consent, Power & Boundaries 🛑</h4>
+                        <p>Because staff and performers hold influence, higher standards apply. Do not use your position to solicit attention, intimacy, favors, or private interactions. Do not flirt, roleplay, or pursue sexual interactions with attendees while acting in an official capacity. Respect boundaries immediately and without debate.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>5. NSFW & Sexual Conduct at Club Meetups 🔞</h4>
+                        <p>No NSFW behavior is permitted at club-style VRChat meetups while representing the group. Avatars worn by performers and staff on duty must not feature visible nudity, explicit sexual interactions, or graphics that violate Twitch or VRChat Terms of Service. Adult content is restricted to clearly designated spaces/events and never while on duty.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>6. Unsolicited Contact 📩</h4>
+                        <p>Do not send unsolicited DMs or friend requests to attendees for the purpose of harassment, unwanted flirting, self-promotion, or recruitment. Do not use staff-only rosters or support tickets to locate and contact users without their prior consent. Any request to stop contact must be honored immediately.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>7. Substance & Party Culture 🥂</h4>
+                        <p>Do not encourage unsafe, illegal, or excessive behavior. Never pressure attendees or other staff to drink, use substances, or "party harder." You are required to remain functional, reliable, and responsible while on duty or performing.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>8. Confidentiality & Trust 🔒</h4>
+                        <p>Do not share internal discussions, reports, moderation actions, or private information. Respect the privacy of attendees, staff, and performers. Leaking private information or screenshots may result in immediate removal.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>9. Compliance & Enforcement ⚖️</h4>
+                        <p>Leadership reserves the right to remove any staff member or performer at any time. Dismissal may occur with or without prior warning, depending on severity. Removal decisions may be based on in-event behavior, off-platform conduct, or public actions. Appeals are not guaranteed.</p>
+                    </div>
+                </div>
+
+                <!-- 🤖 AI MUSIC & TOOLS POLICY -->
+                <div id="tab-ai" class="tab-content">
+                    <h2>AI Music & Tools Policy</h2>
+                    <p>To preserve original artistry and respect the hard work of creators, Club FuRN maintains a clear framework regarding artificial intelligence tools and music selection for all official sets.</p>
+
+                    <div class="policy-allowed">
+                        <div class="policy-header" style="color: #2bce73;">
+                            <span>✅</span> Permitted Uses
+                        </div>
+                        <p style="margin: 0; color: #ccc;">AI tools may be used for assistance and preparation, such as:</p>
+                        <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #aaa;">
+                            <li>Track discovery, recommendations, and crate organization.</li>
+                            <li>Set planning, pacing, and energy flow analysis.</li>
+                            <li>Beat, key, or tempo analysis.</li>
+                            <li>Workflow or preparation assistance.</li>
+                        </ul>
+                        <p style="margin-top: 15px; margin-bottom: 10px; font-size: 0.9rem; font-style: italic; color: #2bce73;">These tools must remain assistive, not the primary creative source.</p>
+                        <p style="margin: 0; font-size: 0.85rem; color: #aaa; line-height: 1.6;"><em>Note: This policy specifically targets fully or partially generative prompt-to-audio services (like Suno or Udio). It does not prohibit standard music production tools used by human artists, such as AI-assisted mixing/mastering plugins, stem separation tools, or vocal synthesizers (like Vocaloid or Synthesizer V) where a human creator maintains complete artistic control.</em></p>
+                    </div>
+
+                    <div class="policy-prohibited">
+                        <div class="policy-header" style="color: #ff5353;">
+                            <span>❌</span> Prohibited Uses
+                        </div>
+                        <p style="margin: 0; color: #ccc;">All music played at events must be created by human artists:</p>
+                        <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #aaa;">
+                            <li><strong>No AI-generated songs</strong> or tracks are allowed in DJ sets or performances.</li>
+                            <li>Music that is fully or primarily composed, generated, or performed by AI may not be played.</li>
+                            <li>Do not misrepresent AI-generated music as original work or as human-created content.</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Enforcement ⚖️</h4>
+                        <p>Staff may request clarification if the origin of a track is in question. Attempts to bypass this policy or mislead staff may result in removal from events, loss of privileges, or further moderation action.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Policy Evolution 🔄</h4>
+                        <p>As AI tools evolve, this policy may be updated. Continued participation in the server and events implies acceptance of future revisions.</p>
+                    </div>
+                </div>
+
+                <!-- 🦊 VRChat COMMUNITY RULES -->
+                <div id="tab-vrchat" class="tab-content">
+                    <h2>VRChat Community Rules</h2>
+                    <p>As a VRChat-based virtual venue, all staff and performers must strictly follow VRChat Community Guidelines and keep our instances safe, optimized, and welcoming.</p>
+
+                    <div class="rule-card">
+                        <h4>No Crashers or Malicious Clients 🛡️</h4>
+                        <p>Using modified, malicious, or rule-breaking clients is strictly forbidden. Avatars featuring crash shaders, performance-destroying scripts, or excessively loud audio dumps are prohibited inside the club instance.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Safety Setting & Instancing Guidelines ⚙️</h4>
+                        <p>Performers should keep safety settings reasonably configured to ensure their performance runs smoothly. Staff must actively coordinate with instance hosts to handle safety settings, mute/kick options, and handle security incidents immediately.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Respect Spawn & Safety Zones 📍</h4>
+                        <p>Do not place portals, drop items, or spam graphics near the instance spawn point or safety zones. Keep flow paths clear so attendees can enter and move around the club without lagging or getting stuck.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Avatar Optimization 🦊</h4>
+                        <p>To maximize performance for our streams and guests, performers and staff are requested to use optimized avatars (Medium rank or better is preferred) during active shifts. Avoid giant, screen-blocking, or highly unoptimized avatars in the DJ booth.</p>
+                    </div>
+                </div>
+
+                <!-- 🟪 TWITCH STREAMING GUIDELINES -->
+                <div id="tab-twitch" class="tab-content">
+                    <h2>Twitch Streaming Guidelines</h2>
+                    <p>We encourage anyone who streams to come and share our events live on Twitch! It helps spread the word about <strong>Club FuRN</strong>, and we love seeing the community involved. Please ensure your content and audio comply with the Twitch Community Guidelines.</p>
+
+                    <div class="rule-card">
+                        <h4>Zero Tolerance for Hate Speech & Slurs 🟪</h4>
+                        <p>Twitch has a zero-tolerance policy for hate speech, harassment, slurs, and toxic behavior. Microphone feeds, voice channels, and chats displayed on stream must be kept clean. Violation will result in an immediate blacklist.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>The Twitch DJ Category 🎵</h4>
+                        <p>Twitch offers a dedicated <strong>DJ Category</strong> designed for music performance. Using this category provides significantly better protection against copyright strikes. <em>Note: This mode automatically disables VODs and Clips for the duration of the stream. We highly recommend using this category to keep your channel safe.</em></p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Keeping Your VODs & Clips? 📹</h4>
+                        <p>If you prefer not to use the DJ category so you can keep your VODs, we highly suggest you configure your <strong>OBS VOD Audio Track</strong> to exclude the VRChat audio. This allows you to stream the music live, but prevents it from being recorded in the VOD, saving you from muted videos or strikes.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Strictly Safe-For-Work (SFW) Visuals 🔞</h4>
+                        <p>Ensure that all avatars, DJ visuals, backdrops, and screen-shares shown on the stream strictly comply with Twitch's policies on nudity and sexual content. Explicit gestures, adult-rated visual content, or avatars depicting sexualized themes are strictly prohibited while on stream.</p>
+                    </div>
+
+                    <div class="rule-card">
+                        <h4>Safety Actions and Alerts 🚨</h4>
+                        <p>If a security issue, crash event, or TOS-breaking avatar appears in the club, staff must work quickly to visual-block, mute, or kick the offending party to prevent stream suspension. Keep the stream overlay clean and report incidents immediately.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="/cdn/js/theme-engine.js"></script>
+    <script>
+        function switchTab(tabId, updateHash = true) {
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            // Add active class to clicked button
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            // Show target tab content
+            const activeContent = document.getElementById(`tab-${tabId}`);
+            if (activeContent) activeContent.classList.add('active');
+
+            if (updateHash) {
+                history.pushState(null, null, '#' + tabId);
+            }
+
+            // Smooth scroll back to top of content on mobile
+            if (window.innerWidth <= 1000) {
+                document.querySelector('.rules-content').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function handleHashRoute() {
+            const hash = window.location.hash.substring(1).toLowerCase(); // remove '#'
+            const allowedTabs = ['coc', 'ai', 'vrchat', 'twitch'];
+            if (allowedTabs.includes(hash)) {
+                switchTab(hash, false);
+            }
+        }
+
+        window.addEventListener('load', handleHashRoute);
+        window.addEventListener('hashchange', handleHashRoute);
+
+        async function initGlobal() {
+            try {
+                const res = await fetch('/api/public/settings');
+                const settings = await res.json();
+                window.applyGlobalSettings(settings);
+            } catch (e) {}
+        }
+        initGlobal();
+    </script>
+</body>
+</html>

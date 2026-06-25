@@ -128,7 +128,7 @@
         font-size: 0.9rem; text-transform: uppercase;
         letter-spacing: 1px;
     }
-    .form-group input, .form-group textarea, .form-group select {
+    .form-group input:not([type="checkbox"]), .form-group textarea, .form-group select {
         width: 100%; background: rgba(0,0,0,0.4);
         border: 1px solid rgba(255,255,255,0.1); padding: 15px;
         border-radius: 12px; color: #fff;
@@ -146,16 +146,31 @@
 
     .form-group select option { background-color: #151e29; color: #fff; padding: 10px; }
 
-    .form-group input:hover, .form-group textarea:hover, .form-group select:hover {
+    .form-group input:not([type="checkbox"]):hover, .form-group textarea:hover, .form-group select:hover {
         border-color: rgba(41, 197, 246, 0.4);
         background: rgba(41, 197, 246, 0.05);
     }
 
-    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    .form-group input:not([type="checkbox"]):focus, .form-group textarea:focus, .form-group select:focus {
         outline: none; border-color: var(--primary-blue);
         background: rgba(0,0,0,0.6);
         box-shadow: 0 0 20px rgba(41, 197, 246, 0.2), inset 0 0 10px rgba(41, 197, 246, 0.1);
         transform: translateY(-2px);
+    }
+
+    /* Beautiful, customized checkbox sizing & styling */
+    .form-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--primary-blue);
+        cursor: pointer;
+        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        flex-shrink: 0;
+        margin-top: 3px;
+    }
+
+    .form-group input[type="checkbox"]:hover {
+        transform: scale(1.15);
     }
 
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -165,6 +180,22 @@
         .app-grid { grid-template-columns: 1fr; }
         .form-row { grid-template-columns: 1fr; }
         .internal-form-container { padding: 25px; border-radius: 20px; }
+    }
+
+    /* Code of Conduct Scrollbar Styling */
+    .coc-content::-webkit-scrollbar {
+        width: 6px;
+    }
+    .coc-content::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 4px;
+    }
+    .coc-content::-webkit-scrollbar-thumb {
+        background: rgba(41, 197, 246, 0.3);
+        border-radius: 4px;
+    }
+    .coc-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(41, 197, 246, 0.6);
     }
 </style>
 <body>
@@ -209,9 +240,9 @@
                         </div>
 
                         <div class="form-group" style="display: flex; align-items: flex-start; gap: 10px; margin-top: 40px; background: rgba(41, 197, 246, 0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(41, 197, 246, 0.1);">
-                            <input type="checkbox" id="field-agree" required style="width: auto; margin-top: 5px;">
+                            <input type="checkbox" id="field-agree" required>
                             <label style="margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.85rem; cursor: pointer;" for="field-agree">
-                                I confirm that I have read and agree to the <strong>Club FuRN Performer/Staff Code of Conduct</strong>.
+                                I confirm that I have read and agree to the <a href="/rules" target="_blank" style="color: var(--primary-blue); text-decoration: underline; font-weight: bold;">Club FuRN Code of Conduct & Rules</a>.
                             </label>
                         </div>
 
@@ -263,9 +294,8 @@
         const FORM_DEFINITIONS = {
             'DJ': [
                 { label: 'DJ Name / Stage Name', key: 'DJ Name', type: 'text', required: true, placeholder: 'What do we call you?' },
-                { label: 'DJ Logo / Font Link', key: 'Logo Link', type: 'url', placeholder: 'https://imgur.com/...' },
+                { label: 'VRChat User URL', key: 'VRChatUser', type: 'url', required: true, placeholder: 'https://vrchat.com/home/user/usr_74826be0-4366-4d04-92df-afdfc8a4d877'},
                 { label: 'Performance Type', key: 'Performance Type', type: 'select', options: ['Individual DJ', 'B2B (Back to Back)'] },
-                { label: 'Stage Name(s)', key: 'Stage Names', type: 'text', required: true, placeholder: 'Names for the pair' },
                 { label: 'Social Media', key: 'Socials', type: 'text', required: true, placeholder: '@yourhandle' },
                 { label: 'DJ Experience', key: 'Experience', type: 'text', placeholder: 'e.g. 2 Years' },
                 { label: 'Primary Genre Family', key: 'Genre Family', type: 'select', options: ['House', 'Techno', 'Bass', 'Trance', 'Hardstyle', 'Multi-Genre', 'Other'] },
@@ -277,7 +307,7 @@
             ],
             'Singer': [
                 { label: 'Singer/Stage Name', key: 'Stage Name', type: 'text', required: true, placeholder: 'Your stage name' },
-                { label: 'Logo/Font Link', key: 'Logo Link', type: 'url', placeholder: 'https://imgur.com/...' },
+                { label: 'VRChat User URL', key: 'VRChatUser', type: 'url', required: true, placeholder: 'https://vrchat.com/home/user/usr_74826be0-4366-4d04-92df-afdfc8a4d877'},
                 { label: 'Genre Family', key: 'Genre Family', type: 'select', options: ['Pop', 'Rock', 'Jazz', 'EDM Vocalist', 'Other'] },
                 { label: 'Social Media', key: 'Socials', type: 'text', required: true, placeholder: '@yourhandle' },
                 { label: 'Previous Performances', key: 'Experience', type: 'textarea', required: true, placeholder: 'Tell us about your history' },
@@ -287,6 +317,7 @@
             ],
             'Musician/Band': [
                 { label: 'Musician / Band Name', key: 'Band Name', type: 'text', required: true },
+                { label: 'VRChat User URL', key: 'VRChatUser', type: 'url', required: true, placeholder: 'https://vrchat.com/home/user/usr_74826be0-4366-4d04-92df-afdfc8a4d877'},
                 { label: 'Members Count', key: 'Members', type: 'text', required: true, placeholder: 'e.g. Solo, Duo, 4 Piece' },
                 { label: 'Instruments Used', key: 'Instruments', type: 'text', placeholder: 'e.g. Guitar, Drums, Synth' },
                 { label: 'Social Media', key: 'Socials', type: 'text', required: true },
@@ -364,12 +395,14 @@
             }
         }
 
+        const isLoggedIn = Boolean("<%= user ? 'true' : '' %>");
+
         function handleInternalApply(id, name, desc, type) {
-            <% if (user) { %>
+            if (isLoggedIn) {
                 openInternalForm(id, name, desc, type);
-            <% } else { %>
+            } else {
                 window.location.href = `/auth/discord?returnTo=/apply?slotId=${id}`;
-            <% } %>
+            }
         }
 
         function openInternalForm(id, name, desc, type) {
