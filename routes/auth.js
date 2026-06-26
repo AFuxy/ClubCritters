@@ -7,6 +7,20 @@ router.get('/discord', (req, res, next) => {
     // 1. Check session for returnTo first, then query, then Referer
     let returnTo = req.session.returnTo || req.query.returnTo || req.get('Referer') || '/';
     
+    // Reconstruct secondary query parameters if Express query-parser split them
+    if (req.query.returnTo) {
+        const queryParams = { ...req.query };
+        delete queryParams.returnTo;
+        if (Object.keys(queryParams).length > 0) {
+            const qs = new URLSearchParams(queryParams).toString();
+            if (returnTo.includes('?')) {
+                returnTo += '&' + qs;
+            } else {
+                returnTo += '?' + qs;
+            }
+        }
+    }
+    
     // 2. Safety: Never redirect back to auth or login-error
     if (returnTo.includes('/auth/discord') || returnTo.includes('/login-error')) {
         returnTo = '/';

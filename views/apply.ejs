@@ -253,7 +253,7 @@
                 <% } else { %>
                     <div style="text-align: center; padding: 40px 0;">
                         <p style="color: #888; margin-bottom: 30px;">You must be logged in with Discord to apply.</p>
-                        <a id="login-redirect-btn" href="/auth/discord?returnTo=/apply" class="btn-cc btn-primary">Login with Discord</a>
+                        <a id="login-redirect-btn" href="/auth/discord?returnTo=<%= encodeURIComponent('/apply' + (locals.slotId ? '?slotId=' + slotId : '')) %>" class="btn-cc btn-primary">Login with Discord</a>
                     </div>
                 <% } %>
             </div>
@@ -388,7 +388,7 @@
                 const autoSlotId = urlParams.get('slotId');
                 if (autoSlotId) {
                     const slot = apps.find(a => a.id.toString() === autoSlotId);
-                    if (slot) openInternalForm(slot.id, slot.roleName, slot.description, slot.roleType);
+                    if (slot) openInternalForm(slot.id, slot.roleName, slot.description, slot.roleType, false);
                 }
 
             } catch (e) {
@@ -403,11 +403,11 @@
             if (isLoggedIn) {
                 openInternalForm(id, name, desc, type);
             } else {
-                window.location.href = `/auth/discord?returnTo=/apply?slotId=${id}`;
+                window.location.href = `/auth/discord?returnTo=` + encodeURIComponent(`/apply?slotId=${id}`);
             }
         }
 
-        function openInternalForm(id, name, desc, type) {
+        function openInternalForm(id, name, desc, type, updateUrl = true) {
             selectionView.classList.add('hidden');
             formView.classList.remove('hidden');
             document.getElementById('form-role-title').innerText = name.toUpperCase() + " APPLICATION";
@@ -430,12 +430,17 @@
                 return `<div class="form-group"><label>${f.label}</label>${input}</div>`;
             }).join('');
 
+            if (updateUrl) {
+                history.pushState(null, null, `?slotId=${id}`);
+            }
+
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function showSelection() {
             formView.classList.add('hidden');
             selectionView.classList.remove('hidden');
+            history.pushState(null, null, window.location.pathname);
         }
 
         const appForm = document.getElementById('dynamic-application-form');
