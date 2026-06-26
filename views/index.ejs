@@ -3,8 +3,158 @@
 <%- include('partials/head', { title: 'Community Hub', page: 'index' }) %>
 <body class="body-centered">
 
+    <style>
+        /* Recruitment Banner Styling */
+        .recruitment-banner {
+            position: relative;
+            background: rgba(21, 30, 41, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px 24px;
+            margin-top: 15px; /* Prevent overlap with navigation bar */
+            margin-bottom: 24px;
+            text-align: left;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            overflow: hidden;
+        }
+
+        .recruitment-banner::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: var(--primary-gradient);
+            box-shadow: 0 2px 10px var(--primary-blue);
+        }
+
+        .recruitment-banner-close {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.4rem;
+            cursor: pointer;
+            line-height: 1;
+            transition: all 0.2s ease;
+            padding: 4px 8px;
+            border-radius: 50%;
+        }
+        .recruitment-banner-close:hover {
+            color: var(--text-white);
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .recruitment-banner-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .recruitment-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            font-weight: 900;
+            color: var(--primary-blue);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-blue);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px var(--primary-blue);
+            animation: alert-pulse 1.8s infinite ease-in-out;
+        }
+
+        .recruitment-title {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: var(--text-white);
+        }
+
+        .recruitment-desc {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #b5c1d1;
+            line-height: 1.4;
+        }
+
+        .recruitment-desc strong {
+            color: var(--text-white);
+        }
+
+        .recruitment-action {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .recruitment-action .btn-cc {
+            font-size: 0.75rem;
+            padding: 8px 20px;
+            border-radius: 30px;
+        }
+
+        .nav-apply-pill-cc {
+            border: 1.5px solid var(--primary-blue) !important;
+            color: var(--primary-blue) !important;
+            font-weight: 700 !important;
+        }
+        .nav-apply-pill-cc:hover {
+            background: var(--primary-gradient) !important;
+            color: white !important;
+            border-color: transparent !important;
+            box-shadow: 0 0 10px var(--primary-blue);
+            transform: translateY(-1px);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes alert-pulse {
+            0% {
+                transform: scale(0.9);
+                box-shadow: 0 0 0 0 var(--primary-blue);
+                opacity: 0.8;
+            }
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 8px transparent;
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0.9);
+                box-shadow: 0 0 0 0 transparent;
+                opacity: 0.8;
+            }
+        }
+    </style>
+
     <div class="container">
         <%- include('partials/nav', { page: 'index' }) %>
+
+        <!-- Recruitment Banner Container -->
+        <div id="recruitment-banner-container"></div>
 
         <div class="logo-container">
             <img class="logo" src="/cdn/logos/club/Logo.png" alt="Club FuRN Logo"> 

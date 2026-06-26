@@ -160,6 +160,7 @@ async function init() {
         console.warn("Network update failed:", error);
     }
     
+    checkRecruitment();
     setInterval(checkStatus, 5000);
 }
 
@@ -444,6 +445,12 @@ function renderEventView(isLive) {
     updateSiteTheme(null); 
 
     if (isLive) {
+        // Clean up recruitment elements when live
+        const banner = document.getElementById('recruitment-banner');
+        if (banner) banner.remove();
+        const applyLink = document.getElementById('nav-apply-link');
+        if (applyLink) applyLink.remove();
+
         document.title = "Furry Rave Night - LIVE NOW";
         badgeContainer.innerHTML = '<div class="status-badge status-live">🔴 EVENT LIVE NOW <span id="vrc-player-count"></span></div>';
         subtext.innerText = "Tonight's Lineup";
@@ -610,5 +617,71 @@ window.copyToClipboard = function(text, btnElement) {
         setTimeout(() => btnElement.classList.remove('copied'), 2000);
     });
 };
+
+window.dismissRecruitmentBanner = function() {
+    const banner = document.getElementById('recruitment-banner');
+    if (banner) {
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateY(-10px) scale(0.98)';
+        banner.style.transition = 'all 0.3s ease';
+        setTimeout(() => {
+            banner.remove();
+        }, 300);
+        sessionStorage.setItem('recruitment_banner_dismissed', 'true');
+    }
+};
+
+async function checkRecruitment() {
+    if (currentState === 'live') return;
+    try {
+        const res = await fetch('/api/public/apps');
+        if (!res.ok) return;
+        const slots = await res.json();
+        
+        const openSlots = slots.filter(s => s.status === 'open');
+        if (openSlots.length === 0) return;
+        
+        const roleNames = openSlots.map(s => s.roleName).join(', ');
+        const applyUrl = openSlots.length === 1 ? `/apply?slotId=${openSlots[0].id}` : '/apply';
+        
+        // Add Apply button to navigation
+        const mainNav = document.getElementById('main-nav');
+        if (mainNav && !document.getElementById('nav-apply-link')) {
+            const applyLink = document.createElement('a');
+            applyLink.id = 'nav-apply-link';
+            applyLink.href = applyUrl;
+            applyLink.className = 'btn-cc nav-pill-cc nav-apply-pill-cc';
+            applyLink.innerHTML = '🚨 Join Team';
+            mainNav.appendChild(applyLink);
+        }
+        
+        // Render banner
+        if (sessionStorage.getItem('recruitment_banner_dismissed') === 'true') {
+            return;
+        }
+        
+        const bannerContainer = document.getElementById('recruitment-banner-container');
+        if (bannerContainer) {
+            bannerContainer.innerHTML = `
+                <div id="recruitment-banner" class="recruitment-banner">
+                    <button class="recruitment-banner-close" onclick="window.dismissRecruitmentBanner()">&times;</button>
+                    <div class="recruitment-banner-content">
+                        <div class="recruitment-badge">
+                            <span class="pulse-dot"></span>
+                            Recruitment Open
+                        </div>
+                        <h3 class="recruitment-title">Join the Club FuRN Crew!</h3>
+                        <p class="recruitment-desc">We are looking for passionate individuals to join our team as: <strong>${roleNames}</strong>.</p>
+                        <div class="recruitment-action">
+                            <a href="${applyUrl}" class="btn-cc btn-primary">Apply Now &rarr;</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.warn("Failed to fetch recruitment apps:", e);
+    }
+}
 
 init();
