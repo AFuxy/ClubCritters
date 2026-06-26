@@ -13,6 +13,31 @@ const safeParseJSON = (data) => {
     return data || {};
 };
 
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
+// Helper to verify Cloudflare Turnstile token
+const verifyTurnstile = async (token) => {
+    const secretKey = process.env.TURNSTILE_SECRET_KEY;
+    if (!secretKey) {
+        // Fallback: if keys are not set up, bypass verification
+        return true;
+    }
+    if (!token) return false;
+
+    try {
+        const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `secret=${encodeURIComponent(secretKey)}&response=${encodeURIComponent(token)}`
+        });
+        const outcome = await response.json();
+        return !!outcome.success;
+    } catch (e) {
+        console.error("[TURNSTILE] Verification failed:", e);
+        return false;
+    }
+};
+
 // --- PUBLIC PAGES ---
 
 router.get('/', (req, res) => { res.render('index', { user: req.user || null, page: 'index' }); });
@@ -20,8 +45,16 @@ router.get('/archive', (req, res) => { res.render('archive', { user: req.user ||
 router.get('/events', (req, res) => { res.render('events', { user: req.user || null, page: 'events' }); });
 router.get('/team', (req, res) => { res.render('team', { user: req.user || null, page: 'team' }); });
 router.get('/gallery', (req, res) => { res.render('gallery', { user: req.user || null, page: 'gallery' }); });
-router.get('/apply', (req, res) => { res.render('apply', { user: req.user || null, page: 'apply' }); });
+router.get('/apply', (req, res) => { res.render('apply', { user: req.user || null, page: 'apply', siteKey: process.env.TURNSTILE_SITE_KEY || null }); });
 router.get('/rules', (req, res) => { res.render('rules', { user: req.user || null, page: 'rules' }); });
+router.get('/discord', (req, res) => {
+    if (req.user) {
+        // Authenticated users bypass verification completely
+        const inviteLink = process.env.DISCORD_INVITE_URL || 'https://discord.gg/hbtDmeC6gG';
+        return res.redirect(inviteLink);
+    }
+    res.render('join', { user: null, page: 'join', siteKey: process.env.TURNSTILE_SITE_KEY || null });
+});
 router.get('/flyer', (req, res) => { res.render('flyer', { user: req.user || null, page: 'flyer' }); });
 router.get('/overlay', (req, res) => { res.render('overlay', { layout: false }); });
 
@@ -349,9 +382,17 @@ router.get('/api/public/gallery', async (req, res) => {
 
 router.post('/api/public/apps/submit', async (req, res) => {
     try {
-        const { slotId, answers, discordId, discordTag } = req.body;
+        if (!req.user) {
+            return res.status(401).json({ error: 'You must be logged in with Discord to submit an application.' });
+        }
+
+        const { slotId, answers } = req.body;
+
         const slot = await AppSlot.findByPk(slotId);
         if (!slot || slot.status !== 'open') return res.status(400).json({ error: 'Slot is closed or invalid.' });
+
+        const discordId = req.user.discordId;
+        const discordTag = req.user.discordData?.username || req.user.name || "Unknown";
 
         const submission = await ApplicationSubmission.create({
             slotId,
@@ -367,6 +408,22 @@ router.post('/api/public/apps/submit', async (req, res) => {
     } catch (err) {
         console.error("Submission Error:", err);
         res.status(500).json({ error: 'Failed to submit application.' });
+    }
+});
+
+router.post('/api/public/verify-discord', async (req, res) => {
+    try {
+        const { token } = req.body;
+        const isValid = await verifyTurnstile(token);
+        if (!isValid) {
+            return res.status(400).json({ success: false, error: 'Invalid verification token' });
+        }
+
+        const inviteLink = process.env.DISCORD_INVITE_URL || 'https://discord.gg/hbtDmeC6gG';
+        res.json({ success: true, inviteLink });
+    } catch (err) {
+        console.error("Discord verification error:", err);
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
 

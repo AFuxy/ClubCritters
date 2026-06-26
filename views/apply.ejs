@@ -246,6 +246,8 @@
                             </label>
                         </div>
 
+
+
                         <button type="submit" id="submit-btn" class="btn-cc btn-primary" style="width: 100%; margin-top: 20px; height: 60px; font-size: 1.2rem;">Submit Application</button>
                     </form>
                 <% } else { %>
@@ -459,8 +461,6 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             slotId,
-                            discordId: '<%= user ? user.discordId : "" %>',
-                            discordTag: '<%= user ? (user.discordData?.nickname || user.name) : "" %>',
                             answers
                         })
                     });
@@ -468,7 +468,8 @@
                     if (res.ok) {
                         formView.innerHTML = `<div class="internal-form-container" style="text-align: center; padding: 60px 40px;"><div style="font-size: 4rem; margin-bottom: 20px;">✅</div><h2 style="color: #00e676; margin-bottom: 10px;">Submitted!</h2><p style="color: #ccc;">Your application for ${document.getElementById('form-role-title').innerText} has been received.</p><a href="/" class="btn-cc btn-primary" style="margin-top: 30px;">Return Home</a></div>`;
                     } else {
-                        alert("Submission failed.");
+                        const errorData = await res.json().catch(() => ({}));
+                        alert(errorData.error || "Submission failed.");
                         submitBtn.disabled = false;
                         submitBtn.innerText = "Submit Application";
                     }

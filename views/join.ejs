@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/head', { title: 'Join our Discord', page: 'join' }) %>
+<body class="body-centered">
+    <div class="container" style="max-width: 480px;">
+        <div style="background: rgba(21, 30, 41, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); padding: 40px 30px; border-radius: 24px; box-shadow: 0 25px 60px rgba(0,0,0,0.6); backdrop-filter: blur(12px);">
+            <div style="font-size: 4rem; margin-bottom: 20px; filter: drop-shadow(0 0 15px rgba(41, 197, 246, 0.4));">📡</div>
+            <h1 style="font-size: 1.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px;">Join our Discord</h1>
+            <p style="color: #b0b8c1; font-size: 0.95rem; line-height: 1.6; margin-bottom: 30px;">
+                To protect our community from automated spam bots, please complete the verification below to receive the invite link.
+            </p>
+
+            <div id="verification-box" style="display: flex; justify-content: center; min-height: 80px; margin-bottom: 20px;">
+                <% if (siteKey) { %>
+                    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+                    <div class="cf-turnstile" data-sitekey="<%= siteKey %>" data-callback="onTurnstileSuccess" data-theme="dark"></div>
+                <% } else { %>
+                    <button onclick="onVerifyManual()" class="btn-cc btn-primary" style="padding: 14px 40px; font-size: 1.1rem; width: 100%;">
+                        Verify & Join Server
+                    </button>
+                <% } %>
+            </div>
+
+            <div id="status-message" style="color: #888; font-size: 0.85rem; min-height: 1.5rem;"></div>
+        </div>
+    </div>
+
+    <script src="/cdn/js/theme-engine.js"></script>
+    <script>
+        async function submitVerification(token = null) {
+            const statusMsg = document.getElementById('status-message');
+            statusMsg.innerHTML = '<span style="color: var(--primary-blue)">Verifying connection...</span>';
+            
+            try {
+                const res = await fetch('/api/public/verify-discord', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+                
+                const data = await res.json();
+                if (data.success && data.inviteLink) {
+                    statusMsg.innerHTML = '<span style="color: #2bce73">Verification successful! Redirecting...</span>';
+                    window.location.href = data.inviteLink;
+                } else {
+                    statusMsg.innerHTML = '<span style="color: #ff5353">Verification failed. Please try again.</span>';
+                }
+            } catch (e) {
+                statusMsg.innerHTML = '<span style="color: #ff5353">Network error. Please refresh and retry.</span>';
+            }
+        }
+
+        function onTurnstileSuccess(token) {
+            submitVerification(token);
+        }
+
+        function onVerifyManual() {
+            submitVerification();
+        }
+
+        async function initGlobal() {
+            try {
+                const res = await fetch('/api/public/settings');
+                const settings = await res.json();
+                window.applyGlobalSettings(settings);
+            } catch (e) {}
+        }
+        initGlobal();
+    </script>
+</body>
+</html>
