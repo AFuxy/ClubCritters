@@ -430,6 +430,9 @@ async function connectPipeline(location) {
             if (msg.type !== 'notification') return;
             const notif = JSON.parse(msg.content);
             
+            // Ignore self-sent notifications (e.g. self-invites used for direct travel)
+            if (notif.senderUserId === botUserId) return;
+            
             // 1. Friend Request
             if (notif.type === 'friendRequest') {
                 console.log(`[VRC API] 🤝 Accepting friend request from: ${notif.senderUsername}`);
@@ -440,46 +443,59 @@ async function connectPipeline(location) {
                 return;
             }
 
-            // 2. Owner Invite (Join Owner if no event is active)
-            if (notif.type === 'invite' && notif.senderUserId === 'usr_5c3e6ced-1e79-40c0-80e6-887c6cb2e1f6') {
-                const { Settings } = require('../db');
-                const settings = await Settings.findOne().catch(() => null);
-                const now = new Date();
-                const isEventActive = settings && (
-                    settings.isEventSession || 
-                    (settings.eventStartTime && settings.eventEndTime && now >= new Date(settings.eventStartTime) && now < new Date(settings.eventEndTime))
-                );
-
-                if (!isEventActive) {
-                    console.log(`[VRC API] 👑 Owner invite received from ${notif.senderUsername} (No active event). Joining owner...`);
-                    const inviteLocation = notif.details?.worldId || notif.details?.location || 'Unknown Instance';
-                    recordNotifLog('invite', notif.senderUsername, notif.senderUserId, notif.details?.inviteMessage || '', `Joined Owner's Instance (${inviteLocation.split(':')[0]})`);
-                    
-                    // If VRChat is running, trigger direct self-invite travel!
-                    if (global.cameraVrcRunning && inviteLocation && inviteLocation !== 'Unknown Instance') {
-                        await inviteMyself(inviteLocation);
+            // 2. Owner / Host Invite (Join sender if they are Owner, Host, have Mascot Access, or match hardcoded Owner ID, and no event is active)
+            if (notif.type === 'invite') {
+                const { Roster, Settings } = require('../db');
+                
+                // Check if the sender is authorized
+                let isAuthorized = notif.senderUserId === 'usr_5c3e6ced-1e79-40c0-80e6-887c6cb2e1f6';
+                if (!isAuthorized) {
+                    const member = await Roster.findOne({ where: { vrcUserId: notif.senderUserId } }).catch(() => null);
+                    if (member) {
+                        const typeLower = (member.type || '').toLowerCase();
+                        isAuthorized = typeLower.includes('owner') || typeLower.includes('host') || member.hasMascotAccess;
                     }
-                    // Otherwise, accept the invite notification and cold-boot the game client
-                    else if (inviteLocation && inviteLocation !== 'Unknown Instance') {
-                        await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
+                }
+
+                if (isAuthorized) {
+                    const settings = await Settings.findOne().catch(() => null);
+                    const now = new Date();
+                    const isEventActive = settings && (
+                        settings.isEventSession || 
+                        (settings.eventStartTime && settings.eventEndTime && now >= new Date(settings.eventStartTime) && now < new Date(settings.eventEndTime))
+                    );
+
+                    if (!isEventActive) {
+                        console.log(`[VRC API] 👑 Authorized invite received from ${notif.senderUsername} (No active event). Joining sender...`);
+                        const inviteLocation = notif.details?.worldId || notif.details?.location || 'Unknown Instance';
+                        recordNotifLog('invite', notif.senderUsername, notif.senderUserId, notif.details?.inviteMessage || '', `Joined Authorized User's Instance (${inviteLocation.split(':')[0]})`);
+                        
+                        // If VRChat is running, trigger direct self-invite travel!
+                        if (global.cameraVrcRunning && inviteLocation && inviteLocation !== 'Unknown Instance') {
+                            await inviteMyself(inviteLocation);
+                        }
+                        // Otherwise, accept the invite notification and cold-boot the game client
+                        else if (inviteLocation && inviteLocation !== 'Unknown Instance') {
+                            await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
+                                method: 'PUT'
+                            }).catch(() => {});
+
+                            console.log(`[VRC API] 🚀 VRChat is closed. Directing Bot PC Agent to cold-boot into authorized instance: ${inviteLocation}`);
+                            if (global.cameraBotClient && global.cameraBotClient.readyState === 1) {
+                                global.cameraBotClient.send(JSON.stringify({
+                                    type: 'command',
+                                    action: 'launch_vrc',
+                                    payload: inviteLocation
+                                }));
+                            }
+                        }
+
+                        // Hide the notification
+                        await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/hide`, {
                             method: 'PUT'
                         }).catch(() => {});
-
-                        console.log(`[VRC API] 🚀 VRChat is closed. Directing Bot PC Agent to cold-boot into owner's instance: ${inviteLocation}`);
-                        if (global.cameraBotClient && global.cameraBotClient.readyState === 1) {
-                            global.cameraBotClient.send(JSON.stringify({
-                                type: 'command',
-                                action: 'launch_vrc',
-                                payload: inviteLocation
-                            }));
-                        }
+                        return;
                     }
-
-                    // Hide the notification
-                    await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/hide`, {
-                        method: 'PUT'
-                    }).catch(() => {});
-                    return;
                 }
             }
 
@@ -781,6 +797,25 @@ async function inviteMyself(location) {
         
         if (res && res.ok) {
             console.log(`[VRC API] ✅ Self-invite travel request accepted by VRChat!`);
+            
+            // Auto-accept the created notification. This signals the active VRChat client process to travel.
+            const notifData = await res.json().catch(() => null);
+            if (notifData && notifData.id) {
+                console.log(`[VRC API] 📥 Auto-accepting self-invite notification: ${notifData.id}`);
+                const acceptRes = await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notifData.id}/accept`, {
+                    method: 'PUT'
+                }).catch(() => null);
+                
+                if (acceptRes && acceptRes.ok) {
+                    console.log(`[VRC API] ✈️ Client redirect command successfully pushed to game process.`);
+                } else {
+                    const status = acceptRes ? acceptRes.status : 'Unknown';
+                    const err = acceptRes ? await acceptRes.json().catch(() => ({})) : {};
+                    console.warn(`[VRC API] ⚠️ Failed to auto-accept self-invite notification: ${status} ${err.error?.message || ''}`);
+                }
+            } else {
+                console.warn(`[VRC API] ⚠️ Self-invite request did not return a valid notification structure.`);
+            }
             return true;
         } else {
             const status = res ? res.status : 'Unknown';
