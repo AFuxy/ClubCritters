@@ -278,6 +278,10 @@ async function getBotCurrentLocation() {
 
 // Global variable to store active club location for the Pipeline listener
 let activeInviteLocation = null;
+
+function setActiveInviteLocation(location) {
+    activeInviteLocation = location;
+}
 global.vrcFriendsLocation = global.vrcFriendsLocation || new Map();
 
 async function refreshVrcFriendsList() {
@@ -751,4 +755,4 @@ async function removeGroupMemberRole(groupShortName, userId, roleId) {
     }
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation };
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation, setActiveInviteLocation };

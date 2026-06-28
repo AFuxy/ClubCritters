@@ -114,8 +114,19 @@ function initCameraWS(server) {
                     if (data.vrc_running !== undefined) global.cameraVrcRunning = data.vrc_running;
                     if (data.obs_running !== undefined) global.cameraObsRunning = data.obs_running;
                     
-                    // Bot -> Server -> Browsers (OBS Status, telemetry)
-                    broadcastToWeb(data);
+                    if (data.vrc_location) {
+                        updateBotVrcLocationFromClient(data.vrc_location).then(() => {
+                            data.vrc_world_name = cachedVrcWorldName;
+                            data.vrc_world_thumbnail = cachedVrcWorldThumbnail;
+                            data.vrc_player_count = cachedVrcPlayerCount;
+                            broadcastToWeb(data);
+                        }).catch(() => {
+                            broadcastToWeb(data);
+                        });
+                    } else {
+                        // Bot -> Server -> Browsers (OBS Status, telemetry)
+                        broadcastToWeb(data);
+                    }
                 }
             } catch (err) {
                 console.error("[CAMERA WS] Error parsing message:", err);
@@ -218,6 +229,48 @@ async function updateBotVrcLocation() {
         }
     } catch (err) {
         console.error("[CAMERA WS] Failed to update bot VRC location:", err);
+    }
+}
+
+async function updateBotVrcLocationFromClient(location) {
+    if (!location || location === 'offline') {
+        cachedVrcLocation = 'offline';
+        cachedVrcWorldName = 'Offline';
+        cachedVrcWorldThumbnail = null;
+        cachedVrcPlayerCount = 0;
+        return;
+    }
+    
+    // If location is the same, no need to query world info again
+    if (cachedVrcLocation === location) return;
+    
+    cachedVrcLocation = location;
+    
+    if (location === 'private') {
+        cachedVrcWorldName = 'Private Instance';
+        cachedVrcWorldThumbnail = null;
+        cachedVrcPlayerCount = 0;
+        return;
+    }
+
+    const vrcApi = require('./vrc-api');
+    try {
+        // Sync active invite location
+        vrcApi.setActiveInviteLocation(location);
+        
+        const instanceData = await vrcApi.getInstanceData(location);
+        if (instanceData && instanceData.world) {
+            cachedVrcWorldName = `${instanceData.world.name} (Instance #${instanceData.name})`;
+            cachedVrcWorldThumbnail = instanceData.world.thumbnailImageUrl || instanceData.world.imageUrl || null;
+            cachedVrcPlayerCount = instanceData.n_users || 0;
+        } else {
+            cachedVrcWorldName = location;
+            cachedVrcWorldThumbnail = null;
+            cachedVrcPlayerCount = 0;
+        }
+    } catch (err) {
+        console.error("[CAMERA WS] Failed to resolve client VRC location:", err);
+        cachedVrcWorldName = location;
     }
 }
 
