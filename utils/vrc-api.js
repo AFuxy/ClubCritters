@@ -454,13 +454,15 @@ async function connectPipeline(location) {
                     console.log(`[VRC API] 👑 Owner invite received from ${notif.senderUsername} (No active event). Joining owner...`);
                     const inviteLocation = notif.details?.worldId || notif.details?.location || 'Unknown Instance';
                     recordNotifLog('invite', notif.senderUsername, notif.senderUserId, notif.details?.inviteMessage || '', `Joined Owner's Instance (${inviteLocation.split(':')[0]})`);
-                    // Accept the invite
+                    
+                    // Accept the invite (this natively tells the running VRC client to travel!)
                     await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
                         method: 'PUT'
                     }).catch(() => {});
 
-                    if (inviteLocation && inviteLocation !== 'Unknown Instance') {
-                        console.log(`[VRC API] 🚀 Directing Bot PC Agent to join owner's instance: ${inviteLocation}`);
+                    // Only send a cold-boot request if VRChat isn't currently running
+                    if (!global.cameraVrcRunning && inviteLocation && inviteLocation !== 'Unknown Instance') {
+                        console.log(`[VRC API] 🚀 VRChat is closed. Directing Bot PC Agent to cold-boot into owner's instance: ${inviteLocation}`);
                         if (global.cameraBotClient && global.cameraBotClient.readyState === 1) {
                             global.cameraBotClient.send(JSON.stringify({
                                 type: 'command',
@@ -746,6 +748,37 @@ async function autoAcceptFriends() {
 }
 
 /**
+ * Direct self-invite travel. Sends a self-invite via VRChat Web API.
+ * If the client is running, VRChat automatically commands it to travel.
+ */
+async function inviteMyself(location) {
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return false;
+
+    const target = cleanInstanceId(location);
+    if (!target) return false;
+    
+    console.log(`[VRC API] ✈️ Attempting direct self-invite travel to: ${target}`);
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/invite/myself/to/${target}`, {
+            method: 'POST'
+        });
+        
+        if (res.ok) {
+            console.log(`[VRC API] ✅ Self-invite travel request accepted by VRChat!`);
+            return true;
+        } else {
+            const err = await res.json().catch(() => ({}));
+            console.error(`[VRC API] ❌ Self-invite travel failed: ${res.status} ${err.error?.message || ''}`);
+            return false;
+        }
+    } catch (e) {
+        console.error("[VRC API] Error during self-invite:", e);
+        return false;
+    }
+}
+
+/**
  * Terminate any instance (Group, Public, etc) if permissions allow.
  */
 async function closeGroupInstance(location) {
@@ -850,4 +883,4 @@ async function getAuthCookie() {
     return authCookie;
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation, setActiveInviteLocation, getWorldData, getAuthCookie };
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation, setActiveInviteLocation, getWorldData, getAuthCookie, inviteMyself };
