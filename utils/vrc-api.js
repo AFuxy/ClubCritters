@@ -258,6 +258,10 @@ function cleanInstanceId(input) {
 
 async function getBotCurrentLocation() {
     try {
+        if (!authCookie) await loadCookieFromDB();
+        if (!authCookie) await loginVRC();
+        if (!authCookie) return null;
+
         const res = await vrcFetch('https://api.vrchat.cloud/api/1/auth/user');
         if (!res.ok) return null;
         const data = await res.json();

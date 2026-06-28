@@ -79,7 +79,8 @@ function initCameraWS(server) {
                 // Single-use token validation
                 global.cameraTokens.delete(token);
             } else {
-                console.warn("[CAMERA WS] ❌ Web connection failed: Invalid or expired token.");
+                const mapKeys = Array.from(global.cameraTokens.keys());
+                console.warn(`[CAMERA WS] ❌ Web connection failed: Invalid or expired token. Received token: "${token}", found in map: ${!!tokenData}, expired: ${tokenData ? (tokenData.expires <= Date.now()) : 'N/A'}. Keys in map: ${JSON.stringify(mapKeys)}`);
                 ws.close(4001, "Invalid token");
                 return;
             }
