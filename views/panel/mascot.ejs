@@ -222,12 +222,33 @@
 
     // --- WEBSOCKET CLIENT CONNECTIVITY ---
     let ws = null;
-    const wsToken = "<%= cameraWsToken %>";
+    let currentWsToken = "<%= cameraWsToken %>";
     let botConnected = false;
 
-    function connectWS() {
+    async function getNewToken() {
+        try {
+            const res = await fetch('/panel/camera-token');
+            if (res.ok) {
+                const data = await res.json();
+                return data.token;
+            }
+        } catch (e) {
+            console.error("Failed to fetch fresh ws token", e);
+        }
+        return null;
+    }
+
+    async function connectWS() {
+        if (!currentWsToken) {
+            currentWsToken = await getNewToken();
+        }
+        if (!currentWsToken) {
+            setTimeout(connectWS, 5000);
+            return;
+        }
+
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${window.location.host}/ws/camera?token=${wsToken}`);
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws/camera?token=${currentWsToken}`);
 
         ws.onopen = () => {
             console.log("[CAMERA WS] Connected to relay server.");
@@ -267,6 +288,7 @@
         ws.onclose = () => {
             console.warn("[CAMERA WS] Connection closed. Reconnecting...");
             updateStatus(false);
+            currentWsToken = null; // Single-use tokens require fetching a fresh one
             setTimeout(connectWS, 5000);
         };
     }

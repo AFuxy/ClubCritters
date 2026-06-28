@@ -1,5 +1,4 @@
 const { WebSocketServer } = require('ws');
-const url = require('url');
 
 // Global maps to keep track of active connections
 // cameraWebClients: Map<ws, { userId, username }>
@@ -14,7 +13,8 @@ function initCameraWS(server) {
 
     // Handle HTTP Upgrade manually to support route matching
     server.on('upgrade', (request, socket, head) => {
-        const pathname = url.parse(request.url).pathname;
+        const parsedUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+        const pathname = parsedUrl.pathname;
 
         if (pathname === '/ws/camera') {
             wss.handleUpgrade(request, socket, head, (ws) => {
@@ -24,9 +24,9 @@ function initCameraWS(server) {
     });
 
     wss.on('connection', (ws, request) => {
-        const query = url.parse(request.url, true).query;
-        const token = query.token;
-        const secret = query.secret;
+        const parsedUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+        const token = parsedUrl.searchParams.get('token');
+        const secret = parsedUrl.searchParams.get('secret');
 
         let clientType = null;
         let clientInfo = null;

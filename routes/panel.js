@@ -15,6 +15,17 @@ router.get('/links', isAuthenticated, isStaff, (req, res) => { res.render('panel
 router.get('/archives', isAuthenticated, (req, res) => { res.render('panel/archives', { user: req.user, page: 'archives' }); });
 const crypto = require('crypto');
 
+router.get('/camera-token', isAuthenticated, canAccessMascot, (req, res) => {
+    const token = crypto.randomBytes(16).toString('hex');
+    global.cameraTokens = global.cameraTokens || new Map();
+    global.cameraTokens.set(token, {
+        userId: req.user.discordId,
+        username: req.user.name,
+        expires: Date.now() + 5 * 60 * 1000 // Valid for 5 minutes
+    });
+    res.json({ token });
+});
+
 router.get('/mascot', isAuthenticated, canAccessMascot, (req, res) => { 
     const token = crypto.randomBytes(16).toString('hex');
     global.cameraTokens = global.cameraTokens || new Map();
