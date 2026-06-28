@@ -115,6 +115,7 @@ function initCameraWS(server) {
                     // Cache last known states
                     if (data.vrc_running !== undefined) global.cameraVrcRunning = data.vrc_running;
                     if (data.obs_running !== undefined) global.cameraObsRunning = data.obs_running;
+                    if (data.players !== undefined) global.cameraInstancePlayers = data.players;
                     
                     if (data.vrc_location) {
                         updateBotVrcLocationFromClient(data.vrc_location).then(() => {
@@ -142,6 +143,7 @@ function initCameraWS(server) {
                 global.cameraBotClient = null;
                 global.cameraVrcRunning = false;
                 global.cameraObsRunning = false;
+                global.cameraInstancePlayers = [];
                 broadcastToWeb({ type: 'status', botOnline: false });
             } else if (clientType === 'web') {
                 console.log(`[CAMERA WS] 🦊 Mascot Web Client disconnected: ${clientInfo.username}`);
@@ -188,6 +190,9 @@ function broadcastToWeb(data) {
 
 // Helper to extract active players inside the bot's instance
 function getPlayersInInstance() {
+    if (global.cameraInstancePlayers && global.cameraInstancePlayers.length > 0) {
+        return global.cameraInstancePlayers;
+    }
     const vrcApi = require('./vrc-api');
     if (typeof vrcApi.getPlayersInBotInstance === 'function') {
         return vrcApi.getPlayersInBotInstance();
