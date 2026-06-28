@@ -455,13 +455,16 @@ async function connectPipeline(location) {
                     const inviteLocation = notif.details?.worldId || notif.details?.location || 'Unknown Instance';
                     recordNotifLog('invite', notif.senderUsername, notif.senderUserId, notif.details?.inviteMessage || '', `Joined Owner's Instance (${inviteLocation.split(':')[0]})`);
                     
-                    // Accept the invite (this natively tells the running VRC client to travel!)
-                    await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
-                        method: 'PUT'
-                    }).catch(() => {});
+                    // If VRChat is running, trigger direct self-invite travel!
+                    if (global.cameraVrcRunning && inviteLocation && inviteLocation !== 'Unknown Instance') {
+                        await inviteMyself(inviteLocation);
+                    }
+                    // Otherwise, accept the invite notification and cold-boot the game client
+                    else if (inviteLocation && inviteLocation !== 'Unknown Instance') {
+                        await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
+                            method: 'PUT'
+                        }).catch(() => {});
 
-                    // Only send a cold-boot request if VRChat isn't currently running
-                    if (!global.cameraVrcRunning && inviteLocation && inviteLocation !== 'Unknown Instance') {
                         console.log(`[VRC API] 🚀 VRChat is closed. Directing Bot PC Agent to cold-boot into owner's instance: ${inviteLocation}`);
                         if (global.cameraBotClient && global.cameraBotClient.readyState === 1) {
                             global.cameraBotClient.send(JSON.stringify({
@@ -760,16 +763,29 @@ async function inviteMyself(location) {
     
     console.log(`[VRC API] ✈️ Attempting direct self-invite travel to: ${target}`);
     try {
-        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/invite/myself/to/${target}`, {
+        let res = await vrcFetch(`https://api.vrchat.cloud/api/1/invite/myself/to/${target}`, {
             method: 'POST'
         });
         
-        if (res.ok) {
+        // Session expired handler: if 401 Unauthorized occurs, re-authenticate and retry
+        if (res.status === 401) {
+            console.warn("[VRC API] Session cookie expired. Re-authenticating and retrying self-invite...");
+            authCookie = null;
+            await loginVRC();
+            if (authCookie) {
+                res = await vrcFetch(`https://api.vrchat.cloud/api/1/invite/myself/to/${target}`, {
+                    method: 'POST'
+                });
+            }
+        }
+        
+        if (res && res.ok) {
             console.log(`[VRC API] ✅ Self-invite travel request accepted by VRChat!`);
             return true;
         } else {
-            const err = await res.json().catch(() => ({}));
-            console.error(`[VRC API] ❌ Self-invite travel failed: ${res.status} ${err.error?.message || ''}`);
+            const status = res ? res.status : 'Unknown';
+            const err = res ? await res.json().catch(() => ({})) : {};
+            console.error(`[VRC API] ❌ Self-invite travel failed: ${status} ${err.error?.message || ''}`);
             return false;
         }
     } catch (e) {
