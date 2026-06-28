@@ -98,45 +98,15 @@ function initCameraWS(server) {
                 const data = JSON.parse(message);
 
                 if (clientType === 'web') {
-                    // Intercept travel/launch VRChat commands when VRChat is already active.
-                    // Instead of running local client subprocess command lines, we request a direct Web API self-invite,
-                    // which natively instructs the running VRC client to hop worlds instantly.
-                    if (data.type === 'control' && data.action === 'launch_vrc' && data.payload) {
-                        console.log(`[CAMERA WS] launch_vrc command received. payload: "${data.payload}", cameraVrcRunning: ${global.cameraVrcRunning}`);
-                        
-                        if (global.cameraVrcRunning) {
-                            const vrcApi = require('./vrc-api');
-                            vrcApi.inviteMyself(data.payload).then((success) => {
-                                if (success) {
-                                    console.log(`[CAMERA WS] ✈️ Successfully redirected running VRChat instance via self-invite: ${data.payload}`);
-                                } else {
-                                    console.warn(`[CAMERA WS] ⚠️ Self-invite failed. Falling back to command-line cold boot...`);
-                                    if (global.cameraBotClient && global.cameraBotClient.readyState === ws.OPEN) {
-                                        global.cameraBotClient.send(message);
-                                    }
-                                }
-                            }).catch((e) => {
-                                console.error(`[CAMERA WS] Error during self-invite:`, e);
-                                if (global.cameraBotClient && global.cameraBotClient.readyState === ws.OPEN) {
-                                    global.cameraBotClient.send(message);
-                                }
-                            });
-                        } else {
-                            console.log(`[CAMERA WS] VRChat is closed. Routing cold boot command to client...`);
-                            if (global.cameraBotClient && global.cameraBotClient.readyState === ws.OPEN) {
-                                global.cameraBotClient.send(message);
-                            }
-                        }
-                    } else {
-                        // General Browser -> Server -> Bot relay
-                        if (global.cameraBotClient && global.cameraBotClient.readyState === ws.OPEN) {
-                            global.cameraBotClient.send(JSON.stringify({
-                                type: data.type,
-                                action: data.action,
-                                key: data.key,
-                                state: data.state, // e.g. down, up
-                                x: data.x,
-                                y: data.y,
+                    // Browser -> Server -> Bot relay (Inputs, Launches, closing commands, etc.)
+                    if (global.cameraBotClient && global.cameraBotClient.readyState === ws.OPEN) {
+                        global.cameraBotClient.send(JSON.stringify({
+                            type: data.type,
+                            action: data.action,
+                            key: data.key,
+                            state: data.state, // e.g. down, up
+                            x: data.x,
+                            y: data.y,
                                 payload: data.payload,
                                 sender: clientInfo.username
                             }));

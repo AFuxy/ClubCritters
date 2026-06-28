@@ -470,17 +470,11 @@ async function connectPipeline(location) {
                         const inviteLocation = notif.details?.worldId || notif.details?.location || 'Unknown Instance';
                         recordNotifLog('invite', notif.senderUsername, notif.senderUserId, notif.details?.inviteMessage || '', `Joined Authorized User's Instance (${inviteLocation.split(':')[0]})`);
                         
-                        // If VRChat is running, trigger direct self-invite travel!
-                        if (global.cameraVrcRunning && inviteLocation && inviteLocation !== 'Unknown Instance') {
-                            await inviteMyself(inviteLocation);
-                        }
-                        // Otherwise, accept the invite notification and cold-boot the game client
-                        else if (inviteLocation && inviteLocation !== 'Unknown Instance') {
-                            await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
-                                method: 'PUT'
-                            }).catch(() => {});
-
-                            console.log(`[VRC API] 🚀 VRChat is closed. Directing Bot PC Agent to cold-boot into authorized instance: ${inviteLocation}`);
+                        // Forward the launch command to the Client Agent to perform a protocol-redirect or cold boot.
+                        // The VRChat API lacks an endpoint to accept/join invite notifications, so running the vrchat:// launch command
+                        // is the only method that natively and automatically commands the game client to travel.
+                        if (inviteLocation && inviteLocation !== 'Unknown Instance') {
+                            console.log(`[VRC API] 🚀 Directing Bot PC Agent to join authorized instance: ${inviteLocation}`);
                             if (global.cameraBotClient && global.cameraBotClient.readyState === 1) {
                                 global.cameraBotClient.send(JSON.stringify({
                                     type: 'command',
