@@ -770,4 +770,9 @@ async function removeGroupMemberRole(groupShortName, userId, roleId) {
     }
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation, setActiveInviteLocation, getWorldData };
+async function getAuthCookie() {
+    if (!authCookie) await loadCookieFromDB();
+    return authCookie;
+}
+
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation, setActiveInviteLocation, getWorldData, getAuthCookie };

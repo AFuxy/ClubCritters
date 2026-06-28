@@ -195,9 +195,13 @@
         align-items: center;
         gap: 10px;
     }
-    #roster-ul li::before {
-        content: '🟢';
-        font-size: 0.65rem;
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
+    }
+    .pulsing-text {
+        animation: pulse 1.5s infinite ease-in-out;
     }
 </style>
 
@@ -334,6 +338,7 @@
             document.getElementById('obs-status-text').style.color = '#888';
             document.getElementById('vrc-location-text').innerText = 'OFFLINE';
             document.getElementById('vrc-location-text').style.color = '#888';
+            document.getElementById('vrc-location-text').classList.remove('pulsing-text');
             document.getElementById('vrc-world-icon').style.display = 'none';
             document.getElementById('vrc-player-count-text').innerText = '0 PLAYERS INSIDE';
             document.getElementById('vrc-player-count-text').style.color = '#666';
@@ -350,18 +355,32 @@
         
         if (locationName === 'Offline') {
             text.style.color = '#888';
+            text.classList.remove('pulsing-text');
             img.style.display = 'none';
             count.innerText = '0 PLAYERS INSIDE';
             count.style.color = '#666';
         } else if (locationName === 'Private Instance') {
             text.style.color = '#ffb300';
+            text.classList.remove('pulsing-text');
             img.style.display = 'none';
             count.innerText = 'PRIVATE';
             count.style.color = '#ffb300';
+        } else if (locationName.toUpperCase().startsWith('TRAVELING')) {
+            text.style.color = '#ff9800'; // Pulsing orange for travel
+            text.classList.add('pulsing-text');
+            if (thumbnail) {
+                img.src = '/panel/world-image?url=' + encodeURIComponent(thumbnail);
+                img.style.display = 'block';
+            } else {
+                img.style.display = 'none';
+            }
+            count.innerText = 'CONNECTING...';
+            count.style.color = '#ff9800';
         } else {
             text.style.color = '#00e676';
+            text.classList.remove('pulsing-text');
             if (thumbnail) {
-                img.src = thumbnail;
+                img.src = '/panel/world-image?url=' + encodeURIComponent(thumbnail);
                 img.style.display = 'block';
             } else {
                 img.style.display = 'none';

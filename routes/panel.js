@@ -44,4 +44,40 @@ router.get('/mascot', isAuthenticated, canAccessMascot, (req, res) => {
     }); 
 });
 
+router.get('/world-image', isAuthenticated, canAccessMascot, async (req, res) => {
+    const imageUrl = req.query.url;
+    if (!imageUrl || (!imageUrl.startsWith('https://api.vrchat.cloud') && !imageUrl.startsWith('https://files.vrchat.cloud'))) {
+        return res.status(400).send("Invalid image URL");
+    }
+
+    const vrcApi = require('../utils/vrc-api');
+    try {
+        const cookie = await vrcApi.getAuthCookie();
+        
+        const response = await fetch(imageUrl, {
+            headers: {
+                'Cookie': cookie || '',
+                'User-Agent': 'ClubFuRNHub/1.0.0'
+            }
+        });
+
+        if (!response.ok) {
+            return res.status(response.status).send("Failed to fetch image from VRChat");
+        }
+
+        const contentType = response.headers.get('content-type') || 'image/png';
+        res.setHeader('Content-Type', contentType);
+        
+        // Cache for 10 minutes
+        res.setHeader('Cache-Control', 'public, max-age=600');
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        res.send(buffer);
+    } catch (e) {
+        console.error("[IMAGE PROXY] Error proxying image:", e);
+        res.status(500).send("Error proxying image");
+    }
+});
+
 module.exports = router;

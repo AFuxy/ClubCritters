@@ -272,6 +272,27 @@ async function updateBotVrcLocationFromClient(location) {
         // Sync active invite location
         vrcApi.setActiveInviteLocation(location);
         
+        // Handle world transition states
+        if (location.startsWith('joining:')) {
+            const rawLoc = location.substring(8);
+            const worldId = rawLoc.split(':')[0];
+            
+            cachedVrcWorldThumbnail = null;
+            cachedVrcPlayerCount = 0;
+            cachedVrcWorldName = 'Traveling...';
+            
+            try {
+                const worldData = await vrcApi.getWorldData(worldId);
+                if (worldData) {
+                    cachedVrcWorldName = `Traveling: ${worldData.name}...`;
+                    cachedVrcWorldThumbnail = worldData.thumbnailImageUrl || worldData.imageUrl || null;
+                }
+            } catch (e) {
+                // Ignore, fallback to Traveling...
+            }
+            return;
+        }
+
         let isPrivate = location.includes('~private') || location.includes('~hidden') || location === 'private';
         const worldId = location.split(':')[0];
         
