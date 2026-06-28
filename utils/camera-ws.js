@@ -107,10 +107,9 @@ function initCameraWS(server) {
                             state: data.state, // e.g. down, up
                             x: data.x,
                             y: data.y,
-                                payload: data.payload,
-                                sender: clientInfo.username
-                            }));
-                        }
+                            payload: data.payload,
+                            sender: clientInfo.username
+                        }));
                     }
                 } else if (clientType === 'bot') {
                     // Cache last known states
