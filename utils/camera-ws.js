@@ -64,7 +64,8 @@ function initCameraWS(server) {
                         vrc_world_name: cachedVrcWorldName,
                         vrc_world_thumbnail: cachedVrcWorldThumbnail,
                         vrc_player_count: cachedVrcPlayerCount,
-                        players: getPlayersInInstance()
+                        players: getPlayersInInstance(),
+                        vrc_notification_logs: global.vrcNotificationLogs || []
                     }));
                 }).catch(() => {
                     ws.send(JSON.stringify({
@@ -72,7 +73,8 @@ function initCameraWS(server) {
                         botOnline: !!global.cameraBotClient,
                         vrc_running: global.cameraVrcRunning || false,
                         obs_running: global.cameraObsRunning || false,
-                        players: getPlayersInInstance()
+                        players: getPlayersInInstance(),
+                        vrc_notification_logs: global.vrcNotificationLogs || []
                     }));
                 });
                 

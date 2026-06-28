@@ -1,5 +1,34 @@
 <%- include('header') %>
 
+<style>
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-backdrop.active {
+        display: flex !important;
+    }
+    .modal-content::-webkit-scrollbar {
+        width: 6px;
+    }
+    .modal-content::-webkit-scrollbar-track {
+        background: rgba(0,0,0,0.1);
+    }
+    .modal-content::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.15);
+        border-radius: 4px;
+    }
+</style>
+
 <div class="staff-hub" style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
     
     <!-- Top Header -->
@@ -66,6 +95,7 @@
                     <button class="btn-cc btn-secondary btn-small" id="btn-launch-obs" onclick="sendCommand('launch_obs')">🎥 Launch OBS</button>
                     <button class="btn-cc btn-dark btn-small" style="background: rgba(255, 68, 68, 0.1); border-color: rgba(255, 68, 68, 0.3); color: #ff4444; display: none;" id="btn-kill-obs" onclick="sendCommand('kill_obs')" disabled>🛑 Close OBS</button>
                 </div>
+                <button class="btn-cc btn-dark btn-small" id="btn-show-notif-log" style="width: 100%; margin-top: 15px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="openNotificationModal()">🔔 View Notification Logs</button>
             </div>
 
             <!-- OBS Controls -->
@@ -272,6 +302,12 @@
                     if (msg.vrc_world_name) {
                         updateVrcLocation(msg.vrc_world_name, msg.vrc_world_thumbnail, msg.vrc_player_count);
                     }
+                    if (msg.vrc_notification_logs !== undefined) {
+                        sessionNotifications = msg.vrc_notification_logs;
+                        if (document.getElementById('notif-modal').classList.contains('active')) {
+                            renderNotificationLogs();
+                        }
+                    }
                 } 
                 // Telemetry / Player list Updates
                 else if (msg.type === 'telemetry') {
@@ -282,6 +318,12 @@
                     }
                     if (msg.vrc_world_name) {
                         updateVrcLocation(msg.vrc_world_name, msg.vrc_world_thumbnail, msg.vrc_player_count);
+                    }
+                    if (msg.vrc_notification_logs !== undefined) {
+                        sessionNotifications = msg.vrc_notification_logs;
+                        if (document.getElementById('notif-modal').classList.contains('active')) {
+                            renderNotificationLogs();
+                        }
                     }
                 }
             } catch (err) {
@@ -630,6 +672,64 @@
 
     // Start WebSocket
     connectWS();
+
+    // Modal Control and Rendering Functions
+    let sessionNotifications = [];
+
+    window.openNotificationModal = function() {
+        document.getElementById('notif-modal').classList.add('active');
+        renderNotificationLogs();
+    }
+
+    window.closeNotificationModal = function() {
+        document.getElementById('notif-modal').classList.remove('active');
+    }
+
+    function renderNotificationLogs() {
+        const container = document.getElementById('notif-log-container');
+        if (!sessionNotifications || sessionNotifications.length === 0) {
+            container.innerHTML = `<p style="color:#888; text-align:center; margin-top:40px;">No events recorded in this session.</p>`;
+            return;
+        }
+
+        container.innerHTML = sessionNotifications.map(log => {
+            let badgeColor = '#888';
+            let typeLabel = log.type;
+            if (log.type === 'friendRequest') { badgeColor = '#2196f3'; typeLabel = 'Friend Request'; }
+            else if (log.type === 'invite') { badgeColor = '#e91e63'; typeLabel = 'Invite'; }
+            else if (log.type === 'requestInvite') { badgeColor = '#ff9800'; typeLabel = 'Request to Join'; }
+
+            return `
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; margin-bottom: 10px; display:flex; flex-direction:column; gap:6px; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.75rem; color:#888; font-weight:bold;">${log.timestamp}</span>
+                        <span style="background:${badgeColor}; color:#fff; font-size:0.65rem; padding:2px 8px; border-radius:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">${typeLabel}</span>
+                    </div>
+                    <div style="font-size:0.9rem; color:#fff;">
+                        From: <strong style="color:var(--primary-blue);">${log.sender}</strong>
+                        ${log.message ? `<p style="margin: 4px 0 0 0; font-size:0.8rem; color:#aaa; font-style:italic;">"${log.message}"</p>` : ''}
+                    </div>
+                    <div style="font-size:0.8rem; color:#00e676; font-weight:bold; display:flex; align-items:center; gap:6px;">
+                        <span style="color:#888;">⚡ Action:</span>
+                        <span>${log.action}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
 </script>
+
+<!-- Notification Log Modal -->
+<div id="notif-modal" class="modal-backdrop" onclick="if(event.target === this) closeNotificationModal()">
+    <div class="modal-content" style="background:#15151a; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; width: 90%; max-width: 550px; max-height: 75vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,0.6); position: relative;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom:12px;">
+            <h3 style="margin:0; color:#fff; font-size:1.15rem; font-weight:800; letter-spacing:0.5px; text-transform:uppercase;">🔔 VRChat Notifications</h3>
+            <button class="btn-cc btn-dark btn-small" style="padding: 6px 12px; border-radius:8px; margin:0;" onclick="closeNotificationModal()">✕ Close</button>
+        </div>
+        <div id="notif-log-container" style="flex: 1; overflow-y: auto; padding-right: 4px; max-height: 55vh;">
+            <p style="color:#888; text-align:center; margin-top:40px;">No events recorded in this session.</p>
+        </div>
+    </div>
+</div>
 
 <%- include('footer') %>

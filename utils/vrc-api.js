@@ -342,6 +342,26 @@ function getPlayersInBotInstance() {
     return players;
 }
 
+// Helper to record notification logs for the mascot web panel
+function recordNotifLog(type, sender, senderId, message, action) {
+    global.vrcNotificationLogs = global.vrcNotificationLogs || [];
+    global.vrcNotificationLogs.unshift({
+        timestamp: new Date().toLocaleTimeString(),
+        type: type,
+        sender: sender,
+        senderId: senderId,
+        message: message,
+        action: action
+    });
+    if (global.vrcNotificationLogs.length > 50) global.vrcNotificationLogs.pop();
+    
+    // Broadcast immediately to web panels
+    try {
+        const cameraWs = require('./camera-ws');
+        cameraWs.broadcastToWeb({ vrc_notification_logs: global.vrcNotificationLogs });
+    } catch (e) {}
+}
+
 /**
  * Connect to VRChat Notification Pipeline (WebSocket)
  */
@@ -413,31 +433,84 @@ async function connectPipeline(location) {
             // 1. Friend Request
             if (notif.type === 'friendRequest') {
                 console.log(`[VRC API] 🤝 Accepting friend request from: ${notif.senderUsername}`);
+                recordNotifLog('friendRequest', notif.senderUsername, notif.senderUserId, '', 'Accepted Friend Request');
                 await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
                     method: 'PUT'
                 }).catch(() => {});
+                return;
             }
 
-            if ((notif.type === 'requestInvite' || notif.type === 'invite') && activeInviteLocation) {
-                const targetLocation = cleanInstanceId(activeInviteLocation);
-                if (!targetLocation) return;
+            // 2. Owner Invite (Join Owner if no event is active)
+            if (notif.type === 'invite' && notif.senderUserId === 'usr_5c3e6ced-1e79-40c0-80e6-887c6cb2e1f6') {
+                const { Settings } = require('../db');
+                const settings = await Settings.findOne().catch(() => null);
+                const now = new Date();
+                const isEventActive = settings && (
+                    settings.isEventSession || 
+                    (settings.eventStartTime && settings.eventEndTime && now >= new Date(settings.eventStartTime) && now < new Date(settings.eventEndTime))
+                );
 
-                console.log(`[VRC API] ✨ Received ${notif.type} from ${notif.senderUsername}. Exchanging for Club Invite...`);
-                
-                const inviteRes = await vrcFetch(`https://api.vrchat.cloud/api/1/invite/${notif.senderUserId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ instanceId: targetLocation })
-                }).catch(() => null);
+                if (!isEventActive) {
+                    console.log(`[VRC API] 👑 Owner invite received from ${notif.senderUsername} (No active event). Joining owner...`);
+                    const inviteLocation = notif.details?.worldId || notif.details?.location || 'Unknown Instance';
+                    recordNotifLog('invite', notif.senderUsername, notif.senderUserId, notif.details?.inviteMessage || '', `Joined Owner's Instance (${inviteLocation.split(':')[0]})`);
+                    // Accept the invite
+                    await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
+                        method: 'PUT'
+                    }).catch(() => {});
 
-                if (inviteRes && inviteRes.ok) {
-                    console.log(`\x1b[32m[VRC API] 📧 Invite successfully sent to ${notif.senderUsername}!\x1b[0m`);
-                } else if (inviteRes) {
-                    const err = await inviteRes.json().catch(() => ({}));
-                    if (inviteRes.status === 403) {
-                        console.error(`\x1b[31m[VRC API] ❌ Invite Failed (403): Bot lacks permission to invite to this instance. (Ensure bot has 'Can Invite' group role!)\x1b[0m`);
-                    } else {
-                        console.error(`\x1b[31m[VRC API] ❌ Failed to send invite: ${inviteRes.status} ${err.error?.message || ''}\x1b[0m`);
+                    if (inviteLocation && inviteLocation !== 'Unknown Instance') {
+                        console.log(`[VRC API] 🚀 Directing Bot PC Agent to join owner's instance: ${inviteLocation}`);
+                        if (global.cameraBotClient && global.cameraBotClient.readyState === 1) {
+                            global.cameraBotClient.send(JSON.stringify({
+                                type: 'command',
+                                action: 'launch_vrc',
+                                payload: inviteLocation
+                            }));
+                        }
+                    }
+
+                    // Hide the notification
+                    await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/hide`, {
+                        method: 'PUT'
+                    }).catch(() => {});
+                    return;
+                }
+            }
+
+            // 3. Regular Invite / Request Invite
+            if (notif.type === 'requestInvite' || notif.type === 'invite') {
+                const loc = activeInviteLocation || await getBotCurrentLocation();
+                if (loc && loc !== 'offline') {
+                    const targetLocation = cleanInstanceId(loc);
+                    if (targetLocation) {
+                        console.log(`[VRC API] ✨ Received ${notif.type} from ${notif.senderUsername}. Sending invite to: ${targetLocation}`);
+                        const actionDesc = notif.type === 'requestInvite' ? 'Accepted Request & Sent Invite' : 'Responded with Invite to self';
+                        recordNotifLog(notif.type, notif.senderUsername, notif.senderUserId, notif.details?.inviteMessage || '', `${actionDesc} (${targetLocation.split(':')[0]})`);
+                        
+                        // If it's a requestInvite, accept it natively too
+                        if (notif.type === 'requestInvite') {
+                            await vrcFetch(`https://api.vrchat.cloud/api/1/auth/user/notifications/${notif.id}/accept`, {
+                                                    method: 'PUT'
+                            }).catch(() => {});
+                        }
+
+                        const inviteRes = await vrcFetch(`https://api.vrchat.cloud/api/1/invite/${notif.senderUserId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ instanceId: targetLocation })
+                        }).catch(() => null);
+
+                        if (inviteRes && inviteRes.ok) {
+                            console.log(`\x1b[32m[VRC API] 📧 Invite successfully sent to ${notif.senderUsername}!\x1b[0m`);
+                        } else if (inviteRes) {
+                            const err = await inviteRes.json().catch(() => ({}));
+                            if (inviteRes.status === 403) {
+                                console.error(`\x1b[31m[VRC API] ❌ Invite Failed (403): Bot lacks permission to invite to this instance. (Ensure bot has 'Can Invite' group role!)\x1b[0m`);
+                            } else {
+                                console.error(`\x1b[31m[VRC API] ❌ Failed to send invite: ${inviteRes.status} ${err.error?.message || ''}\x1b[0m`);
+                            }
+                        }
                     }
                 }
 
@@ -446,7 +519,9 @@ async function connectPipeline(location) {
                     method: 'PUT'
                 }).catch(() => {});
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error("[VRC API] Error handling notification event:", e);
+        }
     });
 
     pipeline.on('close', () => { 
