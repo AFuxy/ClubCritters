@@ -84,6 +84,7 @@ function initCameraWS(server) {
                         global.cameraBotClient.send(JSON.stringify({
                             type: data.type,
                             action: data.action,
+                            key: data.key,
                             state: data.state, // e.g. down, up
                             payload: data.payload,
                             sender: clientInfo.username
