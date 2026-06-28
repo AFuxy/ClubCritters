@@ -219,11 +219,15 @@ async function updateBotVrcLocation() {
             let nUsers = 0;
             
             if (!isPrivate) {
-                const instanceData = await vrcApi.getInstanceData(location);
-                if (instanceData && instanceData.world) {
-                    worldData = instanceData.world;
-                    instanceName = ` (Instance #${instanceData.name})`;
-                    nUsers = instanceData.n_users || 0;
+                try {
+                    const instanceData = await vrcApi.getInstanceData(location);
+                    if (instanceData && instanceData.world) {
+                        worldData = instanceData.world;
+                        instanceName = ` (Instance #${instanceData.name})`;
+                        nUsers = instanceData.n_users || 0;
+                    }
+                } catch (e) {
+                    console.warn("[CAMERA WS] getInstanceData failed for location, trying world fallback:", e.message || e);
                 }
             }
             
@@ -301,11 +305,15 @@ async function updateBotVrcLocationFromClient(location) {
         let nUsers = 0;
         
         if (!isPrivate) {
-            const instanceData = await vrcApi.getInstanceData(location);
-            if (instanceData && instanceData.world) {
-                worldData = instanceData.world;
-                instanceName = ` (Instance #${instanceData.name})`;
-                nUsers = instanceData.n_users || 0;
+            try {
+                const instanceData = await vrcApi.getInstanceData(location);
+                if (instanceData && instanceData.world) {
+                    worldData = instanceData.world;
+                    instanceName = ` (Instance #${instanceData.name})`;
+                    nUsers = instanceData.n_users || 0;
+                }
+            } catch (e) {
+                console.warn("[CAMERA WS] Client-relayed getInstanceData failed, trying world fallback:", e.message || e);
             }
         }
         
