@@ -54,11 +54,27 @@ function initCameraWS(server) {
                 console.log(`[CAMERA WS] 🦊 Mascot Web Client connected: ${clientInfo.username}`);
                 
                 // Immediately notify this client of the current bot status and active roster
-                ws.send(JSON.stringify({
-                    type: 'status',
-                    botOnline: !!global.cameraBotClient,
-                    players: getPlayersInInstance()
-                }));
+                updateBotVrcLocation().then(() => {
+                    ws.send(JSON.stringify({
+                        type: 'status',
+                        botOnline: !!global.cameraBotClient,
+                        vrc_running: global.cameraVrcRunning || false,
+                        obs_running: global.cameraObsRunning || false,
+                        vrc_location: cachedVrcLocation,
+                        vrc_world_name: cachedVrcWorldName,
+                        vrc_world_thumbnail: cachedVrcWorldThumbnail,
+                        vrc_player_count: cachedVrcPlayerCount,
+                        players: getPlayersInInstance()
+                    }));
+                }).catch(() => {
+                    ws.send(JSON.stringify({
+                        type: 'status',
+                        botOnline: !!global.cameraBotClient,
+                        vrc_running: global.cameraVrcRunning || false,
+                        obs_running: global.cameraObsRunning || false,
+                        players: getPlayersInInstance()
+                    }));
+                });
                 
                 // Single-use token validation
                 global.cameraTokens.delete(token);
@@ -86,11 +102,17 @@ function initCameraWS(server) {
                             action: data.action,
                             key: data.key,
                             state: data.state, // e.g. down, up
+                            x: data.x,
+                            y: data.y,
                             payload: data.payload,
                             sender: clientInfo.username
                         }));
                     }
                 } else if (clientType === 'bot') {
+                    // Cache last known states
+                    if (data.vrc_running !== undefined) global.cameraVrcRunning = data.vrc_running;
+                    if (data.obs_running !== undefined) global.cameraObsRunning = data.obs_running;
+                    
                     // Bot -> Server -> Browsers (OBS Status, telemetry)
                     broadcastToWeb(data);
                 }
@@ -104,6 +126,8 @@ function initCameraWS(server) {
             if (clientType === 'bot') {
                 console.log("[CAMERA WS] 🤖 Camera Bot Client disconnected.");
                 global.cameraBotClient = null;
+                global.cameraVrcRunning = false;
+                global.cameraObsRunning = false;
                 broadcastToWeb({ type: 'status', botOnline: false });
             } else if (clientType === 'web') {
                 console.log(`[CAMERA WS] 🦊 Mascot Web Client disconnected: ${clientInfo.username}`);
@@ -118,9 +142,20 @@ function initCameraWS(server) {
 
     // Hook up live VRChat Notification Pipeline updates to broadcast to browsers
     global.cameraRosterUpdated = () => {
-        broadcastToWeb({
-            type: 'telemetry',
-            players: getPlayersInInstance()
+        updateBotVrcLocation().then(() => {
+            broadcastToWeb({
+                type: 'telemetry',
+                vrc_location: cachedVrcLocation,
+                vrc_world_name: cachedVrcWorldName,
+                vrc_world_thumbnail: cachedVrcWorldThumbnail,
+                vrc_player_count: cachedVrcPlayerCount,
+                players: getPlayersInInstance()
+            });
+        }).catch(() => {
+            broadcastToWeb({
+                type: 'telemetry',
+                players: getPlayersInInstance()
+            });
         });
     };
 
@@ -144,6 +179,45 @@ function getPlayersInInstance() {
         return vrcApi.getPlayersInBotInstance();
     }
     return [];
+}
+
+let lastVrcLocationCheck = 0;
+let cachedVrcLocation = 'offline';
+let cachedVrcWorldName = 'Offline';
+let cachedVrcWorldThumbnail = null;
+let cachedVrcPlayerCount = 0;
+
+async function updateBotVrcLocation() {
+    const now = Date.now();
+    // Cache for 15 seconds to avoid spamming VRChat API
+    if (now - lastVrcLocationCheck < 15000 && lastVrcLocationCheck > 0) return;
+    lastVrcLocationCheck = now;
+
+    const vrcApi = require('./vrc-api');
+    try {
+        const location = await vrcApi.getBotCurrentLocation();
+        if (location && location !== 'offline' && location !== 'private') {
+            cachedVrcLocation = location;
+            // Get World details if location is available
+            const instanceData = await vrcApi.getInstanceData(location);
+            if (instanceData && instanceData.world) {
+                cachedVrcWorldName = `${instanceData.world.name} (Instance #${instanceData.name})`;
+                cachedVrcWorldThumbnail = instanceData.world.thumbnailImageUrl || instanceData.world.imageUrl || null;
+                cachedVrcPlayerCount = instanceData.n_users || 0;
+            } else {
+                cachedVrcWorldName = location;
+                cachedVrcWorldThumbnail = null;
+                cachedVrcPlayerCount = 0;
+            }
+        } else {
+            cachedVrcLocation = location || 'offline';
+            cachedVrcWorldName = location === 'private' ? 'Private Instance' : 'Offline';
+            cachedVrcWorldThumbnail = null;
+            cachedVrcPlayerCount = 0;
+        }
+    } catch (err) {
+        console.error("[CAMERA WS] Failed to update bot VRC location:", err);
+    }
 }
 
 module.exports = {

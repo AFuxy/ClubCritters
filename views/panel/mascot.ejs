@@ -43,14 +43,28 @@
                     <span id="bot-status-badge" class="badge" style="background: #ff4444; font-size: 0.65rem; padding: 4px 10px; border-radius: 20px; color: white; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Offline</span>
                 </h2>
                 
+                <!-- Current Location Block -->
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.02); margin-bottom: 15px; display: flex; gap: 15px; align-items: center;">
+                    <img id="vrc-world-icon" src="" style="width: 80px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); display: none;">
+                    <div style="flex: 1;">
+                        <span style="color: #aaa; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 2px;">VRChat Instance</span>
+                        <span id="vrc-location-text" style="font-weight: 800; color: #888; font-size: 0.95rem; line-height: 1.3;">OFFLINE</span>
+                        <span id="vrc-player-count-text" style="color: #666; font-size: 0.75rem; display: block; margin-top: 2px; font-weight: 600; text-transform: uppercase;">0 PLAYERS INSIDE</span>
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label style="color:#aaa; font-size:0.8rem; font-weight:bold; text-transform:uppercase; margin-bottom:5px; display:block;">VRChat Instance Link</label>
                     <input type="text" id="vrc-instance-url" placeholder="https://vrchat.com/home/launch?worldId=..." style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid #444; color: #fff; border-radius: 8px; padding: 10px; margin-bottom: 15px; box-sizing: border-box;">
                 </div>
-                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <!-- VRChat Launch/Close -->
                     <button class="btn-cc btn-secondary btn-small" id="btn-launch-vrc" onclick="sendCommand('launch_vrc', document.getElementById('vrc-instance-url').value)">🚀 Launch VRC</button>
+                    <button class="btn-cc btn-dark btn-small" style="background: rgba(255, 68, 68, 0.1); border-color: rgba(255, 68, 68, 0.3); color: #ff4444; display: none;" id="btn-kill-vrc" onclick="sendCommand('kill_vrc')" disabled>🛑 Close VRC</button>
+
+                    <!-- OBS Launch/Close -->
                     <button class="btn-cc btn-secondary btn-small" id="btn-launch-obs" onclick="sendCommand('launch_obs')">🎥 Launch OBS</button>
+                    <button class="btn-cc btn-dark btn-small" style="background: rgba(255, 68, 68, 0.1); border-color: rgba(255, 68, 68, 0.3); color: #ff4444; display: none;" id="btn-kill-obs" onclick="sendCommand('kill_obs')" disabled>🛑 Close OBS</button>
                 </div>
             </div>
 
@@ -89,10 +103,10 @@
 
         </div>
 
-        <!-- COLUMN 2: WASD CONTROLLER & INSTANCE ROSTER -->
+        <!-- COLUMN 2: WASD CONTROLLER & LOOK CONTROLS -->
         <div style="display: flex; flex-direction: column; gap: 20px;">
             
-            <!-- Virtual WASD D-Pad -->
+            <!-- Virtual WASD D-Pad (Camera Movement) -->
             <div style="background: var(--card-bg); border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center;">
                 <h2 style="color: var(--primary-blue); font-size: 1.1rem; margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; width: 100%; text-align: left;">Camera Movement</h2>
                 
@@ -105,7 +119,27 @@
                     <button id="key-s" class="btn-cc btn-dark dpad-btn" style="width:60px; height:60px; border-radius:12px; font-weight:800; font-size:1.2rem; padding:0; line-height: 60px;" onmousedown="sendMovementKey('s', 'down')" onmouseup="sendMovementKey('s', 'up')" onmouseleave="sendMovementKey('s', 'up')">S</button>
                     <button id="key-d" class="btn-cc btn-dark dpad-btn" style="width:60px; height:60px; border-radius:12px; font-weight:800; font-size:1.2rem; padding:0; line-height: 60px;" onmousedown="sendMovementKey('d', 'down')" onmouseup="sendMovementKey('d', 'up')" onmouseleave="sendMovementKey('d', 'up')">D</button>
                 </div>
-                <p style="color:#555; font-size:0.75rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin:0;">Use Keyboard WASD or Arrow Keys</p>
+                <p style="color:#555; font-size:0.75rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin:0;">Use Keyboard WASD keys</p>
+            </div>
+
+            <!-- Virtual Look D-Pad (Camera Look & Click) -->
+            <div style="background: var(--card-bg); border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center;">
+                <h2 style="color: var(--primary-pink); font-size: 1.1rem; margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; width: 100%; text-align: left;">Camera Look & Interact</h2>
+                
+                <div style="display: grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px 60px; gap: 12px; margin-bottom: 20px; margin-top: 10px;">
+                    <div></div>
+                    <button id="look-up-btn" class="btn-cc btn-dark dpad-btn" style="width:60px; height:60px; border-radius:12px; font-weight:800; font-size:1.1rem; padding:0; line-height: 60px;" onmousedown="startMouseLook(0, -25)" onmouseup="stopMouseLook()" onmouseleave="stopMouseLook()">▲</button>
+                    <div></div>
+                    
+                    <button id="key-left" class="btn-cc btn-dark dpad-btn" style="width:60px; height:60px; border-radius:12px; font-weight:800; font-size:1.1rem; padding:0; line-height: 60px;" onmousedown="sendMovementKey('left', 'down')" onmouseup="sendMovementKey('left', 'up')" onmouseleave="sendMovementKey('left', 'up')">◀</button>
+                    <button id="interact-btn" class="btn-cc btn-primary" style="width:60px; height:60px; border-radius:12px; font-weight:800; font-size:0.85rem; padding:0; line-height: 60px; background: var(--primary-gradient);" onclick="sendMouseClick()">Click</button>
+                    <button id="key-right" class="btn-cc btn-dark dpad-btn" style="width:60px; height:60px; border-radius:12px; font-weight:800; font-size:1.1rem; padding:0; line-height: 60px;" onmousedown="sendMovementKey('right', 'down')" onmouseup="sendMovementKey('right', 'up')" onmouseleave="sendMovementKey('right', 'up')">▶</button>
+                    
+                    <div></div>
+                    <button id="look-down-btn" class="btn-cc btn-dark dpad-btn" style="width:60px; height:60px; border-radius:12px; font-weight:800; font-size:1.1rem; padding:0; line-height: 60px;" onmousedown="startMouseLook(0, 25)" onmouseup="stopMouseLook()" onmouseleave="stopMouseLook()">▼</button>
+                    <div></div>
+                </div>
+                <p style="color:#555; font-size:0.75rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin:0;">Use Keyboard Arrow keys to Turn</p>
             </div>
 
             <!-- In-Instance Roster -->
@@ -207,11 +241,23 @@
                 if (msg.type === 'status') {
                     updateStatus(msg.botOnline);
                     if (msg.players) updateRoster(msg.players);
+                    if (msg.vrc_running !== undefined && msg.obs_running !== undefined) {
+                        updateAppsState(msg.vrc_running, msg.obs_running);
+                    }
+                    if (msg.vrc_world_name) {
+                        updateVrcLocation(msg.vrc_world_name, msg.vrc_world_thumbnail, msg.vrc_player_count);
+                    }
                 } 
                 // Telemetry / Player list Updates
                 else if (msg.type === 'telemetry') {
                     if (msg.players) updateRoster(msg.players);
                     if (msg.obs) updateOBSUI(msg.obs);
+                    if (msg.vrc_running !== undefined && msg.obs_running !== undefined) {
+                        updateAppsState(msg.vrc_running, msg.obs_running);
+                    }
+                    if (msg.vrc_world_name) {
+                        updateVrcLocation(msg.vrc_world_name, msg.vrc_world_thumbnail, msg.vrc_player_count);
+                    }
                 }
             } catch (err) {
                 console.error("[CAMERA WS] Message error:", err);
@@ -230,6 +276,8 @@
         const badge = document.getElementById('bot-status-badge');
         const btnLaunchVrc = document.getElementById('btn-launch-vrc');
         const btnLaunchObs = document.getElementById('btn-launch-obs');
+        const btnKillVrc = document.getElementById('btn-kill-vrc');
+        const btnKillObs = document.getElementById('btn-kill-obs');
         const btnObsStream = document.getElementById('btn-obs-stream');
         const btnObsRecord = document.getElementById('btn-obs-record');
         const sceneSelect = document.getElementById('obs-scene-select');
@@ -239,19 +287,90 @@
             badge.style.background = '#00e676';
             btnLaunchVrc.disabled = false;
             btnLaunchObs.disabled = false;
+            btnKillVrc.disabled = false;
+            btnKillObs.disabled = false;
             // Let the OBS telemetry payload handle enabling output controls
         } else {
             badge.innerText = 'Offline';
             badge.style.background = '#ff4444';
             btnLaunchVrc.disabled = true;
             btnLaunchObs.disabled = true;
+            btnKillVrc.disabled = true;
+            btnKillObs.disabled = true;
+
+            // Reset visibilities when offline
+            btnLaunchVrc.style.display = 'block';
+            btnKillVrc.style.display = 'none';
+            btnLaunchObs.style.display = 'block';
+            btnKillObs.style.display = 'none';
+
             btnObsStream.disabled = true;
             btnObsRecord.disabled = true;
             sceneSelect.disabled = true;
             sceneSelect.innerHTML = '<option value="">No scenes available</option>';
             document.getElementById('obs-status-text').innerText = 'DISCONNECTED';
             document.getElementById('obs-status-text').style.color = '#888';
+            document.getElementById('vrc-location-text').innerText = 'OFFLINE';
+            document.getElementById('vrc-location-text').style.color = '#888';
+            document.getElementById('vrc-world-icon').style.display = 'none';
+            document.getElementById('vrc-player-count-text').innerText = '0 PLAYERS INSIDE';
+            document.getElementById('vrc-player-count-text').style.color = '#666';
             resetStatsDisplay();
+        }
+    }
+
+    function updateVrcLocation(locationName, thumbnail, playerCount) {
+        const text = document.getElementById('vrc-location-text');
+        const img = document.getElementById('vrc-world-icon');
+        const count = document.getElementById('vrc-player-count-text');
+
+        text.innerText = locationName.toUpperCase();
+        
+        if (locationName === 'Offline') {
+            text.style.color = '#888';
+            img.style.display = 'none';
+            count.innerText = '0 PLAYERS INSIDE';
+            count.style.color = '#666';
+        } else if (locationName === 'Private Instance') {
+            text.style.color = '#ffb300';
+            img.style.display = 'none';
+            count.innerText = 'PRIVATE';
+            count.style.color = '#ffb300';
+        } else {
+            text.style.color = '#00e676';
+            if (thumbnail) {
+                img.src = thumbnail;
+                img.style.display = 'block';
+            } else {
+                img.style.display = 'none';
+            }
+            count.innerText = `${playerCount} ${playerCount === 1 ? 'PLAYER' : 'PLAYERS'} INSIDE`;
+            count.style.color = 'var(--primary-blue)';
+        }
+    }
+
+    function updateAppsState(vrc_running, obs_running) {
+        if (!botConnected) return;
+
+        const btnLaunchVrc = document.getElementById('btn-launch-vrc');
+        const btnKillVrc = document.getElementById('btn-kill-vrc');
+        const btnLaunchObs = document.getElementById('btn-launch-obs');
+        const btnKillObs = document.getElementById('btn-kill-obs');
+
+        if (vrc_running) {
+            btnLaunchVrc.style.display = 'none';
+            btnKillVrc.style.display = 'block';
+        } else {
+            btnLaunchVrc.style.display = 'block';
+            btnKillVrc.style.display = 'none';
+        }
+
+        if (obs_running) {
+            btnLaunchObs.style.display = 'none';
+            btnKillObs.style.display = 'block';
+        } else {
+            btnLaunchObs.style.display = 'block';
+            btnKillObs.style.display = 'none';
         }
     }
 
@@ -370,10 +489,12 @@
     // --- KEYBOARD & VIRTUAL KEY HANDLING ---
     const activeKeys = new Set();
     const keyMap = {
-        'KeyW': 'w', 'ArrowUp': 'w',
-        'KeyA': 'a', 'ArrowLeft': 'a',
-        'KeyS': 's', 'ArrowDown': 's',
-        'KeyD': 'd', 'ArrowRight': 'd'
+        'KeyW': 'w',
+        'KeyA': 'a',
+        'KeyS': 's',
+        'KeyD': 'd',
+        'ArrowLeft': 'left',
+        'ArrowRight': 'right'
     };
 
     function sendMovementKey(key, state) {
@@ -392,6 +513,48 @@
             if (state === 'down') btn.classList.add('active-press');
             else btn.classList.remove('active-press');
         }
+    }
+
+    // --- MOUSE LOOK & CLICK FUNCTIONS ---
+    let mouseLookInterval = null;
+
+    function startMouseLook(x, y) {
+        if (!ws || ws.readyState !== WebSocket.OPEN || !botConnected) return;
+        if (mouseLookInterval) clearInterval(mouseLookInterval);
+        
+        sendMouseMove(x, y);
+        mouseLookInterval = setInterval(() => {
+            sendMouseMove(x, y);
+        }, 50);
+    }
+
+    function stopMouseLook() {
+        if (mouseLookInterval) {
+            clearInterval(mouseLookInterval);
+            mouseLookInterval = null;
+        }
+    }
+
+    function sendMouseMove(x, y) {
+        if (!ws || ws.readyState !== WebSocket.OPEN || !botConnected) return;
+        ws.send(JSON.stringify({
+            type: 'control',
+            action: 'mouse_move',
+            x: x,
+            y: y
+        }));
+    }
+
+    function sendMouseClick() {
+        if (!ws || ws.readyState !== WebSocket.OPEN || !botConnected) {
+            showNotify('Bot client is currently offline.', 'error');
+            return;
+        }
+        ws.send(JSON.stringify({
+            type: 'control',
+            action: 'mouse_click'
+        }));
+        showNotify('Interaction click sent');
     }
 
     document.addEventListener('keydown', (e) => {

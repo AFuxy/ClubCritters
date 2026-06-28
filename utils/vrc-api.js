@@ -256,6 +256,22 @@ function cleanInstanceId(input) {
     return input;
 }
 
+async function getBotCurrentLocation() {
+    try {
+        const res = await vrcFetch('https://api.vrchat.cloud/api/1/auth/user');
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data.location) {
+            // Keep invite location in sync with the bot's real location
+            activeInviteLocation = data.location;
+        }
+        return data.location || null;
+    } catch (e) {
+        console.error("[VRC API] Failed to get bot current location:", e);
+        return null;
+    }
+}
+
 // Global variable to store active club location for the Pipeline listener
 let activeInviteLocation = null;
 global.vrcFriendsLocation = global.vrcFriendsLocation || new Map();
@@ -282,14 +298,21 @@ async function refreshVrcFriendsList() {
     }
 }
 
+function getBaseInstanceId(location) {
+    if (!location) return null;
+    const cleaned = cleanInstanceId(location);
+    if (!cleaned) return null;
+    return cleaned.split('~')[0];
+}
+
 function getPlayersInBotInstance() {
     if (!activeInviteLocation) return [];
-    const botLoc = cleanInstanceId(activeInviteLocation);
+    const botLoc = getBaseInstanceId(activeInviteLocation);
     if (!botLoc) return [];
     
     const players = [];
     for (const [userId, data] of global.vrcFriendsLocation.entries()) {
-        if (data.location && cleanInstanceId(data.location) === botLoc) {
+        if (data.location && getBaseInstanceId(data.location) === botLoc) {
             players.push(data.displayName);
         }
     }
@@ -724,4 +747,4 @@ async function removeGroupMemberRole(groupShortName, userId, roleId) {
     }
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance };
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation };
