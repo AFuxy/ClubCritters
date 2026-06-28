@@ -88,11 +88,11 @@
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <!-- VRChat Launch/Close -->
-                    <button class="btn-cc btn-secondary btn-small" id="btn-launch-vrc" onclick="sendCommand('launch_vrc', document.getElementById('vrc-instance-url').value)">🚀 Launch VRC</button>
+                    <button class="btn-cc btn-secondary btn-small" id="btn-launch-vrc" style="grid-column: span 2;" onclick="sendCommand('launch_vrc', document.getElementById('vrc-instance-url').value)">🚀 Launch VRC</button>
                     <button class="btn-cc btn-dark btn-small" style="background: rgba(255, 68, 68, 0.1); border-color: rgba(255, 68, 68, 0.3); color: #ff4444; display: none;" id="btn-kill-vrc" onclick="sendCommand('kill_vrc')" disabled>🛑 Close VRC</button>
 
                     <!-- OBS Launch/Close -->
-                    <button class="btn-cc btn-secondary btn-small" id="btn-launch-obs" onclick="sendCommand('launch_obs')">🎥 Launch OBS</button>
+                    <button class="btn-cc btn-secondary btn-small" id="btn-launch-obs" style="grid-column: span 2;" onclick="sendCommand('launch_obs')">🎥 Launch OBS</button>
                     <button class="btn-cc btn-dark btn-small" style="background: rgba(255, 68, 68, 0.1); border-color: rgba(255, 68, 68, 0.3); color: #ff4444; display: none;" id="btn-kill-obs" onclick="sendCommand('kill_obs')" disabled>🛑 Close OBS</button>
                 </div>
                 <button class="btn-cc btn-dark btn-small" id="btn-show-notif-log" style="width: 100%; margin-top: 15px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="openNotificationModal()">🔔 View Notification Logs</button>
@@ -441,18 +441,26 @@
         const btnKillObs = document.getElementById('btn-kill-obs');
 
         if (vrc_running) {
-            btnLaunchVrc.style.display = 'none';
+            btnLaunchVrc.innerText = '✈️ Join / Redirect';
+            btnLaunchVrc.style.gridColumn = 'span 1';
             btnKillVrc.style.display = 'block';
+            btnKillVrc.style.gridColumn = 'span 1';
         } else {
-            btnLaunchVrc.style.display = 'block';
+            btnLaunchVrc.innerText = '🚀 Launch VRC';
+            btnLaunchVrc.style.gridColumn = 'span 2';
             btnKillVrc.style.display = 'none';
         }
 
         if (obs_running) {
-            btnLaunchObs.style.display = 'none';
+            btnLaunchObs.innerText = '🎥 OBS (Running)';
+            btnLaunchObs.style.gridColumn = 'span 1';
+            btnLaunchObs.disabled = true;
             btnKillObs.style.display = 'block';
+            btnKillObs.style.gridColumn = 'span 1';
         } else {
-            btnLaunchObs.style.display = 'block';
+            btnLaunchObs.innerText = '🎥 Launch OBS';
+            btnLaunchObs.style.gridColumn = 'span 2';
+            btnLaunchObs.disabled = false;
             btnKillObs.style.display = 'none';
         }
     }
@@ -666,6 +674,17 @@
                 stopMouseLook();
             } else {
                 sendMovementKey(mapped, 'up');
+            }
+        }
+    });
+
+    // Enter key support for redirect input
+    document.getElementById('vrc-instance-url').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = e.target.value;
+            if (val && !document.getElementById('btn-launch-vrc').disabled) {
+                sendCommand('launch_vrc', val);
             }
         }
     });
