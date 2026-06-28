@@ -174,8 +174,12 @@ app.use((req, res) => {
 
 async function start() {
     await initDB();
-    app.listen(PORT, () => { 
+    const server = app.listen(PORT, () => { 
         console.log(`\x1b[34m[SERVER] 🚀 Hub running on http://localhost:${PORT}\x1b[0m`); 
     });
+
+    // Initialize Camera Bot WebSocket Relay
+    const { initCameraWS } = require('./utils/camera-ws');
+    initCameraWS(server);
 }
 start();

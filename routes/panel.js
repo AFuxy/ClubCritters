@@ -13,12 +13,23 @@ router.get('/settings', isAuthenticated, isStaff, (req, res) => { res.render('pa
 router.get('/stats', isAuthenticated, isStaff, (req, res) => { res.render('panel/stats', { user: req.user, page: 'stats' }); });
 router.get('/links', isAuthenticated, isStaff, (req, res) => { res.render('panel/links', { user: req.user, page: 'links', vrcGroupId: process.env.VRC_GROUPID || 'FURN.9601' }); });
 router.get('/archives', isAuthenticated, (req, res) => { res.render('panel/archives', { user: req.user, page: 'archives' }); });
+const crypto = require('crypto');
+
 router.get('/mascot', isAuthenticated, canAccessMascot, (req, res) => { 
+    const token = crypto.randomBytes(16).toString('hex');
+    global.cameraTokens = global.cameraTokens || new Map();
+    global.cameraTokens.set(token, {
+        userId: req.user.discordId,
+        username: req.user.name,
+        expires: Date.now() + 5 * 60 * 1000 // Valid for 5 minutes
+    });
+
     res.render('panel/mascot', { 
         user: req.user, 
         page: 'mascot',
         mascotEmail: process.env.VRC_EMAIL || 'Not Configured',
-        mascotPassword: process.env.VRC_PASSWORD || 'Not Configured'
+        mascotPassword: process.env.VRC_PASSWORD || 'Not Configured',
+        cameraWsToken: token
     }); 
 });
 

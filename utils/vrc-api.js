@@ -258,6 +258,43 @@ function cleanInstanceId(input) {
 
 // Global variable to store active club location for the Pipeline listener
 let activeInviteLocation = null;
+global.vrcFriendsLocation = global.vrcFriendsLocation || new Map();
+
+async function refreshVrcFriendsList() {
+    try {
+        const res = await vrcFetch('https://api.vrchat.cloud/api/1/auth/user/friends?offline=false');
+        if (!res.ok) return;
+        const friends = await res.json();
+        for (const friend of friends) {
+            if (friend.location) {
+                global.vrcFriendsLocation.set(friend.id, {
+                    userId: friend.id,
+                    displayName: friend.displayName,
+                    location: friend.location
+                });
+            }
+        }
+        if (typeof global.cameraRosterUpdated === 'function') {
+            global.cameraRosterUpdated();
+        }
+    } catch (e) {
+        console.error("[VRC API] Failed to refresh friends list:", e);
+    }
+}
+
+function getPlayersInBotInstance() {
+    if (!activeInviteLocation) return [];
+    const botLoc = cleanInstanceId(activeInviteLocation);
+    if (!botLoc) return [];
+    
+    const players = [];
+    for (const [userId, data] of global.vrcFriendsLocation.entries()) {
+        if (data.location && cleanInstanceId(data.location) === botLoc) {
+            players.push(data.displayName);
+        }
+    }
+    return players;
+}
 
 /**
  * Connect to VRChat Notification Pipeline (WebSocket)
@@ -293,12 +330,38 @@ async function connectPipeline(location) {
         pipelineHeartbeat = setInterval(() => {
             if (pipeline && pipeline.readyState === WebSocket.OPEN) pipeline.ping();
         }, 30000);
+
+        refreshVrcFriendsList().catch(() => {});
     });
 
     pipeline.on('message', async (data) => {
         try {
             const msg = JSON.parse(data);
-            if (!msg.type || msg.type !== 'notification') return;
+            if (!msg.type) return;
+
+            // Handle Friend Status Updates for live Roster tracking
+            if (['friend-location', 'friend-online', 'friend-active', 'friend-offline'].includes(msg.type)) {
+                const friendData = JSON.parse(msg.content);
+                const userId = friendData.userId;
+
+                if (msg.type === 'friend-offline') {
+                    global.vrcFriendsLocation.delete(userId);
+                } else {
+                    const existing = global.vrcFriendsLocation.get(userId) || {};
+                    global.vrcFriendsLocation.set(userId, {
+                        userId,
+                        displayName: friendData.user?.displayName || existing.displayName || 'Unknown Friend',
+                        location: friendData.location || existing.location || null
+                    });
+                }
+
+                if (typeof global.cameraRosterUpdated === 'function') {
+                    global.cameraRosterUpdated();
+                }
+                return;
+            }
+
+            if (msg.type !== 'notification') return;
             const notif = JSON.parse(msg.content);
             
             // 1. Friend Request
@@ -661,4 +724,4 @@ async function removeGroupMemberRole(groupShortName, userId, roleId) {
     }
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole };
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance };
