@@ -276,6 +276,21 @@ async function getBotCurrentLocation() {
     }
 }
 
+async function getWorldData(worldId) {
+    if (!authCookie) await loadCookieFromDB();
+    if (!authCookie) await loginVRC();
+    if (!authCookie) return null;
+    
+    try {
+        const res = await vrcFetch(`https://api.vrchat.cloud/api/1/worlds/${worldId}`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        console.error("[VRC API] Failed to fetch world data:", e);
+        return null;
+    }
+}
+
 // Global variable to store active club location for the Pipeline listener
 let activeInviteLocation = null;
 
@@ -755,4 +770,4 @@ async function removeGroupMemberRole(groupShortName, userId, roleId) {
     }
 }
 
-module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation, setActiveInviteLocation };
+module.exports = { loginVRC, getInstanceData, getGroupInstanceData, getGroupStats, verifyVRC, getVrcStatus, connectPipeline, disconnectPipeline, updateBotPresence, autoAcceptFriends, closeGroupInstance, getUserInfo, getGroupMembers, banGroupMember, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole, getPlayersInBotInstance, getBotCurrentLocation, setActiveInviteLocation, getWorldData };

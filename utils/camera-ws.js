@@ -208,18 +208,39 @@ async function updateBotVrcLocation() {
     const vrcApi = require('./vrc-api');
     try {
         const location = await vrcApi.getBotCurrentLocation();
-        if (location && location !== 'offline' && location !== 'private') {
+        if (location && location !== 'offline') {
             cachedVrcLocation = location;
-            // Get World details if location is available
-            const instanceData = await vrcApi.getInstanceData(location);
-            if (instanceData && instanceData.world) {
-                cachedVrcWorldName = `${instanceData.world.name} (Instance #${instanceData.name})`;
-                cachedVrcWorldThumbnail = instanceData.world.thumbnailImageUrl || instanceData.world.imageUrl || null;
-                cachedVrcPlayerCount = instanceData.n_users || 0;
+            
+            let isPrivate = location.includes('~private') || location.includes('~hidden') || location === 'private';
+            const worldId = location.split(':')[0];
+            
+            let worldData = null;
+            let instanceName = '';
+            let nUsers = 0;
+            
+            if (!isPrivate) {
+                const instanceData = await vrcApi.getInstanceData(location);
+                if (instanceData && instanceData.world) {
+                    worldData = instanceData.world;
+                    instanceName = ` (Instance #${instanceData.name})`;
+                    nUsers = instanceData.n_users || 0;
+                }
+            }
+            
+            if (!worldData && worldId && worldId.startsWith('wrld_')) {
+                worldData = await vrcApi.getWorldData(worldId);
+                instanceName = isPrivate ? ' (Private)' : '';
+                nUsers = 0;
+            }
+            
+            if (worldData) {
+                cachedVrcWorldName = `${worldData.name}${instanceName}`;
+                cachedVrcWorldThumbnail = worldData.thumbnailImageUrl || worldData.imageUrl || null;
+                cachedVrcPlayerCount = Math.max(nUsers, getPlayersInInstance().length);
             } else {
-                cachedVrcWorldName = location;
+                cachedVrcWorldName = location === 'private' ? 'Private Instance' : location;
                 cachedVrcWorldThumbnail = null;
-                cachedVrcPlayerCount = 0;
+                cachedVrcPlayerCount = getPlayersInInstance().length;
             }
         } else {
             cachedVrcLocation = location || 'offline';
@@ -246,27 +267,41 @@ async function updateBotVrcLocationFromClient(location) {
     
     cachedVrcLocation = location;
     
-    if (location === 'private') {
-        cachedVrcWorldName = 'Private Instance';
-        cachedVrcWorldThumbnail = null;
-        cachedVrcPlayerCount = 0;
-        return;
-    }
-
     const vrcApi = require('./vrc-api');
     try {
         // Sync active invite location
         vrcApi.setActiveInviteLocation(location);
         
-        const instanceData = await vrcApi.getInstanceData(location);
-        if (instanceData && instanceData.world) {
-            cachedVrcWorldName = `${instanceData.world.name} (Instance #${instanceData.name})`;
-            cachedVrcWorldThumbnail = instanceData.world.thumbnailImageUrl || instanceData.world.imageUrl || null;
-            cachedVrcPlayerCount = instanceData.n_users || 0;
+        let isPrivate = location.includes('~private') || location.includes('~hidden') || location === 'private';
+        const worldId = location.split(':')[0];
+        
+        let worldData = null;
+        let instanceName = '';
+        let nUsers = 0;
+        
+        if (!isPrivate) {
+            const instanceData = await vrcApi.getInstanceData(location);
+            if (instanceData && instanceData.world) {
+                worldData = instanceData.world;
+                instanceName = ` (Instance #${instanceData.name})`;
+                nUsers = instanceData.n_users || 0;
+            }
+        }
+        
+        if (!worldData && worldId && worldId.startsWith('wrld_')) {
+            worldData = await vrcApi.getWorldData(worldId);
+            instanceName = isPrivate ? ' (Private)' : '';
+            nUsers = 0;
+        }
+        
+        if (worldData) {
+            cachedVrcWorldName = `${worldData.name}${instanceName}`;
+            cachedVrcWorldThumbnail = worldData.thumbnailImageUrl || worldData.imageUrl || null;
+            cachedVrcPlayerCount = Math.max(nUsers, getPlayersInInstance().length);
         } else {
             cachedVrcWorldName = location;
             cachedVrcWorldThumbnail = null;
-            cachedVrcPlayerCount = 0;
+            cachedVrcPlayerCount = getPlayersInInstance().length;
         }
     } catch (err) {
         console.error("[CAMERA WS] Failed to resolve client VRC location:", err);
