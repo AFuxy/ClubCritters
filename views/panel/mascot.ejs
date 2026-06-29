@@ -556,7 +556,8 @@
             const pct = total > 0 ? ((dropped / total) * 100).toFixed(2) : '0.00';
             droppedText.innerText = `${dropped} / ${total} (${pct}%)`;
 
-            if (dropped > 0 && (dropped / total) > 0.01) {
+            // Prevent division-by-zero (total === 0) resulting in Infinity red flags
+            if (total > 0 && dropped > 0 && (dropped / total) > 0.01) {
                 droppedText.style.color = '#ff4444'; // Red flag for frame drops
             } else {
                 droppedText.style.color = '#ddd';
