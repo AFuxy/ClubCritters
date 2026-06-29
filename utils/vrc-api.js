@@ -358,7 +358,10 @@ function recordNotifLog(type, sender, senderId, message, action) {
     // Broadcast immediately to web panels
     try {
         const cameraWs = require('./camera-ws');
-        cameraWs.broadcastToWeb({ vrc_notification_logs: global.vrcNotificationLogs });
+        cameraWs.broadcastToWeb({ 
+            type: 'telemetry',
+            vrc_notification_logs: global.vrcNotificationLogs 
+        });
     } catch (e) {}
 }
 

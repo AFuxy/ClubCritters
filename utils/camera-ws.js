@@ -117,6 +117,9 @@ function initCameraWS(server) {
                     if (data.obs_running !== undefined) global.cameraObsRunning = data.obs_running;
                     if (data.players !== undefined) global.cameraInstancePlayers = data.players;
                     
+                    // Inject real-time notification logs into every telemetry broadcast
+                    data.vrc_notification_logs = global.vrcNotificationLogs || [];
+
                     if (data.vrc_location) {
                         updateBotVrcLocationFromClient(data.vrc_location).then(() => {
                             data.vrc_world_name = cachedVrcWorldName;
@@ -272,6 +275,9 @@ async function updateBotVrcLocationFromClient(location) {
         cachedVrcPlayerCount = 0;
         return;
     }
+    
+    // Always keep player count cache in sync with local instance players
+    cachedVrcPlayerCount = getPlayersInInstance().length;
     
     // If location is the same, no need to query world info again
     if (cachedVrcLocation === location) return;
