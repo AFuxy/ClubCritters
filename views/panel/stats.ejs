@@ -72,6 +72,40 @@
         padding-left: 15px !important;
     }
     .schedule-item::before { display: none !important; } /* Remove the bar from admin.css to prevent double borders */
+
+    /* AUTOCOMPLETE / CHIP STYLES */
+    .autocomplete-suggestion {
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #eee;
+        transition: background 0.2s;
+    }
+    .autocomplete-suggestion:hover {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    .performer-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(41, 197, 246, 0.15);
+        border: 1px solid rgba(41, 197, 246, 0.3);
+        color: #29C5F6;
+        padding: 4px 10px;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    .performer-chip-remove {
+        cursor: pointer;
+        color: rgba(255,255,255,0.4);
+        transition: color 0.2s;
+        font-weight: bold;
+    }
+    .performer-chip-remove:hover {
+        color: #ff5555;
+    }
 </style>
 
 <div class="staff-hub">
@@ -184,6 +218,12 @@
                     <label style="display:block; color:#888; margin-bottom:5px;">Unique Users</label>
                     <input type="number" name="uniqueUsers" id="log-uniqueUsers" value="0" class="search-bar" style="width:100%;" required>
                 </div>
+            </div>
+            <div class="form-group" style="margin-bottom:15px; position: relative;">
+                <label style="display:block; color:#888; margin-bottom:5px;">Lineup (DJs who played)</label>
+                <div id="selected-performers-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+                <input type="text" id="performer-search" class="search-bar" placeholder="Type DJ name to add..." style="width:100%;" autocomplete="off">
+                <div id="performer-suggestions" class="autocomplete-suggestions" style="display:none; position:absolute; left:0; right:0; background:#1b2533; border:1px solid rgba(255,255,255,0.1); border-radius:8px; max-height:150px; overflow-y:auto; z-index:1001; margin-top:2px;"></div>
             </div>
             <div style="margin-bottom:20px;">
                 <label style="display:flex; align-items:center; gap:10px; color:#eee; cursor:pointer;">
@@ -371,6 +411,7 @@
         } catch (err) { console.error("Failed to load stats:", err); }
     }
     loadGlobalStats();
+    loadAllDjs();
 
     function toggleBreakdown(date) {
         const el = document.getElementById(`breakdown-${date}`);
@@ -404,6 +445,84 @@
         document.getElementById('modal-title').innerText = "Add Overflow Instance";
     }
 
+    let allDjs = [];
+    let selectedPerformerIds = new Set();
+
+    async function loadAllDjs() {
+        try {
+            const res = await fetch('/api/public/roster');
+            allDjs = await res.json();
+        } catch (err) {
+            console.error("Failed to load roster:", err);
+        }
+    }
+
+    function renderSelectedPerformers() {
+        const container = document.getElementById('selected-performers-container');
+        container.innerHTML = "";
+        
+        selectedPerformerIds.forEach(id => {
+            const dj = allDjs.find(d => d.discordId === id);
+            if (!dj) return;
+            
+            const chip = document.createElement('div');
+            chip.className = 'performer-chip';
+            chip.innerHTML = `
+                <span>${dj.name}</span>
+                <span class="performer-chip-remove" onclick="removePerformer('${id}')">✕</span>
+            `;
+            container.appendChild(chip);
+        });
+    }
+
+    window.removePerformer = function(id) {
+        selectedPerformerIds.delete(id);
+        renderSelectedPerformers();
+    };
+
+    // Autocomplete Input Handler
+    const searchInput = document.getElementById('performer-search');
+    const suggestionsBox = document.getElementById('performer-suggestions');
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        if (!query) {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+
+        const filtered = allDjs.filter(dj => 
+            dj.name.toLowerCase().includes(query) && 
+            !selectedPerformerIds.has(dj.discordId)
+        );
+
+        if (filtered.length === 0) {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+
+        suggestionsBox.innerHTML = filtered.map(dj => `
+            <div class="autocomplete-suggestion" onclick="addPerformer('${dj.discordId}')">
+                ${dj.name} (${dj.title || dj.type || 'DJ'})
+            </div>
+        `).join('');
+        suggestionsBox.style.display = 'block';
+    });
+
+    window.addPerformer = function(id) {
+        selectedPerformerIds.add(id);
+        renderSelectedPerformers();
+        searchInput.value = "";
+        suggestionsBox.style.display = 'none';
+    };
+
+    // Click outside handler
+    document.addEventListener('click', (e) => {
+        if (e.target !== searchInput) {
+            suggestionsBox.style.display = 'none';
+        }
+    });
+
     function openLogModal(log = null) {
         const modal = document.getElementById('log-modal');
         const form = document.getElementById('log-form');
@@ -411,6 +530,9 @@
         
         form.reset();
         document.getElementById('log-id').value = "";
+        selectedPerformerIds.clear();
+        searchInput.value = "";
+        suggestionsBox.style.display = 'none';
         
         if (log) {
             title.innerText = log.id ? "Edit Event Log" : "Add Manual Entry";
@@ -421,10 +543,16 @@
             document.getElementById('log-peakCapacity').value = log.peakCapacity;
             document.getElementById('log-uniqueUsers').value = log.uniqueUsers;
             document.getElementById('log-isEventSession').checked = log.isEventSession;
+            
+            // Load selected performers from log
+            if (log.performers && Array.isArray(log.performers)) {
+                log.performers.forEach(p => selectedPerformerIds.add(p.discordId || p.performerId));
+            }
         } else {
             title.innerText = "Add Manual Event Log";
         }
         
+        renderSelectedPerformers();
         modal.style.display = 'flex';
     }
 
@@ -451,6 +579,7 @@
             peakCapacity: logs.reduce((acc, curr) => acc + curr.peakCapacity, 0),
             uniqueUsers: logs.reduce((acc, curr) => acc + curr.uniqueUsers, 0),
             isEventSession: logs.some(l => l.isEventSession),
+            performers: logs[0].performers,
             isMulti: logs.length > 1
         };
 
@@ -478,6 +607,8 @@
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
         data.isEventSession = formData.get('isEventSession') === 'on';
+        // Add performerIds to payload
+        data.performerIds = Array.from(selectedPerformerIds);
         
         const id = document.getElementById('log-id').value;
         const method = id ? 'PATCH' : 'POST';

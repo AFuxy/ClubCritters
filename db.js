@@ -91,12 +91,19 @@ const AppSlot = sequelize.define('AppSlot', {
 const Gallery = sequelize.define('Gallery', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     messageId: { type: DataTypes.STRING, allowNull: false },
-    attachmentId: { type: DataTypes.STRING, unique: true },
+    attachmentId: { type: DataTypes.STRING },
     imageUrl: { type: DataTypes.STRING, allowNull: false },
     thumbnailUrl: { type: DataTypes.STRING },
     uploaderId: { type: DataTypes.STRING }, // Discord ID to fetch fresh data
     caption: { type: DataTypes.TEXT },
     timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, {
+    indexes: [
+        {
+            unique: true,
+            fields: ['attachmentId']
+        }
+    ]
 });
 
 // 8. Application Submissions (Internal)
@@ -148,6 +155,11 @@ const InstanceVisitor = sequelize.define('InstanceVisitor', {
     vrcUsername: { type: DataTypes.STRING }
 });
 
+// 12. Event lineup join table
+const InstanceLogPerformers = sequelize.define('InstanceLogPerformers', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true }
+});
+
 // Relationships
 Roster.hasMany(Schedule, { foreignKey: 'performerId' });
 Schedule.belongsTo(Roster, { foreignKey: 'performerId' });
@@ -165,6 +177,10 @@ ApplicationSubmission.belongsTo(AppSlot, { foreignKey: 'slotId' });
 InstanceLog.hasMany(InstanceVisitor, { foreignKey: 'instanceLogId' });
 InstanceVisitor.belongsTo(InstanceLog, { foreignKey: 'instanceLogId' });
 
+// Event lineup tracking (Many-to-Many)
+InstanceLog.belongsToMany(Roster, { through: InstanceLogPerformers, as: 'performers', foreignKey: 'instanceLogId' });
+Roster.belongsToMany(InstanceLog, { through: InstanceLogPerformers, foreignKey: 'performerId' });
+
 async function initDB() {
     try {
         await sequelize.authenticate();
@@ -176,4 +192,4 @@ async function initDB() {
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, InstanceVisitor, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, InstanceVisitor, InstanceLogPerformers, initDB };

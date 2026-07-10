@@ -338,6 +338,12 @@
                     <% } %>
                 </span>
                 
+                <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                    <span style="background: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.3); color: #00e676; font-size: 0.75rem; font-weight: 800; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; display: inline-flex; align-items: center; gap: 6px;">
+                        ⚡ Played <%= eventCount %> <%= eventCount === 1 ? 'Event' : 'Events' %>
+                    </span>
+                </div>
+
                 <% if (performer.vrcUserId) { %>
                     <div id="vrc-status-container" style="margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                         <span class="vrc-status-badge" style="color: #888; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">

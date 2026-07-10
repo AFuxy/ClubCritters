@@ -99,9 +99,46 @@ function renderEvents(events) {
             `;
         }).join('');
 
-        const breakdownLink = event.isGrouped 
-            ? `<div class="breakdown-toggle" onclick="toggleBreakdown(this)">🔍 VIEW DETAILS</div>`
-            : "";
+        const breakdownLink = `<div class="breakdown-toggle" onclick="toggleBreakdown(this)">🔍 VIEW DETAILS</div>`;
+
+        // Generate Lineup HTML
+        let lineupHtml = "";
+        if (event.performers && event.performers.length > 0) {
+            lineupHtml = `
+                <div class="lineup-section" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                    <div style="font-size:0.75rem; font-weight:900; color:var(--primary-blue); letter-spacing:1.5px; margin-bottom:12px; text-transform:uppercase;">🎧 Event Lineup</div>
+                    <div class="lineup-djs-grid" style="display:flex; flex-wrap:wrap; gap:12px; width:100%;">
+                        ${event.performers.map(p => {
+                            const nameColor = p.colorStyle || 'inherit';
+                            const profileUrl = `/performer/${p.discordId}`;
+                            
+                            const links = p.links || {};
+                            const linksHtml = Object.keys(links).map(label => 
+                                `<a href="${links[label]}" target="_blank" class="lineup-social-link" onclick="event.stopPropagation();">${label}</a>`
+                            ).join('');
+                            const socialContainer = linksHtml ? `<div class="lineup-socials">${linksHtml}</div>` : '';
+
+                            return `
+                                <div class="lineup-dj-card" onclick="window.location.href='${profileUrl}'">
+                                    <img class="lineup-dj-img" src="${p.imageUrl || '/cdn/logos/club/Logo.png'}" onerror="this.src='/cdn/logos/club/Logo.png'">
+                                    <div style="display:flex; flex-direction:column; min-width:0; flex-grow:1;">
+                                        <span class="lineup-dj-name" style="color: ${nameColor}">${p.name}</span>
+                                        ${socialContainer}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            lineupHtml = `
+                <div class="lineup-section" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                    <div style="font-size:0.75rem; font-weight:900; color:var(--primary-blue); letter-spacing:1.5px; margin-bottom:6px; text-transform:uppercase;">🎧 Event Lineup</div>
+                    <span style="font-size:0.8rem; color:#666; font-style:italic;">No lineup recorded for this session.</span>
+                </div>
+            `;
+        }
 
         card.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -119,8 +156,10 @@ function renderEvents(events) {
                     <span class="duration-text">${duration} duration</span>
                 </div>
             </div>
-            <div class="instance-breakdown">
+            <div class="instance-breakdown" style="display: none;">
+                <div style="font-size:0.75rem; font-weight:900; color:var(--primary-blue); letter-spacing:1.5px; margin-bottom:8px; text-transform:uppercase;">📊 Session Instances</div>
                 ${instanceListHtml}
+                ${lineupHtml}
             </div>
         `;
         eventList.appendChild(card);
@@ -133,9 +172,7 @@ function toggleBreakdown(el) {
     const isVisible = breakdown.style.display === 'block';
     
     breakdown.style.display = isVisible ? 'none' : 'block';
-    el.innerText = isVisible 
-        ? `🔍 View ${breakdown.querySelectorAll('.instance-row').length} Instances` 
-        : `➖ Hide Instances`;
-    }
+    el.innerText = isVisible ? `🔍 VIEW DETAILS` : `➖ HIDE DETAILS`;
+}
 
     initEvents();

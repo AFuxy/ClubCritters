@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
-const { sequelize, Roster, Settings, Schedule, Archive, Stats, AppSlot, ApplicationSubmission, InstanceLog } = require('../db');
+const { sequelize, Roster, Settings, Schedule, Archive, Stats, AppSlot, ApplicationSubmission, InstanceLog, InstanceLogPerformers } = require('../db');
 const { getGuildMember, getDiscordStatus } = require('../bot');
 const { getInstanceData, verifyVRC, getVrcStatus, getUserInfo, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole } = require('../utils/vrc-api');
 const { isStaff, isHostOrOwner, isAuthenticated, isOwner } = require('../middleware/auth');
@@ -477,9 +477,37 @@ router.post('/schedule/add', isHostOrOwner, async (req, res) => {
 
 router.post('/schedule/clear', isHostOrOwner, async (req, res) => {
     try {
+        // 1. Gather all performers (primary and B2B) from the current schedule
+        const items = await Schedule.findAll({
+            include: [{ model: Roster, as: 'performers', attributes: ['discordId'] }]
+        });
+        const performerIds = new Set();
+        items.forEach(item => {
+            if (item.performerId) performerIds.add(item.performerId);
+            if (item.performers) {
+                item.performers.forEach(p => performerIds.add(p.discordId));
+            }
+        });
+
+        // 2. Find the most recent event InstanceLog to link these performers to
+        if (performerIds.size > 0) {
+            const lastEvent = await InstanceLog.findOne({
+                where: { isEventSession: true },
+                order: [['startTime', 'DESC']]
+            });
+            if (lastEvent) {
+                await lastEvent.addPerformers(Array.from(performerIds));
+                console.log(`[ARCHIVE] Automatically linked ${performerIds.size} performers to InstanceLog ${lastEvent.id}`);
+            }
+        }
+
+        // 3. Clear schedule
         await Schedule.destroy({ where: {}, truncate: true });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) { 
+        console.error("Archive Schedule Error:", err);
+        res.status(500).json({ error: 'Failed to clear schedule' }); 
+    }
 });
 
 router.delete('/schedule/:id', isHostOrOwner, async (req, res) => {
@@ -521,8 +549,29 @@ router.get('/roster/search', isStaff, async (req, res) => {
 router.get('/roster/all', isStaff, async (req, res) => {
     try {
         const members = await Roster.findAll({ order: [['name', 'ASC']] });
-        res.json(members);
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+        
+        // Fetch event counts for all performers
+        const counts = await InstanceLogPerformers.findAll({
+            attributes: ['performerId', [sequelize.fn('COUNT', sequelize.col('instanceLogId')), 'count']],
+            group: ['performerId']
+        });
+        
+        const countsMap = {};
+        counts.forEach(c => {
+            countsMap[c.performerId] = parseInt(c.get('count')) || 0;
+        });
+
+        const mapped = members.map(m => {
+            const json = m.toJSON();
+            json.eventCount = countsMap[m.discordId] || 0;
+            return json;
+        });
+
+        res.json(mapped);
+    } catch (err) { 
+        console.error("Failed to load roster stats:", err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 router.patch('/roster/:id', isStaff, async (req, res) => {
@@ -818,6 +867,7 @@ router.get('/stats/global', isAuthenticated, isStaff, async (req, res) => {
 router.get('/stats/instances', isAuthenticated, isStaff, async (req, res) => {
     try {
         const logs = await InstanceLog.findAll({
+            include: [{ model: Roster, as: 'performers', attributes: ['discordId', 'name'] }],
             order: [['startTime', 'DESC']],
             limit: 50
         });
@@ -827,12 +877,12 @@ router.get('/stats/instances', isAuthenticated, isStaff, async (req, res) => {
 
 router.post('/stats/instances/add', isAuthenticated, isHostOrOwner, async (req, res) => {
     try {
-        const { worldName, startTime, endTime, peakCapacity, uniqueUsers, isEventSession } = req.body;
+        const { worldName, startTime, endTime, peakCapacity, uniqueUsers, isEventSession, performerIds } = req.body;
         const start = new Date(startTime);
         const end = new Date(endTime);
         const duration = Math.floor((end - start) / 60000);
         
-        await InstanceLog.create({
+        const log = await InstanceLog.create({
             worldName,
             startTime: start,
             endTime: end,
@@ -843,8 +893,16 @@ router.post('/stats/instances/add', isAuthenticated, isHostOrOwner, async (req, 
             instanceId: 'manual-entry',
             isActive: false
         });
+
+        if (performerIds && Array.isArray(performerIds)) {
+            await log.setPerformers(performerIds);
+        }
+
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) { 
+        console.error("Failed to add instance:", err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 router.delete('/stats/instances/:id', isAuthenticated, isHostOrOwner, async (req, res) => {
@@ -856,7 +914,7 @@ router.delete('/stats/instances/:id', isAuthenticated, isHostOrOwner, async (req
 
 router.patch('/stats/instances/:id', isAuthenticated, isHostOrOwner, async (req, res) => {
     try {
-        const { worldName, startTime, endTime, peakCapacity, uniqueUsers, isEventSession } = req.body;
+        const { worldName, startTime, endTime, peakCapacity, uniqueUsers, isEventSession, performerIds } = req.body;
         const updateData = { worldName, peakCapacity, uniqueUsers, isEventSession };
         
         if (startTime && endTime) {
@@ -867,9 +925,20 @@ router.patch('/stats/instances/:id', isAuthenticated, isHostOrOwner, async (req,
             updateData.totalDuration = Math.floor((end - start) / 60000);
         }
 
-        await InstanceLog.update(updateData, { where: { id: req.params.id } });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+        const log = await InstanceLog.findByPk(req.params.id);
+        if (log) {
+            await log.update(updateData);
+            if (performerIds && Array.isArray(performerIds)) {
+                await log.setPerformers(performerIds);
+            }
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: 'Not found' });
+        }
+    } catch (err) { 
+        console.error("Failed to update instance:", err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 router.get('/stats/my', isAuthenticated, async (req, res) => {

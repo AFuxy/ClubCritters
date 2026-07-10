@@ -71,6 +71,12 @@ router.get('/performer/:id', async (req, res) => {
         if (performer.useDiscordName) { const member = await getGuildMember(performer.discordId); if (member) displayName = member.nickname; }
         const archives = await Archive.findAll({ where: { performerId: performer.discordId }, order: [['date', 'DESC'], ['createdAt', 'DESC']] });
         
+        // Count how many events this performer has played in (using InstanceLogPerformers many-to-many relationship)
+        const { sequelize } = require('../db');
+        const eventCount = await sequelize.model('InstanceLogPerformers').count({
+            where: { performerId: performer.discordId }
+        }).catch(() => 0);
+
         performer.links = safeParseJSON(performer.links);
 
         const settings = await Settings.findOne();
@@ -108,6 +114,7 @@ router.get('/performer/:id', async (req, res) => {
             performer, 
             displayName, 
             archives, 
+            eventCount,
             liveStatus, 
             activeSlot, 
             eventStartTime: settings ? settings.eventStartTime : null,
@@ -315,6 +322,7 @@ router.get('/api/public/events', async (req, res) => {
     try {
         const logs = await InstanceLog.findAll({
             where: { isEventSession: true },
+            include: [{ model: Roster, as: 'performers', attributes: ['discordId', 'name', 'colorStyle', 'imageUrl', 'links'] }],
             order: [['startTime', 'DESC']],
             limit: 100
         });
@@ -324,6 +332,16 @@ router.get('/api/public/events', async (req, res) => {
 
         logs.forEach(log => {
             const dateKey = new Date(log.startTime).toISOString().split('T')[0];
+            
+            // Map the performers to clean JSON objects
+            const performersList = (log.performers || []).map(p => ({
+                discordId: p.discordId,
+                name: p.name,
+                colorStyle: p.colorStyle,
+                imageUrl: p.imageUrl,
+                links: safeParseJSON(p.links)
+            }));
+
             if (!dateMap.has(dateKey)) {
                 const entry = {
                     worldName: log.worldName,
@@ -332,7 +350,8 @@ router.get('/api/public/events', async (req, res) => {
                     uniqueUsers: log.uniqueUsers,
                     totalDuration: log.totalDuration || 0,
                     isGrouped: false,
-                    instances: [log]
+                    instances: [log],
+                    performers: performersList
                 };
                 dateMap.set(dateKey, entry);
                 groupedEvents.push(entry);
@@ -345,11 +364,20 @@ router.get('/api/public/events', async (req, res) => {
                 if ((log.totalDuration || 0) > existing.totalDuration) {
                     existing.totalDuration = log.totalDuration;
                 }
+                // Merge unique performers who played in any instance on this date
+                performersList.forEach(p => {
+                    if (!existing.performers.some(ep => ep.discordId === p.discordId)) {
+                        existing.performers.push(p);
+                    }
+                });
             }
         });
 
         res.json(groupedEvents.slice(0, 50));
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) { 
+        console.error("Failed to load public events:", err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 router.get('/api/public/gallery', async (req, res) => {

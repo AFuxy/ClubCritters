@@ -348,6 +348,69 @@ body.theme-rain .status-live {
     100% { transform: translateY(110vh) rotate(10deg); }
 }
 
+/* LINEUP STYLES */
+.lineup-dj-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 10px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex: 1 1 calc(33.333% - 12px);
+    min-width: 220px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
 
+.lineup-dj-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
 
+.lineup-dj-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+}
 
+.lineup-dj-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.3px;
+}
+
+.lineup-socials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.lineup-social-link {
+    font-size: 0.7rem;
+    background: rgba(255, 255, 255, 0.06);
+    color: #aaa;
+    text-decoration: none;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+}
+
+.lineup-social-link:hover {
+    background: var(--primary-blue);
+    color: black;
+}

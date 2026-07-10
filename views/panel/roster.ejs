@@ -126,6 +126,7 @@
                             <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 2px;">
                                 <span style="color: var(--primary-blue); font-weight: bold;">${m.type}</span> 
                                 ${m.title ? '• ' + escapeHtml(m.title) : ''}
+                                • <span style="color: #00e676; font-weight: bold;">${m.eventCount || 0} ${m.eventCount === 1 ? 'Event' : 'Events'}</span>
                             </span>
                             ${vrcBadge}
                         </div>
