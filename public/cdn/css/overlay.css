@@ -41,6 +41,8 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     border-radius: 12px;
     padding: 20px;
+    position: relative;
+    overflow: hidden;
 }
 
 /* Layout Positions */
@@ -54,7 +56,7 @@ body {
     flex-direction: column;
     align-items: flex-start;
     min-width: 240px;
-    border-left: 4px solid var(--accent);
+    padding-left: 24px;
 }
 
 .label {
@@ -93,7 +95,7 @@ body {
 /* Now Playing */
 #now-playing .content-box {
     min-width: 450px;
-    border-left: 4px solid var(--accent);
+    padding-left: 24px;
 }
 
 .performer-info {
@@ -127,7 +129,7 @@ body {
 /* Up Next */
 #up-next .content-box {
     min-width: 320px;
-    border-right: 4px solid var(--accent);
+    padding-right: 24px;
 }
 
 #next-performers-list {
@@ -177,3 +179,31 @@ body {
 #now-playing { animation-delay: 0s; }
 #up-next { animation-delay: 1s; }
 #population-pulse { animation-delay: 2s; }
+
+/* Decorative Accent Bars (Pseudo-elements) */
+.content-box::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--accent);
+}
+
+#population-pulse .content-box::before,
+#now-playing .content-box::before {
+    left: 0;
+}
+
+#up-next .content-box::before {
+    right: 0;
+}
+
+/* Gradient Text Overrides for Genre label */
+#overlay-container.has-gradient .genre {
+    background: var(--accent);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent; /* Force transparency for background clip */
+}

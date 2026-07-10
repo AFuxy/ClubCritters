@@ -45,7 +45,18 @@ async function updateOverlay() {
                         
                         // Update accent color if the DJ has one
                         if (currentDJ.performers[0] && currentDJ.performers[0].color) {
-                            document.documentElement.style.setProperty('--accent', currentDJ.performers[0].color);
+                            const rawColor = currentDJ.performers[0].color;
+                            const parsedColor = parseColor(rawColor);
+                            document.documentElement.style.setProperty('--accent', parsedColor);
+                            
+                            const container = document.getElementById('overlay-container');
+                            if (container) {
+                                if (rawColor.startsWith('[') && rawColor.endsWith(']')) {
+                                    container.classList.add('has-gradient');
+                                } else {
+                                    container.classList.remove('has-gradient');
+                                }
+                            }
                         }
                         
                         nowPlayingEl.classList.remove('slide-out-left');
@@ -115,3 +126,12 @@ setInterval(() => {
         randomEl.classList.remove(animClass);
     }, 1000);
 }, 60000); // Every 60 seconds, one element will do a little refresh slide
+
+function parseColor(val) {
+    if (!val) return '#ff00ff';
+    if (val.startsWith('[') && val.endsWith(']')) {
+        const colors = val.slice(1, -1).split(',').map(c => c.trim());
+        return `linear-gradient(135deg, ${colors.join(', ')})`;
+    }
+    return val;
+}
