@@ -18,12 +18,12 @@
         </div>
 
         <!-- Bottom Left: Now Playing -->
-        <div id="now-playing" class="overlay-element bottom-left">
+        <div id="now-playing" class="overlay-element bottom-left slide-out-left">
             <div class="content-box glass">
                 <div class="performer-info">
-                    <img id="current-dj-image" src="/cdn/logos/club/Logo.png" alt="DJ">
+                    <div id="current-dj-avatar-wrapper"></div>
                     <div class="details">
-                        <div class="label">NOW PLAYING</div>
+                        <div class="label" id="current-label-container">NOW PLAYING <span id="current-countdown" class="set-countdown"></span></div>
                         <div id="current-dj-name" class="name">Waiting...</div>
                         <div id="current-genre" class="genre">Electronic</div>
                     </div>
@@ -32,7 +32,7 @@
         </div>
 
         <!-- Bottom Right: Up Next -->
-        <div id="up-next" class="overlay-element bottom-right">
+        <div id="up-next" class="overlay-element bottom-right slide-out-right">
             <div class="content-box glass">
                 <div class="label">UP NEXT</div>
                 <div id="next-performers-list">

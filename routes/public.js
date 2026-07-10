@@ -468,35 +468,75 @@ router.get('/api/public/overlay-data', async (req, res) => {
 
         const now = new Date();
         const start = settings ? new Date(settings.eventStartTime) : null;
-        const end = settings ? new Date(settings.eventEndTime) : null;
+        let end = settings ? new Date(settings.eventEndTime) : null;
+
+        // Parse start/end for all schedule items chronologically
+        const parsedSchedule = schedule.map(item => {
+            const times = item.timeSlot.match(/(\d{1,2}):(\d{2})/g);
+            let djStart = null;
+            let djEnd = null;
+            if (times && times.length >= 2 && start) {
+                djStart = new Date(start); const [sh, sm] = times[0].split(':').map(Number); djStart.setUTCHours(sh, sm, 0, 0);
+                djEnd = new Date(start); const [eh, em] = times[1].split(':').map(Number); djEnd.setUTCHours(eh, em, 0, 0);
+                if (sh < start.getUTCHours() - 6) { djStart.setDate(djStart.getDate() + 1); djEnd.setDate(djEnd.getDate() + 1); } 
+                else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
+            }
+            return { item, djStart, djEnd };
+        }).filter(x => x.djStart !== null);
+
+        // Sort chronologically by start time
+        parsedSchedule.sort((a, b) => a.djStart - b.djStart);
+
+        // Fail-safe: Extend eventEndTime to match the end of the last set in the schedule if it runs late
+        if (parsedSchedule.length > 0) {
+            const maxDjEnd = new Date(Math.max(...parsedSchedule.map(x => x.djEnd)));
+            if (!end || maxDjEnd > end) {
+                end = maxDjEnd;
+            }
+        }
 
         let currentDJ = null;
+        let currentDJStart = null;
+        let currentDJEnd = null;
+        let isTransition = false;
         let upNext = [];
 
         if (settings && !settings.forceOffline && start && end && now >= start && now < end) {
-            // Find current DJ based on timeSlot
-            for (let i = 0; i < schedule.length; i++) {
-                const item = schedule[i];
-                const times = item.timeSlot.match(/(\d{1,2}):(\d{2})/g);
-                if (times && times.length >= 2) {
-                    const djStart = new Date(start); const [sh, sm] = times[0].split(':').map(Number); djStart.setUTCHours(sh, sm, 0, 0);
-                    const djEnd = new Date(start); const [eh, em] = times[1].split(':').map(Number); djEnd.setUTCHours(eh, em, 0, 0);
-                    if (sh < start.getUTCHours() - 6) { djStart.setDate(djStart.getDate() + 1); djEnd.setDate(djEnd.getDate() + 1); } else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
-                    
-                    if (now >= djStart && now < djEnd) {
+            // Find current active DJ chronologically
+            for (let i = 0; i < parsedSchedule.length; i++) {
+                const { item, djStart, djEnd } = parsedSchedule[i];
+                if (now >= djStart && now < djEnd) {
+                    currentDJ = item;
+                    currentDJStart = djStart;
+                    currentDJEnd = djEnd;
+                    // Get next 2 sets chronologically
+                    upNext = parsedSchedule.slice(i + 1, i + 3).map(x => x.item);
+                    break;
+                }
+            }
+
+            // If we are during the event bounds but no DJ is currently live, we are in a set break/transition!
+            if (!currentDJ) {
+                // Find the first upcoming set chronologically
+                for (let i = 0; i < parsedSchedule.length; i++) {
+                    const { item, djStart, djEnd } = parsedSchedule[i];
+                    if (now < djStart) {
                         currentDJ = item;
-                        // Get next 2
-                        upNext = schedule.slice(i + 1, i + 3);
+                        currentDJStart = djStart;
+                        currentDJEnd = djStart; // Set end time target to the start of the upcoming set!
+                        isTransition = true;
+                        // Include this upcoming set in the Up Next card as the first item, plus the next one
+                        upNext = parsedSchedule.slice(i, i + 2).map(x => x.item);
                         break;
                     }
                 }
             }
         } else if (settings && start && now < start) {
-            // Pre-event: show first 2 as upNext
-            upNext = schedule.slice(0, 2);
+            // Pre-event: show first 2 as upNext chronologically
+            upNext = parsedSchedule.slice(0, 2).map(x => x.item);
         }
 
-        const mapPerformer = async (item) => {
+        const mapPerformer = async (item, isCurrent = false) => {
             if (!item) return null;
             let performers = await Promise.all((item.performers || []).map(async p => {
                 let pName = p.name;
@@ -510,6 +550,8 @@ router.get('/api/public/overlay-data', async (req, res) => {
             return {
                 id: item.id,
                 timeSlot: item.timeSlot,
+                startTime: isCurrent && currentDJStart ? currentDJStart.toISOString() : null,
+                endTime: isCurrent && currentDJEnd ? currentDJEnd.toISOString() : null,
                 genre: item.genre,
                 b2bName: item.b2bName,
                 b2bLogo: item.b2bLogo,
@@ -517,8 +559,8 @@ router.get('/api/public/overlay-data', async (req, res) => {
             };
         };
 
-        const mappedCurrent = await mapPerformer(currentDJ);
-        const mappedNext = await Promise.all(upNext.map(mapPerformer));
+        const mappedCurrent = await mapPerformer(currentDJ, true);
+        const mappedNext = await Promise.all(upNext.map(item => mapPerformer(item, false)));
 
         // VRC Status
         const groupId = process.env.VRC_GROUPID || "FURN.9601";
@@ -545,6 +587,7 @@ router.get('/api/public/overlay-data', async (req, res) => {
             currentDJ: mappedCurrent,
             upNext: mappedNext,
             vrcStatus,
+            isTransition,
             eventTitle: settings ? settings.eventTitle : "Club FuRN"
         });
     } catch (err) {
