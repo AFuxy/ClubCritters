@@ -65,7 +65,12 @@ function initCameraWS(server) {
                         vrc_world_thumbnail: cachedVrcWorldThumbnail,
                         vrc_player_count: cachedVrcPlayerCount,
                         players: getPlayersInInstance(),
-                        vrc_notification_logs: global.vrcNotificationLogs || []
+                        vrc_notification_logs: global.vrcNotificationLogs || [],
+                        osc_avatar_id: global.activeOscAvatarId || null,
+                        osc_avatar_name: global.activeOscAvatarName || "",
+                        osc_parameters: global.activeOscParameters || [],
+                        osc_radial_menu: global.activeOscRadialMenu || null,
+                        osc_states: global.activeOscStates || {}
                     }));
                 }).catch(() => {
                     ws.send(JSON.stringify({
@@ -74,7 +79,12 @@ function initCameraWS(server) {
                         vrc_running: global.cameraVrcRunning || false,
                         obs_running: global.cameraObsRunning || false,
                         players: getPlayersInInstance(),
-                        vrc_notification_logs: global.vrcNotificationLogs || []
+                        vrc_notification_logs: global.vrcNotificationLogs || [],
+                        osc_avatar_id: global.activeOscAvatarId || null,
+                        osc_avatar_name: global.activeOscAvatarName || "",
+                        osc_parameters: global.activeOscParameters || [],
+                        osc_radial_menu: global.activeOscRadialMenu || null,
+                        osc_states: global.activeOscStates || {}
                     }));
                 });
                 
@@ -98,18 +108,10 @@ function initCameraWS(server) {
                 const data = JSON.parse(message);
 
                 if (clientType === 'web') {
-                    // Browser -> Server -> Bot relay (Inputs, Launches, closing commands, etc.)
+                    // Browser -> Server -> Bot relay (relay full object for flexibility, e.g. OSC controls)
                     if (global.cameraBotClient && global.cameraBotClient.readyState === ws.OPEN) {
-                        global.cameraBotClient.send(JSON.stringify({
-                            type: data.type,
-                            action: data.action,
-                            key: data.key,
-                            state: data.state, // e.g. down, up
-                            x: data.x,
-                            y: data.y,
-                            payload: data.payload,
-                            sender: clientInfo.username
-                        }));
+                        data.sender = clientInfo.username;
+                        global.cameraBotClient.send(JSON.stringify(data));
                     }
                 } else if (clientType === 'bot') {
                     // Cache last known states
@@ -117,6 +119,25 @@ function initCameraWS(server) {
                     if (data.obs_running !== undefined) global.cameraObsRunning = data.obs_running;
                     if (data.players !== undefined) global.cameraInstancePlayers = data.players;
                     
+                    // Cache OSC state if sent by the bot (e.g. initial connection sync)
+                    if (data.osc_avatar_id !== undefined) global.activeOscAvatarId = data.osc_avatar_id;
+                    if (data.osc_avatar_name !== undefined) global.activeOscAvatarName = data.osc_avatar_name;
+                    if (data.osc_parameters !== undefined) global.activeOscParameters = data.osc_parameters;
+                    if (data.osc_radial_menu !== undefined) global.activeOscRadialMenu = data.osc_radial_menu;
+                    if (data.osc_states !== undefined) global.activeOscStates = data.osc_states;
+
+                    // Handle real-time OSC events sent from the bot
+                    if (data.type === 'osc_avatar_change') {
+                        global.activeOscAvatarId = data.avatarId;
+                        global.activeOscAvatarName = data.avatarName;
+                        global.activeOscParameters = data.parameters;
+                        global.activeOscRadialMenu = data.radialMenu;
+                        global.activeOscStates = data.states || {};
+                    } else if (data.type === 'osc_parameter_update') {
+                        global.activeOscStates = global.activeOscStates || {};
+                        global.activeOscStates[data.parameter] = data.value;
+                    }
+
                     // Inject real-time notification logs into every telemetry broadcast
                     data.vrc_notification_logs = global.vrcNotificationLogs || [];
 
@@ -130,7 +151,7 @@ function initCameraWS(server) {
                             broadcastToWeb(data);
                         });
                     } else {
-                        // Bot -> Server -> Browsers (OBS Status, telemetry)
+                        // Bot -> Server -> Browsers (OBS Status, telemetry, OSC events)
                         broadcastToWeb(data);
                     }
                 }

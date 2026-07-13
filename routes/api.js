@@ -386,7 +386,9 @@ router.delete('/vrchat/instances/:id/stop', isHostOrOwner, async (req, res) => {
 
 router.post('/settings/update', isStaff, async (req, res) => {
     try {
-        const { eventStartTime, eventEndTime, eventTitle, forceOffline, maintenanceMode, instanceUrl, eventTheme, eventLogo } = req.body;
+        const { 
+            eventStartTime, eventEndTime, eventTitle, forceOffline, maintenanceMode, instanceUrl, eventTheme, eventLogo
+        } = req.body;
         const userType = (req.user?.type || "").toLowerCase();
         const isFullAdmin = userType.includes('host') || userType.includes('owner');
 
@@ -419,6 +421,7 @@ router.post('/settings/update', isStaff, async (req, res) => {
         }
 
         const updateData = { instanceUrl, eventTheme, eventLogo, eventTitle };
+
         if (isFullAdmin) {
             updateData.eventStartTime = eventStartTime;
             updateData.eventEndTime = eventEndTime;
@@ -427,6 +430,7 @@ router.post('/settings/update', isStaff, async (req, res) => {
         }
 
         await settings.update(updateData);
+
         res.json({ success: true });
     } catch (err) { 
         console.error("Failed to update settings:", err);
