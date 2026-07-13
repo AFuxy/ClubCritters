@@ -885,6 +885,7 @@
     let oscStates = {};
     let currentMenuPath = []; // Array of integers representing selected sub-menu indexes
     let selectedPuppetParam = null;
+    let customMaxLimits = {}; // Map parameter names to custom Integer max limits
 
     function handleOscAvatarChange(data) {
         if (!data || !data.avatarId) return;
@@ -1124,6 +1125,7 @@
         const parameterDef = oscParameters.find(p => p.name === selectedPuppetParam);
         const type = parameterDef?.input?.type || 'Float';
         const currentValue = oscStates[selectedPuppetParam] !== undefined ? oscStates[selectedPuppetParam] : 0.0;
+        const sliderMax = customMaxLimits[selectedPuppetParam] !== undefined ? customMaxLimits[selectedPuppetParam] : 10;
 
         let controlHtml = '';
 
@@ -1138,20 +1140,32 @@
                     <input type="range" id="puppet-slider" min="0" max="1" step="0.01" value="${currentValue}" 
                            style="width: 100%; margin: 15px 0; -webkit-appearance: none; background: rgba(255,255,255,0.05); height: 8px; border-radius: 4px; outline: none;" 
                            oninput="onPuppetSliderInput('${selectedPuppetParam}', this.value)">
-                    <p style="font-size:0.7rem; color:#555; margin:0;">Drag to rotate the radial dial from 0% to 100%.</p>
+                    <p style="font-size:0.7rem; color:#555; margin:0 0 15px 0;">Drag to rotate the radial dial from 0% to 100%.</p>
+                    <button class="btn-cc btn-primary btn-small" style="width: 100%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800;" onclick="randomizePuppetValue('${selectedPuppetParam}', 'Float')">
+                        🎲 Randomize Value
+                    </button>
                 </div>
             `;
         } else if (type === 'Int') {
             controlHtml = `
                 <div style="text-align: center; width:100%;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
                         <span style="font-weight:bold; font-size:0.85rem; color:#888;">INTEGER SELECTOR</span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:0.75rem; color:#666;">Max:</span>
+                            <input type="number" min="1" max="255" value="${sliderMax}" 
+                                   style="width:45px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:0.75rem; border-radius:4px; padding:2px; text-align:center; outline:none;"
+                                   onchange="updatePuppetMaxLimit('${selectedPuppetParam}', this.value)">
+                        </div>
                         <span id="puppet-val-label" style="font-weight:900; color:var(--primary-blue); font-size:1.1rem;">${currentValue}</span>
                     </div>
-                    <input type="range" id="puppet-slider" min="0" max="10" step="1" value="${currentValue}" 
+                    <input type="range" id="puppet-slider" min="0" max="${sliderMax}" step="1" value="${currentValue}" 
                            style="width: 100%; margin: 15px 0; -webkit-appearance: none; background: rgba(255,255,255,0.05); height: 8px; border-radius: 4px; outline: none;" 
                            oninput="onPuppetSliderInput('${selectedPuppetParam}', this.value, 'Int')">
-                    <p style="font-size:0.7rem; color:#555; margin:0;">Use slider to select discrete integer values.</p>
+                    <p style="font-size:0.7rem; color:#555; margin:0 0 15px 0;">Use slider to select discrete integer values.</p>
+                    <button class="btn-cc btn-primary btn-small" style="width: 100%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800;" onclick="randomizePuppetValue('${selectedPuppetParam}', 'Int')">
+                        🎲 Randomize Selection
+                    </button>
                 </div>
             `;
         }
@@ -1189,6 +1203,41 @@
             sliderThrottleTimer = null;
         }, 80); // Send updates every 80ms maximum
     }
+
+    window.randomizePuppetValue = function(paramName, type) {
+        const slider = document.getElementById('puppet-slider');
+        if (!slider) return;
+
+        let randomVal;
+        if (type === 'Int') {
+            const min = parseInt(slider.min || '0', 10);
+            const max = parseInt(slider.max || '10', 10);
+            randomVal = Math.floor(Math.random() * (max - min + 1)) + min;
+        } else {
+            randomVal = Math.round(Math.random() * 100) / 100;
+        }
+
+        slider.value = randomVal;
+        const valLabel = document.getElementById('puppet-val-label');
+        if (valLabel) {
+            if (type === 'Float') {
+                valLabel.innerText = Math.round(randomVal * 100) + '%';
+            } else {
+                valLabel.innerText = randomVal;
+            }
+        }
+
+        oscStates[paramName] = randomVal;
+        triggerOscParameter(paramName, type, randomVal);
+        showNotify(`Randomized parameter to ${randomVal}`);
+    };
+
+    window.updatePuppetMaxLimit = function(paramName, maxVal) {
+        let parsed = parseInt(maxVal, 10);
+        if (isNaN(parsed) || parsed < 1) parsed = 10;
+        customMaxLimits[paramName] = parsed;
+        renderDetailView();
+    };
 
     function triggerOscParameter(name, type, value) {
         if (!ws || ws.readyState !== WebSocket.OPEN || !botConnected) {
