@@ -1197,8 +1197,8 @@
             `;
         } else if (type === 'Int') {
             const isSyncDances = selectedPuppetParam === 'SyncDances';
-            const shuffleChecked = danceShuffleInterval ? 'checked' : '';
-            const shuffleDisplay = danceShuffleInterval ? 'flex' : 'none';
+            const shuffleChecked = isShuffleEnabled ? 'checked' : '';
+            const shuffleDisplay = isShuffleEnabled ? 'flex' : 'none';
 
             controlHtml = `
                 <div style="text-align: center; width:100%;">
