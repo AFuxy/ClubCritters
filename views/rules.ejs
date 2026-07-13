@@ -53,10 +53,15 @@
     }
 
     .tab-btn.active {
-        background: linear-gradient(135deg, var(--primary-blue), #B36AF4);
+        background: var(--primary-gradient);
         border-color: transparent;
         color: #fff;
-        box-shadow: 0 10px 20px rgba(41, 197, 246, 0.25);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 15px rgba(255, 123, 46, 0.15);
+    }
+
+    .tab-icon {
+        flex-shrink: 0;
+        transition: stroke 0.3s ease;
     }
 
     .rules-content {
@@ -131,7 +136,7 @@
     }
 
     .rule-card:hover {
-        border-color: rgba(41, 197, 246, 0.2);
+        border-color: var(--primary-blue);
     }
 
     .rule-card h4 {
@@ -232,16 +237,16 @@
             <!-- Sidebar Navigation -->
             <div class="rules-sidebar">
                 <button class="tab-btn active" id="btn-coc" onclick="switchTab('coc')">
-                    <span>🛡️</span> Code of Conduct
+                    <svg class="tab-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Code of Conduct
                 </button>
                 <button class="tab-btn" id="btn-ai" onclick="switchTab('ai')">
-                    <span>🤖</span> AI Music Policy
+                    <svg class="tab-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> AI Music Policy
                 </button>
                 <button class="tab-btn" id="btn-vrchat" onclick="switchTab('vrchat')">
-                    <span>🦊</span> VRChat Rules
+                    <svg class="tab-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> VRChat Rules
                 </button>
                 <button class="tab-btn" id="btn-twitch" onclick="switchTab('twitch')">
-                    <span>🟪</span> Twitch Guidelines
+                    <svg class="tab-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2H3v16h5v4l4-4h5l4-4V2zm-10 9H9V6h2v5zm4 0h-2V6h2v5z"></path></svg> Twitch Guidelines
                 </button>
             </div>
 
@@ -254,47 +259,47 @@
                     <p>By accepting a staff, volunteer, or performer role with Club FuRN, you agree to uphold this Code of Conduct. Failure to do so may result in immediate dismissal from your role.</p>
 
                     <div class="rule-card">
-                        <h4>1. Representation of the Group 👔</h4>
+                        <h4>1. Representation of the Group</h4>
                         <p>Staff, volunteers, and performers are representatives of the community. Your behavior reflects on the group both in VRChat and in public spaces. Conduct that brings embarrassment, reputational harm, or negative attention may result in removal from your role. This applies to behavior during events, in public worlds, and on social media.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>2. Public & Social Media Conduct 📱</h4>
+                        <h4>2. Public & Social Media Conduct</h4>
                         <p>Do not post content that associates the group with harassment, hate speech, illegal activity, or abusive behavior. Avoid public posts, streams, or commentary that could reasonably damage the group’s reputation. <em>Note: Personal accounts are considered public-facing if your affiliation is known.</em></p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>3. Professionalism at Events 🎪</h4>
+                        <h4>3. Professionalism at Events</h4>
                         <p>Remain calm, respectful, and approachable during events. Follow event plans, staff coordination, and moderator instructions. Do not abuse authority, play favorites, or use your role to intimidate others. Personal conflicts must not be handled publicly or during live events.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>4. Consent, Power & Boundaries 🛑</h4>
+                        <h4>4. Consent, Power & Boundaries</h4>
                         <p>Because staff and performers hold influence, higher standards apply. Do not use your position to solicit attention, intimacy, favors, or private interactions. Do not flirt, roleplay, or pursue sexual interactions with attendees while acting in an official capacity. Respect boundaries immediately and without debate.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>5. NSFW & Sexual Conduct at Club Meetups 🔞</h4>
+                        <h4>5. NSFW & Sexual Conduct at Club Meetups</h4>
                         <p>No NSFW behavior is permitted at club-style VRChat meetups while representing the group. Avatars worn by performers and staff on duty must not feature visible nudity, explicit sexual interactions, or graphics that violate Twitch or VRChat Terms of Service. Adult content is restricted to clearly designated spaces/events and never while on duty.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>6. Unsolicited Contact 📩</h4>
+                        <h4>6. Unsolicited Contact</h4>
                         <p>Do not send unsolicited DMs or friend requests to attendees for the purpose of harassment, unwanted flirting, self-promotion, or recruitment. Do not use staff-only rosters or support tickets to locate and contact users without their prior consent. Any request to stop contact must be honored immediately.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>7. Substance & Party Culture 🥂</h4>
+                        <h4>7. Substance & Party Culture</h4>
                         <p>Do not encourage unsafe, illegal, or excessive behavior. Never pressure attendees or other staff to drink, use substances, or "party harder." You are required to remain functional, reliable, and responsible while on duty or performing.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>8. Confidentiality & Trust 🔒</h4>
+                        <h4>8. Confidentiality & Trust</h4>
                         <p>Do not share internal discussions, reports, moderation actions, or private information. Respect the privacy of attendees, staff, and performers. Leaking private information or screenshots may result in immediate removal.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>9. Compliance & Enforcement ⚖️</h4>
+                        <h4>9. Compliance & Enforcement</h4>
                         <p>Leadership reserves the right to remove any staff member or performer at any time. Dismissal may occur with or without prior warning, depending on severity. Removal decisions may be based on in-event behavior, off-platform conduct, or public actions. Appeals are not guaranteed.</p>
                     </div>
                 </div>
@@ -306,7 +311,7 @@
 
                     <div class="policy-allowed">
                         <div class="policy-header" style="color: #2bce73;">
-                            <span>✅</span> Permitted Uses
+                            Permitted Uses
                         </div>
                         <p style="margin: 0; color: #ccc;">AI tools may be used for assistance and preparation, such as:</p>
                         <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #aaa;">
@@ -321,7 +326,7 @@
 
                     <div class="policy-prohibited">
                         <div class="policy-header" style="color: #ff5353;">
-                            <span>❌</span> Prohibited Uses
+                            Prohibited Uses
                         </div>
                         <p style="margin: 0; color: #ccc;">All music played at events must be created by human artists:</p>
                         <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #aaa;">
@@ -332,12 +337,12 @@
                     </div>
 
                     <div class="rule-card">
-                        <h4>Enforcement ⚖️</h4>
+                        <h4>Enforcement</h4>
                         <p>Staff may request clarification if the origin of a track is in question. Attempts to bypass this policy or mislead staff may result in removal from events, loss of privileges, or further moderation action.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>Policy Evolution 🔄</h4>
+                        <h4>Policy Updates</h4>
                         <p>As AI tools evolve, this policy may be updated. Continued participation in the server and events implies acceptance of future revisions.</p>
                     </div>
                 </div>
@@ -348,22 +353,22 @@
                     <p>As a VRChat-based virtual venue, all staff and performers must strictly follow VRChat Community Guidelines and keep our instances safe, optimized, and welcoming.</p>
 
                     <div class="rule-card">
-                        <h4>No Crashers or Malicious Clients 🛡️</h4>
+                        <h4>No Crashers or Malicious Clients</h4>
                         <p>Using modified, malicious, or rule-breaking clients is strictly forbidden. Avatars featuring crash shaders, performance-destroying scripts, or excessively loud audio dumps are prohibited inside the club instance.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>Safety Setting & Instancing Guidelines ⚙️</h4>
+                        <h4>Safety & Instancing Settings</h4>
                         <p>Performers should keep safety settings reasonably configured to ensure their performance runs smoothly. Staff must actively coordinate with instance hosts to handle safety settings, mute/kick options, and handle security incidents immediately.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>Respect Spawn & Safety Zones 📍</h4>
+                        <h4>Respect Spawn & Safety Zones</h4>
                         <p>Do not place portals, drop items, or spam graphics near the instance spawn point or safety zones. Keep flow paths clear so attendees can enter and move around the club without lagging or getting stuck.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>Avatar Optimization 🦊</h4>
+                        <h4>Avatar Performance Ranks</h4>
                         <p>To maximize performance for our streams and guests, performers and staff are requested to use optimized avatars (Medium rank or better is preferred) during active shifts. Avoid giant, screen-blocking, or highly unoptimized avatars in the DJ booth.</p>
                     </div>
                 </div>
@@ -374,27 +379,27 @@
                     <p>We encourage anyone who streams to come and share our events live on Twitch! It helps spread the word about <strong>Club FuRN</strong>, and we love seeing the community involved. Please ensure your content and audio comply with the Twitch Community Guidelines.</p>
 
                     <div class="rule-card">
-                        <h4>Zero Tolerance for Hate Speech & Slurs 🟪</h4>
+                        <h4>Zero Tolerance Policy</h4>
                         <p>Twitch has a zero-tolerance policy for hate speech, harassment, slurs, and toxic behavior. Microphone feeds, voice channels, and chats displayed on stream must be kept clean. Violation will result in an immediate blacklist.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>The Twitch DJ Category 🎵</h4>
+                        <h4>The Twitch DJ Category</h4>
                         <p>Twitch offers a dedicated <strong>DJ Category</strong> designed for music performance. Using this category provides significantly better protection against copyright strikes. <em>Note: This mode automatically disables VODs and Clips for the duration of the stream. We highly recommend using this category to keep your channel safe.</em></p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>Keeping Your VODs & Clips? 📹</h4>
+                        <h4>OBS VOD Sound Separation</h4>
                         <p>If you prefer not to use the DJ category so you can keep your VODs, we highly suggest you configure your <strong>OBS VOD Audio Track</strong> to exclude the VRChat audio. This allows you to stream the music live, but prevents it from being recorded in the VOD, saving you from muted videos or strikes.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>Strictly Safe-For-Work (SFW) Visuals 🔞</h4>
+                        <h4>Strictly Safe-For-Work Visuals</h4>
                         <p>Ensure that all avatars, DJ visuals, backdrops, and screen-shares shown on the stream strictly comply with Twitch's policies on nudity and sexual content. Explicit gestures, adult-rated visual content, or avatars depicting sexualized themes are strictly prohibited while on stream.</p>
                     </div>
 
                     <div class="rule-card">
-                        <h4>Safety Actions and Alerts 🚨</h4>
+                        <h4>Emergency Moderation Actions</h4>
                         <p>If a security issue, crash event, or TOS-breaking avatar appears in the club, staff must work quickly to visual-block, mute, or kick the offending party to prevent stream suspension. Keep the stream overlay clean and report incidents immediately.</p>
                     </div>
                 </div>

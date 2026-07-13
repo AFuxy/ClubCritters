@@ -132,26 +132,45 @@
     border-color: #666;
 }
 
-/* Nav Pills */
+/* Navigation System */
+.nav-container {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
 .nav-pill-cc {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: #ccc !important;
-    padding: 8px 20px;
-    border-radius: 40px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #b5c1d1 !important;
+    padding: 10px 22px;
+    border-radius: 50px;
     font-size: 0.85rem;
-    font-weight: 600;
-    backdrop-filter: blur(10px);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
+
 .nav-pill-cc:hover {
-    background: rgba(255,255,255,0.15);
-    color: white !important;
-    border-color: var(--primary-blue);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-white) !important;
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1.5px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
+
 .nav-pill-cc.active {
     background: var(--primary-gradient);
     color: white !important;
     border-color: transparent;
+    box-shadow: 0 8px 25px rgba(255, 123, 46, 0.25);
 }
 
 /* --- DROPDOWN SYSTEM --- */
