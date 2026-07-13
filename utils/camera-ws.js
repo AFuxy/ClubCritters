@@ -70,7 +70,9 @@ function initCameraWS(server) {
                         osc_avatar_name: global.activeOscAvatarName || "",
                         osc_parameters: global.activeOscParameters || [],
                         osc_radial_menu: global.activeOscRadialMenu || null,
-                        osc_states: global.activeOscStates || {}
+                        osc_states: global.activeOscStates || {},
+                        osc_shuffle_enabled: global.activeOscShuffleEnabled || false,
+                        osc_shuffle_interval: global.activeOscShuffleInterval || 30
                     }));
                 }).catch(() => {
                     ws.send(JSON.stringify({
@@ -84,7 +86,9 @@ function initCameraWS(server) {
                         osc_avatar_name: global.activeOscAvatarName || "",
                         osc_parameters: global.activeOscParameters || [],
                         osc_radial_menu: global.activeOscRadialMenu || null,
-                        osc_states: global.activeOscStates || {}
+                        osc_states: global.activeOscStates || {},
+                        osc_shuffle_enabled: global.activeOscShuffleEnabled || false,
+                        osc_shuffle_interval: global.activeOscShuffleInterval || 30
                     }));
                 });
                 
@@ -125,6 +129,8 @@ function initCameraWS(server) {
                     if (data.osc_parameters !== undefined) global.activeOscParameters = data.osc_parameters;
                     if (data.osc_radial_menu !== undefined) global.activeOscRadialMenu = data.osc_radial_menu;
                     if (data.osc_states !== undefined) global.activeOscStates = data.osc_states;
+                    if (data.osc_shuffle_enabled !== undefined) global.activeOscShuffleEnabled = data.osc_shuffle_enabled;
+                    if (data.osc_shuffle_interval !== undefined) global.activeOscShuffleInterval = data.osc_shuffle_interval;
 
                     // Handle real-time OSC events sent from the bot
                     if (data.type === 'osc_avatar_change') {

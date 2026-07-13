@@ -515,6 +515,9 @@
                             radialMenu: msg.osc_radial_menu,
                             states: msg.osc_states
                         });
+                        if (msg.osc_shuffle_enabled !== undefined) {
+                            handleOscShuffleUpdate(msg.osc_shuffle_enabled, msg.osc_shuffle_interval);
+                        }
                     } else {
                         document.getElementById('osc-control-section').style.display = 'none';
                     }
@@ -543,6 +546,9 @@
                             radialMenu: msg.osc_radial_menu,
                             states: msg.osc_states
                         });
+                        if (msg.osc_shuffle_enabled !== undefined) {
+                            handleOscShuffleUpdate(msg.osc_shuffle_enabled, msg.osc_shuffle_interval);
+                        }
                     }
                 }
                 // OSC Live Events
@@ -927,15 +933,11 @@
     let currentMenuPath = []; // Array of integers representing selected sub-menu indexes
     let selectedPuppetParam = null;
     let customMaxLimits = {}; // Map parameter names to custom Integer max limits
+    let isShuffleEnabled = false;
+    let shuffleTimerSec = 30;
 
     function handleOscAvatarChange(data) {
         if (!data || !data.avatarId) return;
-
-        // Clear any active dance shuffle timer on avatar switch
-        if (danceShuffleInterval) {
-            clearInterval(danceShuffleInterval);
-            danceShuffleInterval = null;
-        }
 
         // If the avatar ID has not changed, just merge the states and update parameter triggers/sliders,
         // but DO NOT reset currentMenuPath or redraw the menu to avoid kicking users out of sub-folders.
@@ -1311,26 +1313,27 @@
         renderDetailView();
     };
 
-    let danceShuffleInterval = null;
-    let shuffleTimerSec = 30;
-
     window.toggleDanceShuffle = function(enabled) {
         const settingsDiv = document.getElementById('shuffle-settings');
         if (settingsDiv) {
             settingsDiv.style.display = enabled ? 'flex' : 'none';
         }
 
-        if (danceShuffleInterval) {
-            clearInterval(danceShuffleInterval);
-            danceShuffleInterval = null;
-        }
+        isShuffleEnabled = enabled;
+        const intervalInput = document.getElementById('shuffle-interval');
+        const interval = intervalInput ? parseInt(intervalInput.value, 10) : 30;
+        const sliderMax = customMaxLimits['SyncDances'] !== undefined ? customMaxLimits['SyncDances'] : 49;
 
-        if (enabled) {
-            randomizePuppetValue('SyncDances', 'Int');
-            startShuffleTimer();
-            showNotify('Auto-shuffle started', 'success');
+        if (ws && ws.readyState === WebSocket.OPEN && botConnected) {
+            ws.send(JSON.stringify({
+                type: 'set_osc_shuffle',
+                enabled: enabled,
+                interval: interval,
+                maxLimit: sliderMax
+            }));
+            showNotify(enabled ? 'Auto-shuffle started' : 'Auto-shuffle stopped', enabled ? 'success' : 'info');
         } else {
-            showNotify('Auto-shuffle stopped');
+            showNotify('Bot client is offline. Auto-shuffle state will sync when online.', 'error');
         }
     };
 
@@ -1338,25 +1341,41 @@
         let parsed = parseInt(value, 10);
         if (isNaN(parsed) || parsed < 5) parsed = 5;
         shuffleTimerSec = parsed;
-        
-        if (danceShuffleInterval) {
-            clearInterval(danceShuffleInterval);
-            startShuffleTimer();
+
+        const toggle = document.getElementById('shuffle-toggle');
+        const enabled = toggle ? toggle.checked : false;
+        const sliderMax = customMaxLimits['SyncDances'] !== undefined ? customMaxLimits['SyncDances'] : 49;
+
+        if (ws && ws.readyState === WebSocket.OPEN && botConnected) {
+            ws.send(JSON.stringify({
+                type: 'set_osc_shuffle',
+                enabled: enabled,
+                interval: parsed,
+                maxLimit: sliderMax
+            }));
         }
     };
 
-    function startShuffleTimer() {
-        danceShuffleInterval = setInterval(() => {
-            const parameterDef = oscParameters.find(p => p.name === 'SyncDances');
-            if (!parameterDef) {
-                toggleDanceShuffle(false);
-                const toggle = document.getElementById('shuffle-toggle');
-                if (toggle) toggle.checked = false;
-                return;
+    window.handleOscShuffleUpdate = function(enabled, interval) {
+        if (enabled !== undefined) {
+            isShuffleEnabled = enabled;
+            const toggle = document.getElementById('shuffle-toggle');
+            if (toggle && toggle !== document.activeElement) {
+                toggle.checked = enabled;
             }
-            randomizePuppetValue('SyncDances', 'Int');
-        }, shuffleTimerSec * 1000);
-    }
+            const settingsDiv = document.getElementById('shuffle-settings');
+            if (settingsDiv) {
+                settingsDiv.style.display = enabled ? 'flex' : 'none';
+            }
+        }
+        if (interval !== undefined) {
+            shuffleTimerSec = interval;
+            const intervalInput = document.getElementById('shuffle-interval');
+            if (intervalInput && intervalInput !== document.activeElement) {
+                intervalInput.value = interval;
+            }
+        }
+    };
 
     function triggerOscParameter(name, type, value) {
         if (!ws || ws.readyState !== WebSocket.OPEN || !botConnected) {
