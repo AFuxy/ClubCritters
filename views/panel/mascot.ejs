@@ -154,6 +154,47 @@
     .radial-transition-in {
         animation: radialRotateIn 0.25s ease-out forwards;
     }
+
+    /* Toggle Switch */
+    .switch-cc {
+        position: relative;
+        display: inline-block;
+        width: 38px;
+        height: 20px;
+    }
+    .switch-cc input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .slider-cc {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: rgba(255,255,255,0.1);
+        transition: .4s;
+        border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .slider-cc:before {
+        position: absolute;
+        content: "";
+        height: 12px;
+        width: 12px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #b5c1d1;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    input:checked + .slider-cc {
+        background-color: var(--primary-green);
+        border-color: var(--primary-green);
+    }
+    input:checked + .slider-cc:before {
+        transform: translateX(18px);
+        background-color: #fff;
+    }
 </style>
 
 <div class="staff-hub" style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
@@ -890,6 +931,12 @@
     function handleOscAvatarChange(data) {
         if (!data || !data.avatarId) return;
 
+        // Clear any active dance shuffle timer on avatar switch
+        if (danceShuffleInterval) {
+            clearInterval(danceShuffleInterval);
+            danceShuffleInterval = null;
+        }
+
         // If the avatar ID has not changed, just merge the states and update parameter triggers/sliders,
         // but DO NOT reset currentMenuPath or redraw the menu to avoid kicking users out of sub-folders.
         if (oscAvatarId === data.avatarId) {
@@ -1147,6 +1194,10 @@
                 </div>
             `;
         } else if (type === 'Int') {
+            const isSyncDances = selectedPuppetParam === 'SyncDances';
+            const shuffleChecked = danceShuffleInterval ? 'checked' : '';
+            const shuffleDisplay = danceShuffleInterval ? 'flex' : 'none';
+
             controlHtml = `
                 <div style="text-align: center; width:100%;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
@@ -1166,6 +1217,27 @@
                     <button class="btn-cc btn-primary btn-small" style="width: 100%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800;" onclick="randomizePuppetValue('${selectedPuppetParam}', 'Int')">
                         🎲 Randomize Selection
                     </button>
+                    
+                    ${isSyncDances ? `
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); text-align: left; width: 100%;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px;">
+                            <span style="font-weight:bold; font-size:0.85rem; color:#fff;">🔁 AUTO-SHUFFLE DANCES</span>
+                            <label class="switch-cc">
+                                <input type="checkbox" id="shuffle-toggle" ${shuffleChecked} onchange="toggleDanceShuffle(this.checked)">
+                                <span class="slider-cc"></span>
+                            </label>
+                        </div>
+                        <div id="shuffle-settings" style="display:${shuffleDisplay}; align-items:center; justify-content:space-between; gap:10px;">
+                            <span style="font-size:0.75rem; color:#888;">Shuffle Interval:</span>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <input type="number" id="shuffle-interval" min="5" value="${shuffleTimerSec}" 
+                                       style="width:50px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:0.75rem; border-radius:4px; padding:3px; text-align:center; outline:none;"
+                                       onchange="updateShuffleInterval(this.value)">
+                                <span style="font-size:0.75rem; color:#888;">sec</span>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
         }
@@ -1238,6 +1310,53 @@
         customMaxLimits[paramName] = parsed;
         renderDetailView();
     };
+
+    let danceShuffleInterval = null;
+    let shuffleTimerSec = 30;
+
+    window.toggleDanceShuffle = function(enabled) {
+        const settingsDiv = document.getElementById('shuffle-settings');
+        if (settingsDiv) {
+            settingsDiv.style.display = enabled ? 'flex' : 'none';
+        }
+
+        if (danceShuffleInterval) {
+            clearInterval(danceShuffleInterval);
+            danceShuffleInterval = null;
+        }
+
+        if (enabled) {
+            randomizePuppetValue('SyncDances', 'Int');
+            startShuffleTimer();
+            showNotify('Auto-shuffle started', 'success');
+        } else {
+            showNotify('Auto-shuffle stopped');
+        }
+    };
+
+    window.updateShuffleInterval = function(value) {
+        let parsed = parseInt(value, 10);
+        if (isNaN(parsed) || parsed < 5) parsed = 5;
+        shuffleTimerSec = parsed;
+        
+        if (danceShuffleInterval) {
+            clearInterval(danceShuffleInterval);
+            startShuffleTimer();
+        }
+    };
+
+    function startShuffleTimer() {
+        danceShuffleInterval = setInterval(() => {
+            const parameterDef = oscParameters.find(p => p.name === 'SyncDances');
+            if (!parameterDef) {
+                toggleDanceShuffle(false);
+                const toggle = document.getElementById('shuffle-toggle');
+                if (toggle) toggle.checked = false;
+                return;
+            }
+            randomizePuppetValue('SyncDances', 'Int');
+        }, shuffleTimerSec * 1000);
+    }
 
     function triggerOscParameter(name, type, value) {
         if (!ws || ws.readyState !== WebSocket.OPEN || !botConnected) {
