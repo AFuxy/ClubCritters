@@ -9,6 +9,8 @@ public/uploads/avatars/*
 !public/uploads/avatars/.gitkeep
 public/uploads/gallery/*
 !public/uploads/gallery/.gitkeep
+public/uploads/partners/*
+!public/uploads/partners/.gitkeep
 
 # Local Data Backups
 legacy_data/

@@ -631,7 +631,99 @@ window.dismissRecruitmentBanner = function() {
     }
 };
 
-async function checkRecruitment() {
+window.dismissPartnerEventBanner = function(eventId) {
+    const banner = document.getElementById('partner-event-banner');
+    if (banner) {
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateY(-10px)';
+        setTimeout(() => banner.remove(), 300);
+        sessionStorage.setItem('partner_event_dismissed_' + eventId, 'true');
+    }
+};
+
+let currentPartnerEventIdx = 0;
+let partnerEventsList = [];
+let partnerRotateTimer = null;
+
+window.renderPartnerEventSlide = function(idx) {
+    if (!partnerEventsList || partnerEventsList.length === 0) return;
+    currentPartnerEventIdx = (idx + partnerEventsList.length) % partnerEventsList.length;
+    const item = partnerEventsList[currentPartnerEventIdx];
+    const event = item.event;
+    const partner = item.partner;
+    const isLive = item.status === 'live';
+
+    const bannerContainer = document.getElementById('recruitment-banner-container');
+    if (!bannerContainer) return;
+
+    const targetUrl = event.eventUrl || `/partner/${partner.slug}`;
+    const startTimeStr = new Date(event.startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    const countTag = partnerEventsList.length > 1 ? `<span style="font-size:0.75rem; color:#aaa; margin-left: auto; margin-right: 32px;">[${currentPartnerEventIdx + 1}/${partnerEventsList.length}]</span>` : '';
+    const accent = partner.accentColor || (isLive ? '#ff1744' : '#f2008d');
+    bannerContainer.innerHTML = `
+        <div id="partner-event-banner" class="recruitment-banner" style="border-color: ${accent}; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+            <button class="recruitment-banner-close" onclick="window.dismissPartnerEventBanner(${event.id})">&times;</button>
+            <div class="recruitment-banner-content">
+                <div class="recruitment-badge" style="color: ${isLive ? '#ff1744' : accent}; display:flex; align-items:center; width:100%;">
+                    <span class="pulse-dot" style="${isLive ? 'background-color:#ff1744; box-shadow:0 0 8px #ff1744;' : `background-color:${accent};`}"></span>
+                    ${isLive ? 'LIVE PARTNER EVENT' : 'UPCOMING PARTNER EVENT'}
+                    ${countTag}
+                </div>
+                <h3 class="recruitment-title" style="margin-top: 4px;">
+                    ${event.title} <span style="font-weight: 400; opacity: 0.8; font-size: 0.95rem;">by ${partner.name}</span>
+                </h3>
+                <p class="recruitment-desc" style="margin-bottom: 8px;">
+                    ${isLive ? 'Event is happening LIVE right now!' : `Starts: <strong>${startTimeStr}</strong>`}
+                </p>
+                <div class="recruitment-action" style="margin-top: 8px; display:flex; align-items:center; gap:10px;">
+                    <a href="${targetUrl}" target="${event.eventUrl ? '_blank' : '_self'}" class="btn-cc ${isLive ? 'btn-primary' : 'btn-secondary'}" style="font-size: 0.75rem; padding: 6px 18px; ${!isLive ? `border-color:${accent}; color:${accent};` : ''}">
+                        ${isLive ? 'Join Event Live ↗' : 'View Partner Club &rarr;'}
+                    </a>
+                    ${partnerEventsList.length > 1 ? `
+                        <button class="btn-cc btn-small btn-dark" style="padding:4px 10px; font-size:0.75rem; border-color: rgba(255,255,255,0.15);" onclick="window.renderPartnerEventSlide(${currentPartnerEventIdx - 1})" title="Previous Event">&larr;</button>
+                        <button class="btn-cc btn-small btn-dark" style="padding:4px 10px; font-size:0.75rem; border-color: rgba(255,255,255,0.15);" onclick="window.renderPartnerEventSlide(${currentPartnerEventIdx + 1})" title="Next Event">&rarr;</button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+async function checkHomeAnnouncements() {
+    if (currentState === 'live') return;
+
+    // 1. Always check recruitment applications first to populate 'Join Team' nav button
+    await checkRecruitment(true); // pass skipBanner = true initially
+
+    // 2. Check for Featured Partner Events
+    try {
+        const partnerRes = await fetch('/api/public/featured-partner-event');
+        if (partnerRes.ok) {
+            const partnerData = await partnerRes.json();
+            if (partnerData.hasFeatured && partnerData.events && partnerData.events.length > 0) {
+                partnerEventsList = partnerData.events.filter(e => sessionStorage.getItem('partner_event_dismissed_' + e.event.id) !== 'true');
+                
+                if (partnerEventsList.length > 0) {
+                    window.renderPartnerEventSlide(0);
+                    if (partnerEventsList.length > 1) {
+                        if (partnerRotateTimer) clearInterval(partnerRotateTimer);
+                        partnerRotateTimer = setInterval(() => {
+                            window.renderPartnerEventSlide(currentPartnerEventIdx + 1);
+                        }, 7000);
+                    }
+                    return; // Partner event banner active
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to check partner events:", e);
+    }
+
+    // 3. Fallback: Render Recruitment Banner if no partner events active/undismissed
+    await checkRecruitment(false);
+}
+
+async function checkRecruitment(navOnly = false) {
     if (currentState === 'live') return;
     try {
         const res = await fetch('/api/public/apps');
@@ -651,9 +743,11 @@ async function checkRecruitment() {
             applyLink.id = 'nav-apply-link';
             applyLink.href = applyUrl;
             applyLink.className = 'btn-cc nav-pill-cc nav-apply-pill-cc';
-            applyLink.innerHTML = '🚨 Join Team';
+            applyLink.innerHTML = 'Join Team';
             mainNav.appendChild(applyLink);
         }
+
+        if (navOnly) return;
         
         // Render banner
         if (sessionStorage.getItem('recruitment_banner_dismissed') === 'true') {
@@ -685,3 +779,4 @@ async function checkRecruitment() {
 }
 
 init();
+checkHomeAnnouncements();

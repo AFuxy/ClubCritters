@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Roster, Settings, Schedule, Archive, Gallery, AppSlot, ApplicationSubmission, InstanceLog, sequelize } = require('../db');
+const { Roster, Settings, Schedule, Archive, Gallery, AppSlot, ApplicationSubmission, InstanceLog, Partner, PartnerEvent, sequelize } = require('../db');
 const { getGuildMember } = require('../bot');
 const { getInstanceData, getGroupInstanceData, getGroupStats, getUserInfo, getVrcStatus } = require('../utils/vrc-api');
+const { Op } = require('sequelize');
 
 // Helper to handle Sequelize/MySQL/MariaDB JSON parsing inconsistencies
 const safeParseJSON = (data) => {
@@ -44,6 +45,88 @@ router.get('/', (req, res) => { res.render('index', { user: req.user || null, pa
 router.get('/archive', (req, res) => { res.render('archive', { user: req.user || null, page: 'archive' }); });
 router.get('/events', (req, res) => { res.render('events', { user: req.user || null, page: 'events' }); });
 router.get('/team', (req, res) => { res.render('team', { user: req.user || null, page: 'team' }); });
+router.get('/partners', async (req, res) => {
+    try {
+        const partners = await Partner.findAll({
+            where: { isApproved: true },
+            order: [['order', 'ASC'], ['name', 'ASC']]
+        });
+        res.render('partners', { user: req.user || null, page: 'partners', partners });
+    } catch (err) {
+        console.error("Error loading partners page:", err);
+        res.status(500).send("Error loading partners page");
+    }
+});
+router.get('/partner/:slug', async (req, res) => {
+    try {
+        const partner = await Partner.findOne({
+            where: { slug: req.params.slug, isApproved: true },
+            include: [
+                { model: Roster, as: 'owner' },
+                { model: PartnerEvent, as: 'events', where: { isApproved: true }, required: false }
+            ]
+        });
+        if (!partner) {
+            return res.status(404).render('error', {
+                title: 'Partner Not Found',
+                message: "We couldn't find this partnered club. They might have updated their link or moved to a new domain!",
+                icon: '🤝',
+                buttons: [{ label: 'Back to Partners', link: '/partners', class: 'btn-primary' }]
+            });
+        }
+        
+        // Sort events: live/upcoming first, then by startTime ASC
+        if (partner.events) {
+            partner.events.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+        }
+
+        res.render('partner', { user: req.user || null, page: 'partner', partner });
+    } catch (err) {
+        console.error("Error loading partner detail page:", err);
+        res.status(500).send("Error loading partner page");
+    }
+});
+
+// API endpoint to fetch featured partner events for home page (Live and upcoming events)
+router.get('/api/public/featured-partner-event', async (req, res) => {
+    try {
+        const now = new Date();
+
+        const activeEvents = await PartnerEvent.findAll({
+            where: {
+                endTime: { [Op.gt]: now }
+            },
+            include: [{
+                model: Partner,
+                as: 'partner'
+            }],
+            order: [['startTime', 'ASC']],
+            limit: 10
+        });
+
+        if (!activeEvents || activeEvents.length === 0) {
+            return res.json({ hasFeatured: false });
+        }
+
+        const eventsList = activeEvents.map(evt => {
+            const isLive = now >= new Date(evt.startTime) && now < new Date(evt.endTime);
+            return {
+                status: isLive ? 'live' : 'upcoming',
+                event: evt,
+                partner: evt.partner
+            };
+        });
+
+        res.json({
+            hasFeatured: true,
+            count: eventsList.length,
+            events: eventsList
+        });
+    } catch (err) {
+        console.error("Failed to fetch featured partner events:", err);
+        res.status(500).json({ error: 'Failed' });
+    }
+});
 router.get('/gallery', (req, res) => { res.render('gallery', { user: req.user || null, page: 'gallery' }); });
 router.get('/apply', (req, res) => { res.render('apply', { user: req.user || null, page: 'apply', siteKey: process.env.TURNSTILE_SITE_KEY || null, slotId: req.query.slotId || null }); });
 router.get('/rules', (req, res) => { res.render('rules', { user: req.user || null, page: 'rules' }); });
@@ -230,8 +313,12 @@ router.get('/api/public/schedule', async (req, res) => {
 
 router.get('/api/public/roster', async (req, res) => { 
     try { 
+        const { Op } = require('sequelize');
         const roster = await Roster.findAll({ 
-            where: { isBanned: false },
+            where: { 
+                isBanned: false,
+                type: { [Op.or]: [{ [Op.ne]: 'Partner' }, { [Op.eq]: null }] }
+            },
             order: [['name', 'ASC']] 
         }); 
         const mapped = await Promise.all(roster.map(async user => { 

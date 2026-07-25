@@ -12,19 +12,18 @@
     <link rel="preconnect" href="https://docs.google.com">
     <link rel="preconnect" href="https://sheets.googleapis.com">
 
-    <meta name="title" content="Club FuRN">
+    <meta name="title" content="Club FuRN - <%= title %>">
     <meta name="description" content="<%= locals.description || 'The Club FuRN Community Hub. Check event times, DJ lineups, and join us in VRChat!' %>">
     <meta name="theme-color" content="<%= locals.themeColor || '#f2008d' %>">
 
+    <meta property="og:site_name" content="Club FuRN Network">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://clubfurn.com"> 
-    <meta property="og:title" content="Club FuRN - <%= title %>">
+    <meta property="og:title" content="<%= locals.ogTitle || ('Club FuRN - ' + title) %>">
     <meta property="og:description" content="<%= locals.description || 'The Club FuRN Community Hub. Check event times, DJ lineups, and join us in VRChat!' %>">
-    <meta property="og:image" content="https://clubfurn.com/cdn/logos/club/Logo.png">
+    <meta property="og:image" content="<%= locals.ogImage || 'https://clubfurn.com/cdn/logos/club/Logo.png' %>">
 
-    <meta property="twitter:card" content="summary">
-    <meta property="twitter:url" content="https://clubfurn.com">
-    <meta property="twitter:title" content="Club FuRN - <%= title %>">
-    <meta property="twitter:description" content="<%= locals.description || 'The Club FuRN Community Hub. Check event times, DJ lineups, and join us in VRChat!' %>">
-    <meta property="twitter:image" content="https://clubfurn.com/cdn/logos/club/Logo.png">
+    <meta name="twitter:card" content="<%= locals.ogImage ? 'summary_large_image' : 'summary' %>">
+    <meta name="twitter:title" content="<%= locals.ogTitle || ('Club FuRN - ' + title) %>">
+    <meta name="twitter:description" content="<%= locals.description || 'The Club FuRN Community Hub. Check event times, DJ lineups, and join us in VRChat!' %>">
+    <meta name="twitter:image" content="<%= locals.ogImage || 'https://clubfurn.com/cdn/logos/club/Logo.png' %>">
 </head>

@@ -4,16 +4,34 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
-const { sequelize, Roster, Settings, Schedule, Archive, Stats, AppSlot, ApplicationSubmission, InstanceLog, InstanceLogPerformers } = require('../db');
+const { sequelize, Roster, Settings, Schedule, Archive, Stats, AppSlot, ApplicationSubmission, InstanceLog, InstanceLogPerformers, Partner, PartnerEvent } = require('../db');
 const { getGuildMember, getDiscordStatus } = require('../bot');
 const { getInstanceData, verifyVRC, getVrcStatus, getUserInfo, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole } = require('../utils/vrc-api');
-const { isStaff, isHostOrOwner, isAuthenticated, isOwner } = require('../middleware/auth');
+const { isStaff, isHostOrOwner, isAuthenticated, isOwner, isPartnerOrStaff } = require('../middleware/auth');
 
 // Multer Setup (Memory Storage for Sharp processing)
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB Limit
 });
+
+// Middleware wrapper for Multer error handling
+const handleUpload = (fieldName) => {
+    return (req, res, next) => {
+        upload.single(fieldName)(req, res, (err) => {
+            if (err) {
+                if (err instanceof multer.MulterError) {
+                    if (err.code === 'LIMIT_FILE_SIZE') {
+                        return res.status(400).json({ error: 'File is too large! Maximum allowed size is 10MB.' });
+                    }
+                    return res.status(400).json({ error: `Upload error: ${err.message}` });
+                }
+                return res.status(400).json({ error: err.message || 'Failed to upload file' });
+            }
+            next();
+        });
+    };
+};
 
 // Helper to handle Sequelize/MySQL/MariaDB JSON parsing inconsistencies
 const safeParseJSON = (data) => {
@@ -154,7 +172,7 @@ async function executeRoleSync(vrcUserId, discordId) {
 // --- PROFILE ROUTES ---
 
 // Avatar Upload Route
-router.post('/profile/upload-avatar', isAuthenticated, upload.single('avatar'), async (req, res) => {
+router.post('/profile/upload-avatar', isAuthenticated, handleUpload('avatar'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -195,6 +213,426 @@ router.post('/profile/update', async (req, res) => {
         req.user.links = links;
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// Helper function to convert club name to URL-safe slug
+function slugify(text) {
+    if (!text) return "partner-club";
+    return text.toString().toLowerCase()
+        .replace(/\s+/g, '-')           // Replace spaces with -
+        .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+        .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+        .replace(/^-+/, '')             // Trim - from start of text
+        .replace(/-+$/, '');            // Trim - from end of text
+}
+
+// --- PARTNER API ENDPOINTS ---
+
+// 1. Partner Profile Update (Owner or Staff)
+router.post('/partner/update', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const { id, name, description, customSlug, accentColor, vrcGroupUrl, discordInvite, websiteUrl } = req.body;
+        let partner = null;
+        
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+
+        if (id && isStaffUser) {
+            partner = await Partner.findByPk(id);
+        } else {
+            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+        }
+
+        if (!partner && !isStaffUser) {
+            partner = await Partner.create({
+                ownerDiscordId: req.user.discordId,
+                name: name || `${req.user.name}'s Club`,
+                slug: slugify(customSlug || name || req.user.name || "partner")
+            });
+        }
+
+        if (!partner) return res.status(404).json({ error: 'Partner profile not found' });
+
+        // Handle custom slug
+        let finalSlug = partner.slug;
+        if (customSlug && customSlug.trim()) {
+            const sanitized = slugify(customSlug.trim());
+            if (sanitized.length < 2) {
+                return res.status(400).json({ error: 'Custom URL slug must be at least 2 characters long (letters, numbers, and hyphens).' });
+            }
+            if (sanitized !== partner.slug) {
+                const existing = await Partner.findOne({ where: { slug: sanitized } });
+                if (existing && existing.id !== partner.id) {
+                    return res.status(400).json({ error: `The URL slug "/partner/${sanitized}" is already taken by another club. Please choose a different slug!` });
+                }
+                finalSlug = sanitized;
+            }
+        } else if (name && !partner.slug) {
+            finalSlug = slugify(name);
+        }
+
+        // Validate accent color format
+        let validColor = partner.accentColor || '#f2008d';
+        if (accentColor && /^#([0-9a-fA-F]{3}){1,2}$/.test(accentColor.trim())) {
+            validColor = accentColor.trim();
+        }
+
+        await partner.update({
+            name: name || partner.name,
+            slug: finalSlug,
+            description: description !== undefined ? description : partner.description,
+            accentColor: validColor,
+            vrcGroupUrl: vrcGroupUrl !== undefined ? vrcGroupUrl : partner.vrcGroupUrl,
+            discordInvite: discordInvite !== undefined ? discordInvite : partner.discordInvite,
+            websiteUrl: websiteUrl !== undefined ? websiteUrl : partner.websiteUrl
+        });
+
+        res.json({ success: true, partner });
+    } catch (err) {
+        console.error("[PARTNER API] Update Error:", err);
+        res.status(500).json({ error: 'Failed to update partner profile' });
+    }
+});
+
+// 2. Partner Icon Upload
+router.post('/partner/upload-icon', isAuthenticated, isPartnerOrStaff, handleUpload('icon'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'partners');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        const partnerId = req.body.partnerId;
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+
+        let partner = null;
+        if (partnerId) {
+            partner = await Partner.findByPk(partnerId);
+        }
+        if (!partner) {
+            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+        }
+
+        if (partner && !isStaffUser && partner.ownerDiscordId !== req.user.discordId) {
+            return res.status(403).json({ error: 'Not authorized to update this partner profile' });
+        }
+
+        if (!partner) {
+            partner = await Partner.create({
+                ownerDiscordId: req.user.discordId,
+                name: `${req.user.name}'s Club`,
+                slug: slugify(req.user.name || "partner") + `-${Date.now()}`
+            });
+        }
+
+        const isAnimated = req.file.mimetype === 'image/gif' || req.file.mimetype === 'image/webp';
+        const filename = `icon_${req.user.discordId}_${Date.now()}.webp`;
+        const filePath = path.join(uploadDir, filename);
+        const webPath = `/uploads/partners/${filename}`;
+
+        let pipeline = sharp(req.file.buffer, { animated: isAnimated });
+        pipeline = pipeline.resize(512, 512, { fit: 'cover', position: 'center' });
+        await pipeline.webp({ effort: 6, quality: 85 }).toFile(filePath);
+
+        if (partner.iconUrl && partner.iconUrl.startsWith('/uploads/partners/')) {
+            const oldPath = path.join(__dirname, '..', 'public', partner.iconUrl);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+        await partner.update({ iconUrl: webPath });
+
+        res.json({ success: true, iconUrl: webPath });
+    } catch (err) {
+        console.error("[PARTNER API] Icon Upload Error:", err);
+        res.status(500).json({ error: 'Failed to upload icon' });
+    }
+});
+
+// 3. Partner Banner Upload
+router.post('/partner/upload-banner', isAuthenticated, isPartnerOrStaff, handleUpload('banner'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'partners');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        const partnerId = req.body.partnerId;
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+
+        let partner = null;
+        if (partnerId) {
+            partner = await Partner.findByPk(partnerId);
+        }
+        if (!partner) {
+            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+        }
+
+        if (partner && !isStaffUser && partner.ownerDiscordId !== req.user.discordId) {
+            return res.status(403).json({ error: 'Not authorized to update this partner profile' });
+        }
+
+        if (!partner) {
+            partner = await Partner.create({
+                ownerDiscordId: req.user.discordId,
+                name: `${req.user.name}'s Club`,
+                slug: slugify(req.user.name || "partner") + `-${Date.now()}`
+            });
+        }
+
+        const isAnimated = req.file.mimetype === 'image/gif' || req.file.mimetype === 'image/webp';
+        const filename = `banner_${req.user.discordId}_${Date.now()}.webp`;
+        const filePath = path.join(uploadDir, filename);
+        const webPath = `/uploads/partners/${filename}`;
+
+        let pipeline = sharp(req.file.buffer, { animated: isAnimated });
+        pipeline = pipeline.resize(1920, 600, { fit: 'cover', position: 'center' });
+        await pipeline.webp({ effort: 6, quality: 85 }).toFile(filePath);
+
+        if (partner.bannerUrl && partner.bannerUrl.startsWith('/uploads/partners/')) {
+            const oldPath = path.join(__dirname, '..', 'public', partner.bannerUrl);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+        await partner.update({ bannerUrl: webPath });
+
+        res.json({ success: true, bannerUrl: webPath });
+    } catch (err) {
+        console.error("[PARTNER API] Banner Upload Error:", err);
+        res.status(500).json({ error: 'Failed to upload banner' });
+    }
+});
+
+// 4. Staff Partner Management APIs
+router.post('/admin/partners/create', isAuthenticated, isStaff, async (req, res) => {
+    try {
+        const { ownerDiscordId, name, description, vrcGroupUrl, discordInvite, websiteUrl } = req.body;
+        if (!ownerDiscordId || !name) {
+            return res.status(400).json({ error: 'Owner Discord ID and Name are required' });
+        }
+
+        let slug = slugify(name);
+        const existingSlug = await Partner.findOne({ where: { slug } });
+        if (existingSlug) {
+            slug = `${slug}-${Date.now()}`;
+        }
+
+        const newPartner = await Partner.create({
+            ownerDiscordId,
+            name,
+            slug,
+            description,
+            vrcGroupUrl,
+            discordInvite,
+            websiteUrl,
+            isApproved: true
+        });
+
+        res.json({ success: true, partner: newPartner });
+    } catch (err) {
+        console.error("[ADMIN PARTNER API] Create Error:", err);
+        res.status(500).json({ error: 'Failed to create partner' });
+    }
+});
+
+router.put('/admin/partners/:id', isAuthenticated, isStaff, async (req, res) => {
+    try {
+        const partner = await Partner.findByPk(req.params.id);
+        if (!partner) return res.status(404).json({ error: 'Partner not found' });
+
+        const { name, isApproved, order, description, vrcGroupUrl, discordInvite, websiteUrl, ownerDiscordId } = req.body;
+        
+        let updates = {};
+        if (name !== undefined) {
+            updates.name = name;
+            updates.slug = slugify(name);
+        }
+        if (isApproved !== undefined) updates.isApproved = isApproved;
+        if (order !== undefined) updates.order = parseInt(order, 10) || 0;
+        if (description !== undefined) updates.description = description;
+        if (vrcGroupUrl !== undefined) updates.vrcGroupUrl = vrcGroupUrl;
+        if (discordInvite !== undefined) updates.discordInvite = discordInvite;
+        if (websiteUrl !== undefined) updates.websiteUrl = websiteUrl;
+        if (ownerDiscordId !== undefined) updates.ownerDiscordId = ownerDiscordId;
+
+        await partner.update(updates);
+        res.json({ success: true, partner });
+    } catch (err) {
+        console.error("[ADMIN PARTNER API] Update Error:", err);
+        res.status(500).json({ error: 'Failed to update partner' });
+    }
+});
+
+router.delete('/admin/partners/:id', isAuthenticated, isStaff, async (req, res) => {
+    try {
+        const partner = await Partner.findByPk(req.params.id);
+        if (!partner) return res.status(404).json({ error: 'Partner not found' });
+
+        // 1. Clean up uploaded icon file
+        if (partner.iconUrl && partner.iconUrl.startsWith('/uploads/partners/')) {
+            const iconPath = path.join(__dirname, '..', 'public', partner.iconUrl);
+            if (fs.existsSync(iconPath)) fs.unlinkSync(iconPath);
+        }
+
+        // 2. Clean up uploaded banner file
+        if (partner.bannerUrl && partner.bannerUrl.startsWith('/uploads/partners/')) {
+            const bannerPath = path.join(__dirname, '..', 'public', partner.bannerUrl);
+            if (fs.existsSync(bannerPath)) fs.unlinkSync(bannerPath);
+        }
+
+        // 3. Clean up any uploaded partner event flyer files
+        const events = await PartnerEvent.findAll({ where: { partnerId: partner.id } });
+        for (const evt of events) {
+            if (evt.bannerUrl && evt.bannerUrl.startsWith('/uploads/partners/')) {
+                const flyerPath = path.join(__dirname, '..', 'public', evt.bannerUrl);
+                if (fs.existsSync(flyerPath)) fs.unlinkSync(flyerPath);
+            }
+        }
+
+        await partner.destroy();
+        res.json({ success: true });
+    } catch (err) {
+        console.error("[ADMIN PARTNER API] Delete Error:", err);
+        res.status(500).json({ error: 'Failed to delete partner' });
+    }
+});
+
+// --- PARTNER EVENT API ENDPOINTS ---
+
+// 1. Create Partner Event
+router.post('/partner/events/create', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const { partnerId, title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone } = req.body;
+        
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+
+        let partner = null;
+        if (partnerId && isStaffUser) {
+            partner = await Partner.findByPk(partnerId);
+        } else {
+            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+        }
+
+        if (!partner) {
+            return res.status(403).json({ error: 'Partner profile not found. Please create a partner profile first.' });
+        }
+
+        if (!title || !startTime || !endTime) {
+            return res.status(400).json({ error: 'Event Title, Start Time, and End Time are required.' });
+        }
+
+        const newEvent = await PartnerEvent.create({
+            partnerId: partner.id,
+            title,
+            description,
+            lineup: typeof lineup === 'object' ? JSON.stringify(lineup) : lineup,
+            startTime: new Date(startTime),
+            endTime: new Date(endTime),
+            eventUrl,
+            bannerUrl,
+            timezone: timezone || 'UTC',
+            isApproved: true
+        });
+
+        res.json({ success: true, event: newEvent });
+    } catch (err) {
+        console.error("[PARTNER EVENT API] Create error:", err);
+        res.status(500).json({ error: 'Failed to create partner event' });
+    }
+});
+
+// 2. Update Partner Event
+router.put('/partner/events/:id', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const partnerEvent = await PartnerEvent.findByPk(eventId, { include: [{ model: Partner, as: 'partner' }] });
+        if (!partnerEvent) return res.status(404).json({ error: 'Event not found' });
+
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+        const isOwnerOfPartner = partnerEvent.partner && partnerEvent.partner.ownerDiscordId === req.user.discordId;
+
+        if (!isStaffUser && !isOwnerOfPartner) {
+            return res.status(403).json({ error: 'Not authorized to edit this event' });
+        }
+
+        const { title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone, isApproved } = req.body;
+        
+        let updates = {};
+        if (title !== undefined) updates.title = title;
+        if (description !== undefined) updates.description = description;
+        if (lineup !== undefined) updates.lineup = typeof lineup === 'object' ? JSON.stringify(lineup) : lineup;
+        if (startTime !== undefined) updates.startTime = new Date(startTime);
+        if (endTime !== undefined) updates.endTime = new Date(endTime);
+        if (eventUrl !== undefined) updates.eventUrl = eventUrl;
+        if (bannerUrl !== undefined) updates.bannerUrl = bannerUrl;
+        if (timezone !== undefined) updates.timezone = timezone;
+        if (isApproved !== undefined && isStaffUser) updates.isApproved = isApproved;
+
+        await partnerEvent.update(updates);
+        res.json({ success: true, event: partnerEvent });
+    } catch (err) {
+        console.error("[PARTNER EVENT API] Update error:", err);
+        res.status(500).json({ error: 'Failed to update partner event' });
+    }
+});
+
+// 3. Delete Partner Event
+router.delete('/partner/events/:id', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const partnerEvent = await PartnerEvent.findByPk(eventId, { include: [{ model: Partner, as: 'partner' }] });
+        if (!partnerEvent) return res.status(404).json({ error: 'Event not found' });
+
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+        const isOwnerOfPartner = partnerEvent.partner && partnerEvent.partner.ownerDiscordId === req.user.discordId;
+
+        if (!isStaffUser && !isOwnerOfPartner) {
+            return res.status(403).json({ error: 'Not authorized to delete this event' });
+        }
+
+        if (partnerEvent.bannerUrl && partnerEvent.bannerUrl.startsWith('/uploads/partners/')) {
+            const flyerPath = path.join(__dirname, '..', 'public', partnerEvent.bannerUrl);
+            if (fs.existsSync(flyerPath)) fs.unlinkSync(flyerPath);
+        }
+
+        await partnerEvent.destroy();
+        res.json({ success: true });
+    } catch (err) {
+        console.error("[PARTNER EVENT API] Delete error:", err);
+        res.status(500).json({ error: 'Failed to delete partner event' });
+    }
+});
+
+// 4. Partner Event Flyer Upload
+router.post('/partner/events/upload-flyer', isAuthenticated, isPartnerOrStaff, handleUpload('flyer'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'partners');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        const isAnimated = req.file.mimetype === 'image/gif' || req.file.mimetype === 'image/webp';
+        const filename = `flyer_${req.user.discordId}_${Date.now()}.webp`;
+        const filePath = path.join(uploadDir, filename);
+        const webPath = `/uploads/partners/${filename}`;
+
+        let pipeline = sharp(req.file.buffer, { animated: isAnimated });
+        pipeline = pipeline.resize(1920, 1080, { fit: 'inside', withoutEnlargement: true });
+        await pipeline.webp({ effort: 6, quality: 85 }).toFile(filePath);
+
+        res.json({ success: true, flyerUrl: webPath });
+    } catch (err) {
+        console.error("[PARTNER EVENT API] Flyer Upload Error:", err);
+        res.status(500).json({ error: 'Failed to upload event flyer' });
+    }
 });
 
 // VRChat Details route

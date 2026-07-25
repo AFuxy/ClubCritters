@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { isAuthenticated, isStaff, canAccessMascot } = require('../middleware/auth');
+const { isAuthenticated, isStaff, canAccessMascot, isPartnerOrStaff } = require('../middleware/auth');
+const { Partner, PartnerEvent, Roster } = require('../db');
 
 // --- PANEL ROUTES ---
 
@@ -13,6 +14,60 @@ router.get('/settings', isAuthenticated, isStaff, (req, res) => { res.render('pa
 router.get('/stats', isAuthenticated, isStaff, (req, res) => { res.render('panel/stats', { user: req.user, page: 'stats' }); });
 router.get('/links', isAuthenticated, isStaff, (req, res) => { res.render('panel/links', { user: req.user, page: 'links', vrcGroupId: process.env.VRC_GROUPID || 'FURN.9601' }); });
 router.get('/archives', isAuthenticated, (req, res) => { res.render('panel/archives', { user: req.user, page: 'archives' }); });
+
+// Partner Edit Route
+router.get('/partner', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        let partner = null;
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+        
+        const includeOptions = [
+            { model: Roster, as: 'owner' },
+            { model: PartnerEvent, as: 'events' }
+        ];
+
+        if (isStaffUser && req.query.id) {
+            partner = await Partner.findByPk(req.query.id, { include: includeOptions });
+        } else {
+            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId }, include: includeOptions });
+        }
+
+        if (partner && partner.events) {
+            partner.events.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+        }
+
+        res.render('panel/partner-edit', {
+            user: req.user,
+            page: 'partner',
+            partner: partner || null
+        });
+    } catch (err) {
+        console.error("Error loading partner page:", err);
+        res.status(500).send("Internal Error");
+    }
+});
+
+// Partner Management Hub (Staff Only)
+router.get('/partners', isAuthenticated, isStaff, async (req, res) => {
+    try {
+        const partners = await Partner.findAll({
+            include: [{ model: Roster, as: 'owner', attributes: ['discordId', 'name', 'type', 'imageUrl'] }],
+            order: [['order', 'ASC'], ['name', 'ASC']]
+        });
+        const rosterUsers = await Roster.findAll({ attributes: ['discordId', 'name', 'type'] });
+
+        res.render('panel/partners-list', {
+            user: req.user,
+            page: 'partners',
+            partners,
+            rosterUsers
+        });
+    } catch (err) {
+        console.error("Error loading staff partners page:", err);
+        res.status(500).send("Internal Error");
+    }
+});
 const crypto = require('crypto');
 
 router.get('/camera-token', isAuthenticated, canAccessMascot, (req, res) => {

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/head', { title: 'Partner Clubs & Network', page: 'partners', description: 'Explore our network of partnered VRChat clubs and affiliated communities.' }) %>
+<body>
+
+    <div class="container">
+        <%- include('partials/nav', { page: 'partners' }) %>
+
+        <div class="logo-container">
+            <img src="/cdn/logos/club/Logo.png" class="logo" alt="Club FuRN Logo">
+        </div>
+
+        <h1 style="background: linear-gradient(45deg, #f2008d, #29c5f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px;">
+            Partner Clubs & Network
+        </h1>
+        <p id="status-subtext" style="color: #aaa; margin-bottom: 35px; font-size: 0.95rem;">
+            Meet our affiliated VRChat communities, partnered event organizers, and friendly furry club networks.
+        </p>
+
+        <% if (partners && partners.length > 0) { %>
+            <div class="team-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 25px; width: 100%; margin-bottom: 50px;">
+                <% partners.forEach(partner => { %>
+                    <% const accent = partner.accentColor || '#f2008d'; %>
+                    <div class="card-cc dj-card-cc" style="background: rgba(21, 30, 41, 0.85); border: 1px solid <%= accent %>; border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.4); transition: all 0.3s ease;">
+                        
+                        <!-- Banner Backdrop -->
+                        <div style="height: 130px; position: relative; background: #0c1219; overflow: hidden;">
+                            <img src="<%= partner.bannerUrl || '/cdn/logos/club/banner_fallback.jpg' %>" alt="<%= partner.name %> Banner" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/cdn/logos/club/Logo.png'">
+                            <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 30%, rgba(21, 30, 41, 0.95) 100%);"></div>
+                        </div>
+
+                        <!-- Card Content -->
+                        <div style="padding: 0 20px 20px 20px; position: relative; margin-top: -45px; flex: 1; display: flex; flex-direction: column;">
+                            
+                            <!-- Icon -->
+                            <div style="width: 75px; height: 75px; border-radius: 50%; border: 3px solid <%= accent %>; overflow: hidden; background: #111; box-shadow: 0 5px 15px rgba(0,0,0,0.6); margin-bottom: 12px;">
+                                <img src="<%= partner.iconUrl || '/cdn/logos/club/Logo.png' %>" alt="<%= partner.name %> Icon" style="width: 100%; height: 100%; object-fit: cover;">
+                            </div>
+
+                            <h2 style="margin: 0 0 8px 0; font-size: 1.3rem; color: #fff; border: none; text-align: left; padding: 0;">
+                                <%= partner.name %>
+                            </h2>
+
+                            <p style="font-size: 0.85rem; color: #b5c1d1; margin: 0 0 20px 0; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-align: left; flex: 1; white-space: pre-wrap;"><%= partner.description || 'Welcome to our partnered club page!' %></p>
+
+                            <!-- Social Action Links -->
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px;">
+                                <% if (partner.discordInvite) { %>
+                                    <a href="<%= partner.discordInvite %>" target="_blank" class="btn-cc btn-small" style="text-decoration: none; font-size: 0.75rem; background: rgba(88, 101, 242, 0.2); border-color: rgba(88, 101, 242, 0.4); color: #5865F2;">
+                                        Discord
+                                    </a>
+                                <% } %>
+                                <% if (partner.vrcGroupUrl) { %>
+                                    <a href="<%= partner.vrcGroupUrl %>" target="_blank" class="btn-cc btn-small" style="text-decoration: none; font-size: 0.75rem; background: rgba(41, 197, 246, 0.2); border-color: rgba(41, 197, 246, 0.4); color: #29c5f6;">
+                                        VRC Group
+                                    </a>
+                                <% } %>
+                                <% if (partner.websiteUrl) { %>
+                                    <a href="<%= partner.websiteUrl %>" target="_blank" class="btn-cc btn-small" style="text-decoration: none; font-size: 0.75rem; background: rgba(255, 255, 255, 0.08); border-color: <%= accent %>; color: <%= accent %>;">
+                                        Website
+                                    </a>
+                                <% } %>
+                            </div>
+
+                            <!-- Showcase Link -->
+                            <a href="/partner/<%= partner.slug %>" class="btn-cc btn-primary" style="text-decoration: none; text-align: center; width: 100%; box-sizing: border-box; font-weight: bold; font-size: 0.85rem; background: <%= accent %>; border-color: <%= accent %>;">
+                                View Club Showcase ↗
+                            </a>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+        <% } else { %>
+            <div style="padding: 45px 25px; background: rgba(21, 30, 41, 0.6); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(10px); width: 100%; box-sizing: border-box; margin-bottom: 50px;">
+                <h3 style="margin: 0 0 6px 0; color: #fff; font-size: 1.1rem;">Partner Network Expanding</h3>
+                <p style="font-size: 0.85rem; color: #b5c1d1; margin: 0; line-height: 1.5;">
+                    Our partnered club listings will appear here soon. Check back shortly for new community partners!
+                </p>
+            </div>
+        <% } %>
+    </div>
+
+    <script src="/cdn/js/theme-engine.js"></script>
+</body>
+</html>

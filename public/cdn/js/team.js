@@ -114,6 +114,10 @@ function processRoster(members) {
 
     members.forEach(member => {
         const type = (member.type || "").toLowerCase();
+        if (type === 'partner') {
+            // Partner accounts display on the dedicated /partners directory page
+            return;
+        }
         if (type.includes('owner') || type.includes('host') || type.includes('staff')) {
             staffMembers.push(member);
         } else {

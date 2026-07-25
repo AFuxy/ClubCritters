@@ -17,7 +17,8 @@ module.exports = {
                     { name: 'Host', value: 'Host' },
                     { name: 'Staff', value: 'Staff' },
                     { name: 'Resident', value: 'Resident' },
-                    { name: 'Performer', value: 'Performer' }
+                    { name: 'Performer', value: 'Performer' },
+                    { name: 'Partner', value: 'Partner' }
                 ))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     async execute(interaction) {

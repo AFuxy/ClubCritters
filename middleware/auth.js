@@ -37,10 +37,20 @@ const canAccessMascot = (req, res, next) => {
     res.status(403).json({ error: 'Mascot account access not authorized' });
 };
 
+const isPartnerOrStaff = (req, res, next) => {
+    const allowedRoles = ['partner', 'host', 'staff', 'owner', 'resident dj'];
+    const userType = (req.user?.type || "").toLowerCase();
+    if (req.isAuthenticated() && allowedRoles.some(role => userType.includes(role))) {
+        return next();
+    }
+    res.status(403).json({ error: 'Partner or Staff access required' });
+};
+
 module.exports = {
     isAuthenticated,
     isStaff,
     isHostOrOwner,
     isOwner,
-    canAccessMascot
+    canAccessMascot,
+    isPartnerOrStaff
 };

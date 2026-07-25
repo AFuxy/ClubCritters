@@ -181,6 +181,53 @@ InstanceVisitor.belongsTo(InstanceLog, { foreignKey: 'instanceLogId' });
 InstanceLog.belongsToMany(Roster, { through: InstanceLogPerformers, as: 'performers', foreignKey: 'instanceLogId' });
 Roster.belongsToMany(InstanceLog, { through: InstanceLogPerformers, foreignKey: 'performerId' });
 
+// 13. Partnered Servers / Communities
+const Partner = sequelize.define('Partner', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    ownerDiscordId: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        references: { model: Roster, key: 'discordId' }
+    },
+    name: { type: DataTypes.STRING, allowNull: false },
+    slug: { type: DataTypes.STRING, allowNull: false, unique: true },
+    description: { type: DataTypes.TEXT },
+    iconUrl: { type: DataTypes.STRING },
+    bannerUrl: { type: DataTypes.STRING },
+    vrcGroupUrl: { type: DataTypes.STRING },
+    discordInvite: { type: DataTypes.STRING },
+    websiteUrl: { type: DataTypes.STRING },
+    accentColor: { type: DataTypes.STRING, defaultValue: '#f2008d' },
+    isApproved: { type: DataTypes.BOOLEAN, defaultValue: true },
+    order: { type: DataTypes.INTEGER, defaultValue: 0 }
+});
+
+// Partner Relationships
+Roster.hasOne(Partner, { foreignKey: 'ownerDiscordId', as: 'partnerProfile' });
+Partner.belongsTo(Roster, { foreignKey: 'ownerDiscordId', as: 'owner' });
+
+// 14. Partner Events
+const PartnerEvent = sequelize.define('PartnerEvent', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    partnerId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: { model: Partner, key: 'id' }
+    },
+    title: { type: DataTypes.STRING, allowNull: false },
+    description: { type: DataTypes.TEXT },
+    lineup: { type: DataTypes.TEXT },
+    startTime: { type: DataTypes.DATE, allowNull: false },
+    endTime: { type: DataTypes.DATE, allowNull: false },
+    bannerUrl: { type: DataTypes.STRING },
+    eventUrl: { type: DataTypes.STRING },
+    timezone: { type: DataTypes.STRING, defaultValue: 'UTC' },
+    isApproved: { type: DataTypes.BOOLEAN, defaultValue: true }
+});
+
+Partner.hasMany(PartnerEvent, { foreignKey: 'partnerId', as: 'events', onDelete: 'CASCADE' });
+PartnerEvent.belongsTo(Partner, { foreignKey: 'partnerId', as: 'partner' });
+
 async function initDB() {
     try {
         await sequelize.authenticate();
@@ -192,4 +239,4 @@ async function initDB() {
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, InstanceVisitor, InstanceLogPerformers, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, InstanceVisitor, InstanceLogPerformers, Partner, PartnerEvent, initDB };

@@ -1,0 +1,219 @@
+<%- include('header') %>
+
+<div class="staff-hub">
+
+    <!-- Top Header -->
+    <div class="staff-section" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
+        <div>
+            <h2 style="margin: 0; font-size: 1.5rem;">Partner Management Hub</h2>
+            <p style="font-size: 0.8rem; color: #888; margin: 5px 0 0 0;">
+                Manage partnered VRChat communities, assign partner account owners, approve profiles, and feature partner clubs on the public network.
+            </p>
+        </div>
+        <button class="btn-cc btn-primary btn-small" onclick="openCreatePartnerModal()">
+            ➕ Add New Partner
+        </button>
+    </div>
+
+    <!-- PARTNERS GRID -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        <% if (partners && partners.length > 0) { %>
+            <% partners.forEach(partner => { %>
+                <div class="staff-section" style="margin-bottom: 0; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+                    <!-- Banner -->
+                    <div style="height: 95px; position: relative; background: #111;">
+                        <img src="<%= partner.bannerUrl || '/cdn/logos/club/banner_fallback.jpg' %>" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/cdn/logos/club/Logo.png'">
+                        <div style="position: absolute; top: 10px; right: 10px;">
+                            <span style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; font-weight: bold; background: <%= partner.isApproved ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255, 82, 82, 0.2)' %>; color: <%= partner.isApproved ? '#00e676' : '#ff5252' %>; border: 1px solid <%= partner.isApproved ? '#00e676' : '#ff5252' %>;">
+                                <%= partner.isApproved ? 'Active' : 'Pending/Hidden' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Content -->
+                    <div style="padding: 15px; position: relative; flex: 1; display: flex; flex-direction: column;">
+                        <div style="width: 50px; height: 50px; border-radius: 50%; border: 3px solid #151e29; overflow: hidden; background: #111; margin-top: -35px; margin-bottom: 8px;">
+                            <img src="<%= partner.iconUrl || '/cdn/logos/club/Logo.png' %>" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+
+                        <h3 style="margin: 0 0 4px 0; font-size: 1.1rem; color: #fff;"><%= partner.name %></h3>
+                        <p style="font-size: 0.75rem; color: var(--primary-pink); margin: 0 0 10px 0;">
+                            Owner: <%= partner.owner ? partner.owner.name : partner.ownerDiscordId %>
+                        </p>
+                        
+                        <p style="font-size: 0.8rem; color: #aaa; margin: 0 0 15px 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1;">
+                            <%= partner.description || 'No description set.' %>
+                        </p>
+
+                        <!-- Action Buttons -->
+                        <div style="display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; margin-top: auto;">
+                            <a href="/panel/partner?id=<%= partner.id %>" class="btn-cc btn-small btn-dark" style="text-decoration: none;">
+                                Edit
+                            </a>
+                            <button class="btn-cc btn-small btn-dark" onclick="togglePartnerApproval(<%= partner.id %>, <%= !partner.isApproved %>)">
+                                <%= partner.isApproved ? 'Hide' : 'Approve' %>
+                            </button>
+                            <button class="btn-cc btn-small btn-danger" onclick="deletePartner(<%= partner.id %>, '<%= partner.name %>')">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <div class="staff-section" style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+                <p style="font-size: 1rem; color: #aaa; margin: 0 0 15px 0;">No partner clubs added yet.</p>
+                <button class="btn-cc btn-primary btn-small" onclick="openCreatePartnerModal()">Add First Partner</button>
+            </div>
+        <% } %>
+    </div>
+
+</div>
+
+<!-- CREATE PARTNER MODAL -->
+<div id="create-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+    <div class="staff-section" style="width: 480px; max-width: 90%; border: 1px solid var(--primary-pink); box-shadow: 0 15px 40px rgba(0,0,0,0.8);">
+        <h3 style="margin-top: 0; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+            ➕ Register Partner Club
+        </h3>
+        
+        <form onsubmit="handleCreatePartner(event)">
+            <div class="form-group" style="position: relative;">
+                <label>Select Account Owner (Roster) *</label>
+                <input type="hidden" id="modal-owner-id" required>
+                <input type="text" id="modal-owner-search" placeholder="Type member name to search..." autocomplete="off" oninput="filterRosterUsers(this.value)" onfocus="filterRosterUsers(this.value)">
+                <div id="roster-autocomplete-list" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #0c1219; border: 1px solid var(--primary-pink); border-radius: 8px; max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.8); margin-top: 4px;"></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label>Club / Community Name *</label>
+                <input type="text" id="modal-club-name" placeholder="e.g. Furuity Events" required>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-cc btn-secondary" onclick="closeCreatePartnerModal()">Cancel</button>
+                <button type="submit" class="btn-cc btn-primary">Create Partner</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const rosterUsersData = <%- JSON.stringify(rosterUsers.map(u => ({ id: u.discordId, name: u.name, type: u.type || 'User' }))) %>;
+
+    function filterRosterUsers(query) {
+        const listEl = document.getElementById('roster-autocomplete-list');
+        const q = (query || '').toLowerCase().trim();
+        const matches = rosterUsersData.filter(u => u.name.toLowerCase().includes(q) || u.type.toLowerCase().includes(q));
+
+        if (matches.length === 0) {
+            listEl.innerHTML = '<div style="padding: 10px; color: #777; font-size: 0.8rem; text-align: center;">No matching members found</div>';
+            listEl.style.display = 'block';
+            return;
+        }
+
+        listEl.innerHTML = matches.map(u => `
+            <div class="autocomplete-item" style="padding: 10px 14px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between;" onclick="selectRosterUser('${u.id}', '${u.name.replace(/'/g, "\\'")}')" onmouseover="this.style.background='rgba(242, 0, 141, 0.15)'" onmouseout="this.style.background='transparent'">
+                <span style="font-weight: bold; color: #fff; font-size: 0.88rem;">${u.name}</span>
+                <span style="font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: rgba(242, 0, 141, 0.2); color: var(--primary-pink); font-weight: bold;">${u.type}</span>
+            </div>
+        `).join('');
+
+        listEl.style.display = 'block';
+    }
+
+    function selectRosterUser(discordId, name) {
+        document.getElementById('modal-owner-id').value = discordId;
+        document.getElementById('modal-owner-search').value = name;
+        document.getElementById('roster-autocomplete-list').style.display = 'none';
+    }
+
+    document.addEventListener('click', (e) => {
+        const searchInput = document.getElementById('modal-owner-search');
+        const listEl = document.getElementById('roster-autocomplete-list');
+        if (searchInput && listEl && !searchInput.contains(e.target) && !listEl.contains(e.target)) {
+            listEl.style.display = 'none';
+        }
+    });
+
+    function openCreatePartnerModal() {
+        document.getElementById('create-modal').style.display = 'flex';
+        document.getElementById('modal-owner-id').value = '';
+        document.getElementById('modal-owner-search').value = '';
+        document.getElementById('modal-club-name').value = '';
+    }
+
+    function closeCreatePartnerModal() {
+        document.getElementById('create-modal').style.display = 'none';
+    }
+
+    async function handleCreatePartner(event) {
+        event.preventDefault();
+        const ownerId = document.getElementById('modal-owner-id').value;
+        if (!ownerId) {
+            return showNotify('Please select a valid account owner from the search list!', 'error');
+        }
+
+        const payload = {
+            ownerDiscordId: ownerId,
+            name: document.getElementById('modal-club-name').value.trim()
+        };
+
+        try {
+            const res = await fetch('/api/admin/partners/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showNotify('Partner created successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showNotify(data.error || 'Failed to create partner', 'error');
+            }
+        } catch (err) {
+            showNotify('Error creating partner', 'error');
+        }
+    }
+
+    async function togglePartnerApproval(id, isApproved) {
+        try {
+            const res = await fetch(`/api/admin/partners/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isApproved })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showNotify('Partner approval status updated', 'success');
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                showNotify(data.error || 'Failed to update partner', 'error');
+            }
+        } catch (err) {
+            showNotify('Error updating status', 'error');
+        }
+    }
+
+    async function deletePartner(id, name) {
+        if (!confirm(`Are you sure you want to remove "${name}" from partners?`)) return;
+
+        try {
+            const res = await fetch(`/api/admin/partners/${id}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success) {
+                showNotify('Partner removed', 'success');
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                showNotify(data.error || 'Failed to delete partner', 'error');
+            }
+        } catch (err) {
+            showNotify('Error deleting partner', 'error');
+        }
+    }
+</script>
+
+<%- include('footer') %>
