@@ -37,7 +37,7 @@
         <% if (canManage) { %>
             <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Search and add multiple performers for B2B sets. Both DJs and Staff can be added.</p>
             
-            <div id="add-form" class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;">
+            <div id="add-form" class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; gap: 15px;">
                 <div class="form-group" style="grid-column: span 2;">
                     <label>Search & Add Performers</label>
                     <div class="autocomplete-container">
@@ -58,14 +58,46 @@
                     <input type="text" id="b2b-logo" placeholder="https://...">
                 </div>
 
-                <div class="form-group">
-                    <label>Time Slot (UTC)</label>
-                    <input type="text" id="time-slot" placeholder="20:00 - 21:00">
+                <!-- TIMEZONE & TIME CONVERSION MANAGER -->
+                <div class="form-group" style="grid-column: span 2; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px;">
+                    <div style="display: grid; grid-template-columns: 1fr 120px 120px; gap: 12px; align-items: flex-end;">
+                        <div>
+                            <label style="color: var(--primary-blue); font-weight: bold; font-size: 0.8rem;">Input Timezone *</label>
+                            <select id="schedule-tz" style="color: #fff;" onchange="updateLiveUtcPreview()">
+                                <option value="Europe/London">UK / London (BST/GMT)</option>
+                                <option value="America/New_York">US Eastern (EST/EDT)</option>
+                                <option value="America/Chicago">US Central (CST/CDT)</option>
+                                <option value="America/Denver">US Mountain (MST/MDT)</option>
+                                <option value="America/Los_Angeles">US Pacific (PST/PDT)</option>
+                                <option value="Europe/Berlin">Central Europe (CET/CEST)</option>
+                                <option value="Asia/Tokyo">Japan (JST)</option>
+                                <option value="Australia/Sydney">Australia Eastern (AEST/AEDT)</option>
+                                <option value="UTC">UTC / GMT (Coordinated Universal Time)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem;">Start Time *</label>
+                            <input type="time" id="slot-start" value="20:00" style="color: #fff;" oninput="updateLiveUtcPreview()">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem;">End Time *</label>
+                            <input type="time" id="slot-end" value="21:00" style="color: #fff;" oninput="updateLiveUtcPreview()">
+                        </div>
+                    </div>
+
+                    <!-- Real-Time Timezone Conversion Preview Badge -->
+                    <div id="tz-preview-badge" style="margin-top: 10px; font-size: 0.8rem; background: rgba(41, 197, 246, 0.1); border: 1px solid rgba(41, 197, 246, 0.3); border-radius: 6px; padding: 8px 12px; color: var(--primary-blue); font-family: monospace;">
+                        🕒 Calculating timezone conversion...
+                    </div>
+
+                    <input type="hidden" id="time-slot">
                 </div>
-                <div class="form-group">
+
+                <div class="form-group" style="grid-column: span 2;">
                     <label>Genre</label>
                     <input type="text" id="genre-input" placeholder="House / Trance">
                 </div>
+
                 <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px; grid-column: span 2;">
                     <button id="add-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addToSchedule()">Add to Lineup</button>
                     <button id="cancel-edit-btn" class="btn-cc btn-danger btn-small" style="margin: 0; display: none;" onclick="cancelEdit()">Cancel</button>
@@ -104,6 +136,76 @@
     let selectedPerformers = []; // Array of {id, name}
     let editModeId = null;
 
+    // Auto-select user timezone
+    try {
+        const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const tzSelect = document.getElementById('schedule-tz');
+        if (tzSelect && userTz) {
+            for (let opt of tzSelect.options) {
+                if (opt.value === userTz) { opt.selected = true; break; }
+            }
+        }
+    } catch(e) {}
+
+    function convertLocalTimeToUtcStr(timeStr, timezoneStr) {
+        if (!timeStr) return '00:00';
+        try {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const day = now.getDate();
+
+            const targetUtc = Date.UTC(year, month, day, hours, minutes, 0);
+
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: timezoneStr || 'UTC',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            });
+
+            const parts = formatter.formatToParts(new Date(targetUtc));
+            const p = {};
+            parts.forEach(pt => p[pt.type] = pt.value);
+
+            const tzYear = parseInt(p.year, 10);
+            const tzMonth = parseInt(p.month, 10);
+            const tzDay = parseInt(p.day, 10);
+            const tzHour = parseInt(p.hour === '24' ? '0' : p.hour, 10);
+            const tzMin = parseInt(p.minute, 10);
+
+            const tzAsUtc = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMin, 0);
+            const offsetMs = tzAsUtc - targetUtc;
+
+            const finalUtcDate = new Date(targetUtc - offsetMs);
+            const utcH = String(finalUtcDate.getUTCHours()).padStart(2, '0');
+            const utcM = String(finalUtcDate.getUTCMinutes()).padStart(2, '0');
+            return `${utcH}:${utcM}`;
+        } catch (e) {
+            return timeStr;
+        }
+    }
+
+    function updateLiveUtcPreview() {
+        const tzSelect = document.getElementById('schedule-tz');
+        const startVal = document.getElementById('slot-start').value;
+        const endVal = document.getElementById('slot-end').value;
+        const badge = document.getElementById('tz-preview-badge');
+        if (!tzSelect || !badge) return;
+
+        const tzStr = tzSelect.value;
+        const tzNameShort = tzSelect.options[tzSelect.selectedIndex].text.split(' ')[0];
+
+        const utcStart = convertLocalTimeToUtcStr(startVal, tzStr);
+        const utcEnd = convertLocalTimeToUtcStr(endVal, tzStr);
+
+        const formattedUtcSlot = `${utcStart} - ${utcEnd}`;
+        document.getElementById('time-slot').value = formattedUtcSlot;
+
+        badge.innerHTML = `🕒 <strong>Your Input:</strong> ${startVal || '00:00'} - ${endVal || '00:00'} (${tzNameShort}) &nbsp;&rarr;&nbsp; <strong>Saves To UTC:</strong> <span style="color:#fff; font-weight:bold;">${formattedUtcSlot} UTC</span>`;
+    }
+
     function parseColor(val) {
         if (!val) return 'var(--primary-blue)';
         if (val.startsWith('[') && val.endsWith(']')) {
@@ -113,120 +215,125 @@
         return val;
     }
 
-
     async function loadSchedulePage() {
         try {
             const res = await fetch('/api/roster/search');
             allMembers = await res.json();
             renderSchedule();
-        } catch (e) {
-            showNotify('Failed to load roster', 'error');
-        }
+        } catch (e) { console.error(e); }
     }
 
     if (djSearch) {
-        djSearch.addEventListener('input', () => {
-            const query = djSearch.value.trim().toLowerCase();
-            if (!query) {
+        djSearch.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) { searchResults.style.display = 'none'; return; }
+
+            const matches = allMembers.filter(m => 
+                (m.name && m.name.toLowerCase().includes(query)) ||
+                (m.discordTag && m.discordTag.toLowerCase().includes(query))
+            ).slice(0, 8);
+
+            if (matches.length === 0) {
                 searchResults.style.display = 'none';
                 return;
             }
-            const filtered = allMembers.filter(m => 
-                m.name.toLowerCase().includes(query) && 
-                !selectedPerformers.some(p => p.id === m.discordId)
-            );
-            if (filtered.length > 0) {
-                searchResults.innerHTML = filtered.map(m => `
-                    <div class="result-item" onclick="addPerformerChip('${m.discordId}', '${m.name}')">
-                        ${m.name} <span>(${m.type})</span>
-                    </div>
-                `).join('');
-                searchResults.style.display = 'block';
-            } else {
+
+            searchResults.innerHTML = matches.map(m => `
+                <div class="result-item" onclick="selectPerformer('${m.discordId}', '${m.name.replace(/'/g, "\\'")}')">
+                    <strong>${m.name}</strong> <span>@${m.discordTag} (${m.roleType || 'Member'})</span>
+                </div>
+            `).join('');
+
+            searchResults.style.display = 'block';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!djSearch.contains(e.target) && !searchResults.contains(e.target)) {
                 searchResults.style.display = 'none';
             }
         });
     }
 
-    function addPerformerChip(id, name) {
-        selectedPerformers.push({id, name});
+    function selectPerformer(id, name) {
+        if (selectedPerformers.some(p => p.id === id)) return;
+        selectedPerformers.push({ id, name });
+        renderChips();
         djSearch.value = '';
         searchResults.style.display = 'none';
-        renderChips();
     }
 
-    function removePerformerChip(id) {
+    function removePerformer(id) {
         selectedPerformers = selectedPerformers.filter(p => p.id !== id);
         renderChips();
     }
 
     function renderChips() {
+        if (!selectedContainer) return;
         selectedContainer.innerHTML = selectedPerformers.map(p => `
-            <div class="nav-pill-cc" style="display: flex; align-items: center; gap: 8px; background: rgba(41, 197, 246, 0.1); border-color: var(--primary-blue); color: #fff; padding: 5px 12px;">
-                ${p.name}
-                <span onclick="removePerformerChip('${p.id}')" style="cursor: pointer; opacity: 0.6; font-size: 1.2rem;">&times;</span>
+            <div style="background: #1c2835; border: 1px solid var(--primary-blue); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px;">
+                <span>${p.name}</span>
+                <span onclick="removePerformer('${p.id}')" style="cursor: pointer; color: var(--accent-red); font-weight: bold;">&times;</span>
             </div>
         `).join('');
     }
 
-    document.addEventListener('click', (e) => {
-        if (searchResults && !e.target.closest('.autocomplete-container')) {
-            searchResults.style.display = 'none';
-        }
-    });
-
     async function renderSchedule() {
         try {
-            const res = await fetch('/api/schedule');
+            const res = await fetch('/api/public/schedule');
             const schedule = await res.json();
-            
-            // Store schedule globally so we can access it by ID for editing
             window.currentSchedule = schedule;
 
             if (schedule.length === 0) {
-                scheduleList.innerHTML = '<li style="color: #666; text-align: center; padding: 20px;">No DJs scheduled yet.</li>';
+                scheduleList.innerHTML = '<li style="color: #666; text-align: center; padding: 20px;">No performers listed in lineup.</li>';
                 return;
             }
 
             scheduleList.innerHTML = schedule.map(item => {
-                const hasPerformers = item.performers && item.performers.length > 0;
                 const isB2B = item.performers && item.performers.length > 1;
                 
-                // Improved name logic: prefer b2bName, then joined performer names, then primary roster name, then "Unknown"
-                let displayName = item.b2bName;
-                if (!displayName) {
-                    if (hasPerformers) displayName = item.performers.map(p => p.name).join(' B2B ');
-                    else if (item.Roster) displayName = item.Roster.name;
-                    else displayName = 'Unknown Performer';
+                let nameHtml = '';
+                if (item.b2bName) {
+                    nameHtml = `<strong style="color: var(--primary-blue); font-size: 1.1rem;">${item.b2bName}</strong>`;
+                    if (item.performers && item.performers.length > 0) {
+                        nameHtml += `<div style="font-size: 0.75rem; color: #aaa;">${item.performers.map(p => p.name).join(' B2B ')}</div>`;
+                    }
+                } else if (isB2B) {
+                    nameHtml = item.performers.map(p => `<strong style="color: #fff;">${p.name}</strong>`).join(' <span style="color: var(--primary-pink); font-size: 0.8rem;">B2B</span> ');
+                } else if (item.performer) {
+                    nameHtml = `<strong style="color: #fff;">${item.performer.name}</strong>`;
+                } else {
+                    nameHtml = '<em style="color: #777;">Empty Slot</em>';
                 }
 
-                // Accent color: prefer primary roster, then first performer, then default
-                let colorVal = null;
-                if (item.Roster && item.Roster.colorStyle) colorVal = item.Roster.colorStyle;
-                else if (hasPerformers && item.performers[0].colorStyle) colorVal = item.performers[0].colorStyle;
-                
-                const accent = parseColor(colorVal);
-                const isGradient = accent.includes('gradient');
-                
-                let controls = '';
-                if (canManage) {
-                    controls = `
-                    <div style="display: flex; gap: 10px; align-items: center; padding-right: 10px;">
-                        <button class="btn-cc btn-small btn-dark" onclick="startEdit(${item.id})">Edit</button>
-                        <button class="btn-cc btn-small btn-danger" onclick="deleteSlot(${item.id})">Remove</button>
-                    </div>`;
+                let logosHtml = '';
+                if (item.b2bLogo) {
+                    logosHtml = `<img src="${item.b2bLogo}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 1px solid var(--primary-blue);">`;
+                } else if (item.performers && item.performers.length > 0) {
+                    logosHtml = `<div style="display: flex; margin-left: 5px;">` + 
+                        item.performers.map((p, idx) => `
+                            <img src="${p.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--card-bg); margin-left: ${idx > 0 ? '-10px' : '0'}; z-index: ${10 - idx};">
+                        `).join('') + `</div>`;
                 }
 
                 return `
-                <li class="schedule-item" style="--sidebar-color: ${accent};">
-                    <div style="flex: 1; min-width: 200px; padding-left: 15px;">
-                        <span style="display: block; font-weight: bold; color: var(--primary-blue); font-size: 0.85rem;">${item.timeSlot}</span>
-                        <span style="font-size: 1.2rem; font-weight: 900; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent}; display: inline-block;">${displayName}</span>
-                        <span style="color: #888; font-size: 0.85rem; display: block;">${item.genre}</span>
-                        ${isB2B && item.b2bName ? `<span style="font-size: 0.7rem; color: #666; display: block;">${item.performers.map(p => p.name).join(' & ')}</span>` : ''}
-                    </div>
-                    ${controls}
-                </li>
+                    <li style="display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            ${logosHtml}
+                            <div>
+                                ${nameHtml}
+                                <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">
+                                    <span style="color: var(--primary-blue); font-family: monospace;">🕒 ${item.timeSlot} UTC</span> &bull; <span>${item.genre || 'Open Format'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${canManage ? `
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-cc btn-small btn-secondary" onclick="startEdit(${item.id})">Edit</button>
+                                <button class="btn-cc btn-small btn-danger" onclick="deleteSlot(${item.id})">Remove</button>
+                            </div>
+                        ` : ''}
+                    </li>
                 `;
             }).join('');
         } catch (e) {
@@ -277,7 +384,13 @@
         if (!item) return;
 
         editModeId = id;
-        timeInput.value = item.timeSlot || '';
+        
+        if (item.timeSlot && item.timeSlot.includes('-')) {
+            const parts = item.timeSlot.split('-');
+            document.getElementById('slot-start').value = parts[0].trim();
+            document.getElementById('slot-end').value = parts[1].trim();
+        }
+
         genreInput.value = item.genre || '';
         b2bNameInput.value = item.b2bName || '';
         b2bLogoInput.value = item.b2bLogo || '';
@@ -288,6 +401,7 @@
         }));
         
         renderChips();
+        updateLiveUtcPreview();
 
         managerTitle.innerText = "Editing Slot";
         addBtn.innerText = "Save Changes";
@@ -321,6 +435,7 @@
         timeInput.value = ''; genreInput.value = ''; djSearch.value = ''; b2bNameInput.value = ''; b2bLogoInput.value = '';
         selectedPerformers = [];
         renderChips();
+        updateLiveUtcPreview();
         managerTitle.innerText = "Live Lineup Manager";
         addBtn.innerText = "Add to Lineup";
         cancelEditBtn.style.display = "none";
@@ -336,6 +451,7 @@
         } catch (e) { showNotify('Error clearing lineup', 'error'); }
     }
 
+    updateLiveUtcPreview();
     loadSchedulePage();
 </script>
 

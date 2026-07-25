@@ -13,11 +13,16 @@
             <input type="text" id="custom-title" value="" placeholder="Enter Title..." oninput="updateTitle()">
             
             <select id="timezone-select" onchange="initFlyer()" class="btn btn-small btn-secondary" style="background: #151e29; border: 1px solid #444; color: white;">
-                <option value="0" selected>UTC (Default)</option>
-                <option value="-5">EST (New York)</option>
-                <option value="-8">PST (Los Angeles)</option>
-                <option value="1">CET (Berlin)</option>
-                <option value="9">JST (Tokyo)</option>
+                <option value="AUTO" selected>Auto-detect Local Time</option>
+                <option value="Europe/London">UK / London (BST/GMT)</option>
+                <option value="America/New_York">US Eastern (EST/EDT)</option>
+                <option value="America/Chicago">US Central (CST/CDT)</option>
+                <option value="America/Denver">US Mountain (MST/MDT)</option>
+                <option value="America/Los_Angeles">US Pacific (PST/PDT)</option>
+                <option value="Europe/Berlin">Central Europe (CET/CEST)</option>
+                <option value="Asia/Tokyo">Japan (JST)</option>
+                <option value="Australia/Sydney">Australia Eastern (AEST/AEDT)</option>
+                <option value="UTC">UTC (Default)</option>
             </select>
             
             <button onclick="initFlyer()" class="btn btn-small">🔄 Refresh Data</button>

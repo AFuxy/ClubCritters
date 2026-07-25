@@ -46,7 +46,9 @@ const Schedule = sequelize.define('Schedule', {
     timeSlot: { type: DataTypes.STRING }, // e.g. '20:00 - 21:00'
     genre: { type: DataTypes.STRING },
     b2bName: { type: DataTypes.STRING }, // Optional name for B2B groups
-    b2bLogo: { type: DataTypes.STRING }  // Optional logo for B2B groups
+    b2bLogo: { type: DataTypes.STRING },  // Optional logo for B2B groups
+    startTimeUtc: { type: DataTypes.DATE },
+    endTimeUtc: { type: DataTypes.DATE }
 });
 
 // Join table for B2B support (Multiple performers per slot)
