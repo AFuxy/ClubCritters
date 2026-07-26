@@ -45,6 +45,7 @@ router.get('/', (req, res) => { res.render('index', { user: req.user || null, pa
 router.get('/archive', (req, res) => { res.render('archive', { user: req.user || null, page: 'archive' }); });
 router.get('/events', (req, res) => { res.render('events', { user: req.user || null, page: 'events' }); });
 router.get('/team', (req, res) => { res.render('team', { user: req.user || null, page: 'team' }); });
+router.get('/partner-with-us', (req, res) => { res.render('partner-pitch', { user: req.user || null, page: 'partner-with-us' }); });
 router.get('/partners', async (req, res) => {
     try {
         const partners = await Partner.findAll({
