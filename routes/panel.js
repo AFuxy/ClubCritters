@@ -34,7 +34,26 @@ router.get('/partner', isAuthenticated, isPartnerOrStaff, async (req, res) => {
         }
 
         if (partner && partner.events) {
-            partner.events.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+            const now = new Date();
+            partner.events.sort((a, b) => {
+                const aStart = new Date(a.startTime);
+                const aEnd = new Date(a.endTime);
+                const bStart = new Date(b.startTime);
+                const bEnd = new Date(b.endTime);
+
+                const aLive = now >= aStart && now < aEnd;
+                const bLive = now >= bStart && now < bEnd;
+                if (aLive && !bLive) return -1;
+                if (!aLive && bLive) return 1;
+
+                const aEnded = now >= aEnd;
+                const bEnded = now >= bEnd;
+                if (!aEnded && bEnded) return -1;
+                if (aEnded && !bEnded) return 1;
+
+                if (aEnded && bEnded) return bEnd - aEnd; // past events newest first
+                return aStart - bStart; // upcoming events soonest first
+            });
         }
 
         res.render('panel/partner-edit', {

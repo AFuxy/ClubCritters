@@ -224,7 +224,11 @@ const PartnerEvent = sequelize.define('PartnerEvent', {
     bannerUrl: { type: DataTypes.STRING },
     eventUrl: { type: DataTypes.STRING },
     timezone: { type: DataTypes.STRING, defaultValue: 'UTC' },
-    isApproved: { type: DataTypes.BOOLEAN, defaultValue: true }
+    isApproved: { type: DataTypes.BOOLEAN, defaultValue: true },
+    hasPostedDiscordUpcoming: { type: DataTypes.BOOLEAN, defaultValue: false },
+    hasPostedDiscordLive: { type: DataTypes.BOOLEAN, defaultValue: false },
+    hasPostedDiscordEnded: { type: DataTypes.BOOLEAN, defaultValue: false },
+    discordMessageId: { type: DataTypes.STRING }
 });
 
 Partner.hasMany(PartnerEvent, { foreignKey: 'partnerId', as: 'events', onDelete: 'CASCADE' });

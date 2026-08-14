@@ -425,4 +425,231 @@ async function auditGroupMembers(client) {
     }
 }
 
-module.exports = { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, createApplicationTicket, joinGuild, auditGroupMembers };
+/**
+ * Posts a partner event announcement embed with instance join button and DJ set list to Discord
+ */
+async function postPartnerEventAnnouncement(client, partnerEventId, options = {}) {
+    if (!client || !client.isReady()) {
+        throw new Error('Discord bot is not connected');
+    }
+
+    const { PartnerEvent, Partner } = require('../db');
+    const evt = await PartnerEvent.findByPk(partnerEventId, {
+        include: [{ model: Partner, as: 'partner' }]
+    });
+
+    if (!evt || !evt.partner) {
+        throw new Error('Partner event record not found');
+    }
+
+    const isManualUpcoming = options.isManualUpcoming || false;
+    if (isManualUpcoming && (evt.hasPostedDiscordUpcoming || evt.hasPostedDiscordLive)) {
+        throw new Error('This event announcement has already been posted to Discord.');
+    }
+
+    const partner = evt.partner;
+    const now = new Date();
+    const isLive = now >= new Date(evt.startTime) && now < new Date(evt.endTime);
+    const isEnded = now >= new Date(evt.endTime);
+
+    // Determine target channel
+    const channelId = process.env.PARTNER_EVENT_CHANNEL_ID || process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID;
+    if (!channelId) {
+        throw new Error('No Discord announcement channel ID configured (PARTNER_EVENT_CHANNEL_ID or DISCORD_ANNOUNCEMENT_CHANNEL_ID)');
+    }
+
+    const channel = await client.channels.fetch(channelId);
+    if (!channel || !channel.isTextBased()) {
+        throw new Error(`Target channel ${channelId} is invalid or not text-based`);
+    }
+
+    // Domain for links
+    const domain = process.env.PUBLIC_DOMAIN || 'https://clubfurn.com';
+    const showcaseUrl = `${domain}/partner/${partner.slug}`;
+
+    // Format Lineup / Set List
+    let lineupText = '';
+    if (evt.lineup) {
+        try {
+            const slots = typeof evt.lineup === 'string' ? JSON.parse(evt.lineup) : evt.lineup;
+            if (Array.isArray(slots) && slots.length > 0) {
+                lineupText = slots.map(s => {
+                    const dj = s.djName || 'TBA';
+                    const genre = s.genre ? ` *(${s.genre})*` : '';
+                    let timeStr = '';
+                    if (s.startUtc && s.endUtc) {
+                        const startUnix = Math.floor(new Date(s.startUtc).getTime() / 1000);
+                        const endUnix = Math.floor(new Date(s.endUtc).getTime() / 1000);
+                        timeStr = `<t:${startUnix}:t> - <t:${endUnix}:t>`;
+                    } else if (s.start || s.end) {
+                        timeStr = `${s.start || ''} - ${s.end || ''}`;
+                    }
+                    return `• ${timeStr ? `**${timeStr}**: ` : ''}**${dj}**${genre}`;
+                }).join('\n');
+            }
+        } catch(e) {}
+    }
+
+    // Hex Color conversion
+    let hexColor = partner.accentColor || '#f2008d';
+    if (hexColor.startsWith('#')) hexColor = hexColor.replace('#', '');
+    const colorInt = parseInt(hexColor, 16) || 0xf2008d;
+
+    // Status titles, colors, and messages
+    let embedTitle = `📅 UPCOMING EVENT: ${evt.title}`;
+    let embedColor = colorInt;
+    let embedDesc = evt.description || `Join us for **${evt.title}** hosted by **${partner.name}**!`;
+    let messageContent = `📅 **New Partner Event Scheduled!**`;
+
+    if (isLive) {
+        embedTitle = `⚡ LIVE NOW: ${evt.title}`;
+        embedColor = 0xff1744; // Glowing Red
+        messageContent = `🚨 **${partner.name} is LIVE NOW in VRChat!** @everyone`;
+    } else if (isEnded) {
+        embedTitle = `🏁 EVENT CONCLUDED: ${evt.title}`;
+        embedColor = 0x555555; // Muted Dark Gray
+        embedDesc = `This event hosted by **${partner.name}** has concluded. Thank you to everyone who joined us!`;
+        messageContent = `🏁 **This partner event has concluded.**`;
+    }
+
+    // Build Embed
+    const embed = new EmbedBuilder()
+        .setTitle(embedTitle)
+        .setURL(showcaseUrl)
+        .setColor(embedColor)
+        .setDescription(embedDesc)
+        .addFields(
+            { name: '🏛️ Partner Club', value: `**[${partner.name}](${showcaseUrl})**`, inline: true },
+            { name: '🕒 Event Duration', value: `<t:${Math.floor(new Date(evt.startTime).getTime()/1000)}:F>\n(<t:${Math.floor(new Date(evt.startTime).getTime()/1000)}:R>)`, inline: true }
+        )
+        .setFooter({ text: 'Club FuRN Network • Partner Showcase', iconURL: `${domain}/cdn/logos/club/Logo.png` })
+        .setTimestamp();
+
+    if (lineupText) {
+        embed.addFields({ name: '🎧 DJ Set List & Timetable', value: lineupText, inline: false });
+    }
+
+    // Attach flyer banner image if present
+    if (evt.bannerUrl) {
+        const fullBannerUrl = evt.bannerUrl.startsWith('http') ? evt.bannerUrl : `${domain}${evt.bannerUrl}`;
+        embed.setImage(fullBannerUrl);
+    } else if (partner.bannerUrl) {
+        const fullBannerUrl = partner.bannerUrl.startsWith('http') ? partner.bannerUrl : `${domain}${partner.bannerUrl}`;
+        embed.setImage(fullBannerUrl);
+    }
+
+    // Action Row Buttons
+    const row = new ActionRowBuilder();
+
+    // Button 1: Instance Join Link (Only show if instance link is explicitly set and event is NOT ended)
+    if (evt.eventUrl && evt.eventUrl.trim().length > 0 && !isEnded) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setLabel('🌐 Join VRChat Instance')
+                .setStyle(ButtonStyle.Link)
+                .setURL(evt.eventUrl.trim())
+        );
+    }
+
+    // Button 2: Partner Showcase Link
+    row.addComponents(
+        new ButtonBuilder()
+            .setLabel('⭐ View Partner Showcase')
+            .setStyle(ButtonStyle.Link)
+            .setURL(showcaseUrl)
+    );
+
+    let message = null;
+
+    // Check if an existing message was already posted to Discord and edit it in-place
+    if (evt.discordMessageId) {
+        try {
+            const existingMsg = await channel.messages.fetch(evt.discordMessageId);
+            if (existingMsg) {
+                await existingMsg.edit({
+                    content: messageContent,
+                    embeds: [embed],
+                    components: [row]
+                });
+                message = existingMsg;
+            }
+        } catch (e) {
+            console.log(`[BOT] Existing message ${evt.discordMessageId} not found, posting new announcement.`);
+        }
+    }
+
+    if (!message) {
+        message = await channel.send({
+            content: messageContent,
+            embeds: [embed],
+            components: [row]
+        });
+    }
+
+    // Update DB record
+    await evt.update({
+        hasPostedDiscordUpcoming: isManualUpcoming ? true : evt.hasPostedDiscordUpcoming,
+        hasPostedDiscordLive: isLive ? true : evt.hasPostedDiscordLive,
+        hasPostedDiscordEnded: isEnded ? true : evt.hasPostedDiscordEnded,
+        discordMessageId: message.id
+    });
+
+    return { success: true, messageId: message.id };
+}
+
+/**
+ * Auto-announces partner events when they turn live, and updates them when concluded
+ */
+async function autoAnnounceLivePartnerEvents(client) {
+    if (!client || !client.isReady()) return;
+    try {
+        const { PartnerEvent, Partner } = require('../db');
+        const { Op } = require('sequelize');
+        const now = new Date();
+
+        // 1. Auto-announce Live events
+        const liveEventsToAnnounce = await PartnerEvent.findAll({
+            where: {
+                isApproved: true,
+                hasPostedDiscordLive: false,
+                startTime: { [Op.lte]: now },
+                endTime: { [Op.gt]: now }
+            },
+            include: [{ model: Partner, as: 'partner' }]
+        });
+
+        for (const evt of liveEventsToAnnounce) {
+            try {
+                console.log(`\x1b[35m[BOT] ⚡ Auto-announcing live partner event #${evt.id}: "${evt.title}"\x1b[0m`);
+                await postPartnerEventAnnouncement(client, evt.id, { auto: true });
+            } catch (err) {
+                console.error(`[BOT] Error auto-announcing live partner event #${evt.id}:`, err.message);
+            }
+        }
+
+        // 2. Auto-update Concluded events
+        const endedEventsToUpdate = await PartnerEvent.findAll({
+            where: {
+                isApproved: true,
+                discordMessageId: { [Op.ne]: null },
+                hasPostedDiscordEnded: false,
+                endTime: { [Op.lte]: now }
+            },
+            include: [{ model: Partner, as: 'partner' }]
+        });
+
+        for (const evt of endedEventsToUpdate) {
+            try {
+                console.log(`\x1b[35m[BOT] 🏁 Auto-updating concluded partner event #${evt.id}: "${evt.title}"\x1b[0m`);
+                await postPartnerEventAnnouncement(client, evt.id, { auto: true });
+            } catch (err) {
+                console.error(`[BOT] Error auto-updating concluded partner event #${evt.id}:`, err.message);
+            }
+        }
+    } catch (e) {
+        console.error('[BOT] Auto-announce partner events error:', e);
+    }
+}
+
+module.exports = { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, createApplicationTicket, joinGuild, auditGroupMembers, postPartnerEventAnnouncement, autoAnnounceLivePartnerEvents };
+

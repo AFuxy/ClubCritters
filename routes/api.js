@@ -119,6 +119,13 @@ async function executeRoleSync(vrcUserId, discordId) {
             vrcFallbackName: 'moderator'
         },
         {
+            name: 'Partner',
+            discordEnvId: process.env.DISCORD_ROLE_PARTNER,
+            discordFallbackName: 'partner',
+            vrcEnvId: process.env.VRC_ROLE_PARTNER,
+            vrcFallbackName: 'partner'
+        },
+        {
             name: 'VIP',
             discordEnvId: process.env.DISCORD_ROLE_VIP,
             discordFallbackName: 'vip',
@@ -574,6 +581,18 @@ router.put('/partner/events/:id', isAuthenticated, isPartnerOrStaff, async (req,
         if (isApproved !== undefined && isStaffUser) updates.isApproved = isApproved;
 
         await partnerEvent.update(updates);
+
+        // Auto-update existing Discord message embed if one was already posted
+        if (partnerEvent.discordMessageId) {
+            try {
+                const { client } = require('../bot');
+                const { postPartnerEventAnnouncement } = require('../utils/bot-utils');
+                await postPartnerEventAnnouncement(client, partnerEvent.id);
+            } catch (e) {
+                console.error('[PARTNER EVENT API] Failed to auto-update Discord message:', e.message);
+            }
+        }
+
         res.json({ success: true, event: partnerEvent });
     } catch (err) {
         console.error("[PARTNER EVENT API] Update error:", err);
@@ -632,6 +651,20 @@ router.post('/partner/events/upload-flyer', isAuthenticated, isPartnerOrStaff, h
     } catch (err) {
         console.error("[PARTNER EVENT API] Flyer Upload Error:", err);
         res.status(500).json({ error: 'Failed to upload event flyer' });
+    }
+});
+
+// 5. Post Partner Event Announcement to Discord
+router.post('/partner/events/:id/announce', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const { client } = require('../bot');
+        const { postPartnerEventAnnouncement } = require('../utils/bot-utils');
+
+        const result = await postPartnerEventAnnouncement(client, req.params.id, { isManualUpcoming: true });
+        res.json({ success: true, message: 'Upcoming event announcement posted to Discord!', messageId: result.messageId });
+    } catch (err) {
+        console.error('[PARTNER EVENT API] Discord announcement error:', err);
+        res.status(500).json({ error: err.message || 'Failed to post announcement to Discord' });
     }
 });
 

@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, Events, REST, Routes, Collection, EmbedBuilder, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild, auditGroupMembers } = require('./utils/bot-utils');
+const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild, auditGroupMembers, autoAnnounceLivePartnerEvents } = require('./utils/bot-utils');
 require('dotenv').config();
 
 const client = new Client({
@@ -54,7 +54,11 @@ client.once(Events.ClientReady, (c) => {
     console.log(`\x1b[35m[BOT] 💜 Discord Bot logged in as ${c.user.tag}\x1b[0m`);
     registerSlashCommands();
     
-    // Start automated status loop
+    // Partner Event Live Announcements Loop (Every 60s)
+    setInterval(() => autoAnnounceLivePartnerEvents(client), 60000);
+    setTimeout(() => autoAnnounceLivePartnerEvents(client), 5000);
+
+    // VRChat Status & Group Audit Loops
     if (process.env.DISABLE_VRC_BOT !== 'true') {
         setInterval(() => autoUpdateStatus(client), 60000);
         autoUpdateStatus(client);
@@ -63,7 +67,7 @@ client.once(Events.ClientReady, (c) => {
         setInterval(() => auditGroupMembers(client), 600000);
         setTimeout(() => auditGroupMembers(client), 15000); // Initial run
     } else {
-        console.log(`\x1b[33m[BOT] ⚠️ Logic & Status updates DISABLED (DISABLE_VRC_BOT=true)\x1b[0m`);
+        console.log(`\x1b[33m[BOT] ⚠️ VRChat Status & Audit updates DISABLED (DISABLE_VRC_BOT=true)\x1b[0m`);
     }
 });
 

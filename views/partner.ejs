@@ -104,13 +104,31 @@
                                 const start = new Date(evt.startTime);
                                 const end = new Date(evt.endTime);
                                 const isLive = now >= start && now < end;
+                                const isEnded = now >= end;
+
+                                let badgeLabel = 'UPCOMING';
+                                let badgeBg = 'rgba(255,255,255,0.05)';
+                                let badgeColor = accent;
+                                let badgeBorder = accent;
+
+                                if (isLive) {
+                                    badgeLabel = 'LIVE NOW';
+                                    badgeBg = 'rgba(255,23,68,0.2)';
+                                    badgeColor = '#ff1744';
+                                    badgeBorder = '#ff1744';
+                                } else if (isEnded) {
+                                    badgeLabel = 'ENDED';
+                                    badgeBg = 'rgba(255,255,255,0.04)';
+                                    badgeColor = '#888888';
+                                    badgeBorder = '#444444';
+                                }
 
                                 let lineupSlots = [];
                                 if (evt.lineup) {
                                     try { lineupSlots = typeof evt.lineup === 'string' ? JSON.parse(evt.lineup) : evt.lineup; } catch(e) {}
                                 }
                             %>
-                            <div style="background: rgba(12, 18, 25, 0.9); border: 1px solid <%= isLive ? '#ff1744' : accent %>; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: <%= isLive ? '0 0 25px rgba(255,23,68,0.3)' : '0 5px 20px rgba(0,0,0,0.4)' %>;">
+                            <div style="background: rgba(12, 18, 25, 0.9); border: 1px solid <%= isLive ? '#ff1744' : (isEnded ? '#333' : accent) %>; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; opacity: <%= isEnded ? '0.75' : '1' %>; box-shadow: <%= isLive ? '0 0 25px rgba(255,23,68,0.3)' : '0 5px 20px rgba(0,0,0,0.4)' %>;">
                                 
                                 <% if (evt.bannerUrl) { %>
                                     <div style="height: 180px; position: relative; background: #080c10; overflow: hidden; display: flex; justify-content: center; align-items: center; cursor: pointer; group:" onclick="openFlyerLightbox('<%= evt.bannerUrl %>', '<%= evt.title.replace(/'/g, "\\'") %>')">
@@ -126,8 +144,8 @@
 
                                 <div style="padding: 20px; flex: 1; display: flex; flex-direction: column;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                                        <span style="font-size: 0.7rem; font-weight: 900; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; background: <%= isLive ? 'rgba(255,23,68,0.2)' : 'rgba(255,255,255,0.05)' %>; color: <%= isLive ? '#ff1744' : accent %>; border: 1px solid <%= isLive ? '#ff1744' : accent %>;">
-                                            <%= isLive ? 'LIVE NOW' : 'UPCOMING' %>
+                                        <span style="font-size: 0.7rem; font-weight: 900; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; background: <%= badgeBg %>; color: <%= badgeColor %>; border: 1px solid <%= badgeBorder %>;">
+                                            <%= badgeLabel %>
                                         </span>
                                     </div>
 

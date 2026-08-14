@@ -138,17 +138,41 @@
                                             <img src="<%= evt.bannerUrl %>" alt="<%= evt.title %> Flyer" style="width: 100%; height: 100%; object-fit: cover;">
                                         </div>
                                     <% } %>
-                                    <div style="padding: 15px; display: flex; align-items: flex-start; justify-content: space-between; gap: 15px;">
-                                        <div style="flex: 1;">
-                                            <h4 style="margin: 0 0 4px 0; color: #fff; font-size: 1rem;"><%= evt.title %></h4>
-                                            <p style="margin: 0 0 8px 0; font-size: 0.78rem; color: <%= partner.accentColor || 'var(--primary-pink)' %>; font-weight: bold;">
+                                    <div style="padding: 15px;">
+                                        <%
+                                            const now = new Date();
+                                            const start = new Date(evt.startTime);
+                                            const end = new Date(evt.endTime);
+                                            const isLive = now >= start && now < end;
+                                            const isEnded = now >= end;
+                                            let badgeText = isLive ? 'LIVE NOW' : (isEnded ? 'ENDED' : 'UPCOMING');
+                                            let badgeStyle = isLive ? 'background: rgba(255,23,68,0.2); color: #ff1744; border: 1px solid #ff1744;' : (isEnded ? 'background: rgba(255,255,255,0.05); color: #888; border: 1px solid #444;' : 'background: rgba(41,197,246,0.15); color: #29c5f6; border: 1px solid #29c5f6;');
+                                        %>
+                                        
+                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+                                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                                <h4 style="margin: 0; color: #fff; font-size: 1rem;"><%= evt.title %></h4>
+                                                <span style="font-size: 0.65rem; font-weight: bold; padding: 2px 8px; border-radius: 12px; <%= badgeStyle %>"><%= badgeText %></span>
+                                            </div>
+                                            <span style="font-size: 0.78rem; color: <%= partner.accentColor || 'var(--primary-pink)' %>; font-weight: bold;">
                                                 🕒 <%= new Date(evt.startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) %> &rarr; <%= new Date(evt.endTime).toLocaleTimeString([], { timeStyle: 'short' }) %>
-                                            </p>
-                                            <% if (evt.description) { %>
-                                                <div style="font-size: 0.8rem; color: #aaa; line-height: 1.4; white-space: pre-wrap;"><%= evt.description %></div>
-                                            <% } %>
+                                            </span>
                                         </div>
-                                        <div style="display: flex; gap: 8px;">
+
+                                        <% if (evt.description) { %>
+                                            <div style="font-size: 0.8rem; color: #aaa; line-height: 1.4; white-space: pre-wrap; margin-bottom: 10px;"><%= evt.description %></div>
+                                        <% } %>
+
+                                        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; margin-top: 10px; flex-wrap: wrap;">
+                                            <% if (evt.hasPostedDiscordLive || evt.hasPostedDiscordUpcoming) { %>
+                                                <button type="button" class="btn-cc btn-small" disabled style="background: rgba(255,255,255,0.04); border: 1px solid #444; color: #777; cursor: not-allowed;" title="<%= evt.hasPostedDiscordLive ? 'Live announcement posted to Discord.' : 'Initial announcement posted. When live, our bot will automatically post a live announcement.' %>">
+                                                    <%= evt.hasPostedDiscordLive ? '✓ Live Announcement Posted' : '✓ Announced to Discord' %>
+                                                </button>
+                                            <% } else { %>
+                                                <button type="button" class="btn-cc btn-small btn-secondary" style="background: rgba(88, 101, 242, 0.2); border: 1px solid #5865F2; color: #5865F2;" onclick="openDiscordPostModal(<%= evt.id %>, '<%= evt.title.replace(/'/g, "\\'") %>')">
+                                                    📢 Post to Discord
+                                                </button>
+                                            <% } %>
                                             <button type="button" class="btn-cc btn-small btn-dark" onclick="triggerEditEvent(<%= evt.id %>)">
                                                 Edit
                                             </button>
@@ -697,6 +721,80 @@
             showNotify('Error deleting event', 'error');
         }
     }
+
+    let activeDiscordEventId = null;
+
+    function openDiscordPostModal(eventId, eventTitle) {
+        activeDiscordEventId = eventId;
+        const modal = document.getElementById('discord-post-modal');
+        const titleEl = document.getElementById('discord-modal-event-title');
+        if (titleEl) titleEl.innerText = `Event: "${eventTitle}"`;
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeDiscordPostModal() {
+        activeDiscordEventId = null;
+        const modal = document.getElementById('discord-post-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmPostDiscordAnnouncement() {
+        if (!activeDiscordEventId) return;
+        const confirmBtn = document.getElementById('discord-modal-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.innerText = 'Posting...';
+        }
+
+        try {
+            const res = await fetch(`/api/partner/events/${activeDiscordEventId}/announce`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            closeDiscordPostModal();
+
+            if (res.ok && data.success) {
+                showNotify('Announcement posted to Discord successfully!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showNotify(data.error || 'Failed to post to Discord', 'error');
+            }
+        } catch(e) {
+            closeDiscordPostModal();
+            showNotify('Network error posting announcement', 'error');
+        } finally {
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.innerText = 'Post Announcement Now';
+            }
+        }
+    }
 </script>
+
+<!-- DISCORD POST CONFIRMATION MODAL -->
+<div id="discord-post-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div style="background: #121821; border: 1px solid #5865F2; border-radius: 16px; width: 90%; max-width: 480px; padding: 25px; box-shadow: 0 15px 40px rgba(88,101,242,0.3); position: relative; text-align: left;">
+        <h3 style="margin-top: 0; margin-bottom: 8px; color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+            <span style="color: #5865F2;">📢</span> Post Announcement to Discord
+        </h3>
+        
+        <p id="discord-modal-event-title" style="font-size: 0.9rem; color: var(--primary-blue); font-weight: bold; margin-bottom: 15px;"></p>
+        
+        <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 20px; background: rgba(88,101,242,0.1); border: 1px solid rgba(88,101,242,0.25); padding: 14px; border-radius: 10px;">
+            You can post an initial event announcement <strong>once</strong> to advertise this upcoming event in Discord.<br><br>
+            <span style="color: #5865F2; font-weight: bold;">Note:</span> Once your event goes live, our system will automatically post a live announcement to Discord.
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" class="btn-cc btn-small btn-dark" onclick="closeDiscordPostModal()">
+                Cancel
+            </button>
+            <button id="discord-modal-confirm-btn" type="button" class="btn-cc btn-small btn-primary" style="background: #5865F2; border-color: #5865F2;" onclick="confirmPostDiscordAnnouncement()">
+                Post Announcement Now
+            </button>
+        </div>
+    </div>
+</div>
 
 <%- include('footer') %>
