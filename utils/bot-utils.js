@@ -512,6 +512,15 @@ async function postPartnerEventAnnouncement(client, partnerEventId, options = {}
         messageContent = `🏁 **This partner event has concluded.**`;
     }
 
+    // Parse stream links
+    let streamUrlsObj = {};
+    if (evt.streamUrls) {
+        try { streamUrlsObj = typeof evt.streamUrls === 'string' ? JSON.parse(evt.streamUrls) : evt.streamUrls; } catch(e) {}
+    }
+
+    const startUnix = Math.floor(new Date(evt.startTime).getTime() / 1000);
+    const endUnix = Math.floor(new Date(evt.endTime).getTime() / 1000);
+
     // Build Embed
     const embed = new EmbedBuilder()
         .setTitle(embedTitle)
@@ -520,9 +529,15 @@ async function postPartnerEventAnnouncement(client, partnerEventId, options = {}
         .setDescription(embedDesc)
         .addFields(
             { name: '🏛️ Partner Club', value: `**[${partner.name}](${showcaseUrl})**`, inline: true },
-            { name: '🕒 Event Duration', value: `<t:${Math.floor(new Date(evt.startTime).getTime()/1000)}:F>\n(<t:${Math.floor(new Date(evt.startTime).getTime()/1000)}:R>)`, inline: true }
-        )
-        .setFooter({ text: 'Club FuRN Network • Partner Showcase', iconURL: `${domain}/cdn/logos/club/Logo.png` })
+            { name: '🚀 Starts', value: `<t:${startUnix}:f>\n(<t:${startUnix}:R>)`, inline: true },
+            { name: '🏁 Ends', value: `<t:${endUnix}:f>\n(<t:${endUnix}:t>)`, inline: true }
+        );
+
+    if (evt.isStreamedByClubFurn) {
+        embed.addFields({ name: '📡 Official Broadcast', value: 'Streamed live by **Club FuRN**!', inline: true });
+    }
+
+    embed.setFooter({ text: 'Club FuRN Network • Partner Showcase', iconURL: `${domain}/cdn/logos/club/Logo.png` })
         .setTimestamp();
 
     if (lineupText) {
@@ -551,7 +566,48 @@ async function postPartnerEventAnnouncement(client, partnerEventId, options = {}
         );
     }
 
-    // Button 2: Partner Showcase Link
+    // Button 2 & 3: Live Stream Watch Links
+    if (evt.isStreamedByClubFurn && !isEnded) {
+        const twitchUrl = streamUrlsObj.twitch || process.env.DEFAULT_TWITCH_URL || 'https://twitch.tv/clubfurn';
+        const youtubeUrl = streamUrlsObj.youtube || process.env.DEFAULT_YOUTUBE_URL || 'https://youtube.com/@clubfurn';
+        const tiktokUrl = streamUrlsObj.tiktok || null;
+        const otherUrl = streamUrlsObj.other || null;
+
+        if (twitchUrl && row.components.length < 4) {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setLabel('📺 Watch on Twitch')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(twitchUrl)
+            );
+        }
+        if (youtubeUrl && row.components.length < 4) {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setLabel('🔴 Watch on YouTube')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(youtubeUrl)
+            );
+        }
+        if (tiktokUrl && row.components.length < 4) {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setLabel('🎵 Watch on TikTok')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(tiktokUrl)
+            );
+        }
+        if (otherUrl && row.components.length < 4) {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setLabel('⚡ Kick / Live')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(otherUrl)
+            );
+        }
+    }
+
+    // Partner Showcase Link
     row.addComponents(
         new ButtonBuilder()
             .setLabel('⭐ View Partner Showcase')

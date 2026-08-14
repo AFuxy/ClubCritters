@@ -8,10 +8,14 @@
 </head>
 <body>
     <div id="overlay-container">
-        <!-- Top Left: Population Pulse -->
+        <!-- Top Left: Population Pulse & Partner Branding -->
         <div id="population-pulse" class="overlay-element top-left">
             <div class="content-box glass">
-                <div class="label">INSTANCE POPULATION</div>
+                <div id="partner-overlay-badge" class="partner-overlay-badge" style="display: none;">
+                    <img id="partner-badge-logo" src="" alt="Partner Logo">
+                    <span id="partner-badge-name"></span>
+                </div>
+                <div class="label" id="pop-pulse-label">INSTANCE POPULATION</div>
                 <div class="value"><span id="vrc-count">0</span><span class="total">/</span><span id="vrc-capacity">0</span></div>
                 <div class="status-indicator" id="vrc-active-dot"></div>
             </div>
@@ -34,7 +38,7 @@
         <!-- Bottom Right: Up Next -->
         <div id="up-next" class="overlay-element bottom-right slide-out-right">
             <div class="content-box glass">
-                <div class="label">UP NEXT</div>
+                <div class="label" id="up-next-label">UP NEXT</div>
                 <div id="next-performers-list">
                     <!-- Dynamic Items -->
                 </div>

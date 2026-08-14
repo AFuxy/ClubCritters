@@ -143,10 +143,15 @@
                                 <% } %>
 
                                 <div style="padding: 20px; flex: 1; display: flex; flex-direction: column;">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
                                         <span style="font-size: 0.7rem; font-weight: 900; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; background: <%= badgeBg %>; color: <%= badgeColor %>; border: 1px solid <%= badgeBorder %>;">
                                             <%= badgeLabel %>
                                         </span>
+                                        <% if (evt.isStreamedByClubFurn) { %>
+                                            <span style="font-size: 0.68rem; font-weight: bold; padding: 3px 8px; border-radius: 12px; background: rgba(88,101,242,0.15); color: #5865F2; border: 1px solid #5865F2;">
+                                                📡 Official Live Stream by Club FuRN
+                                            </span>
+                                        <% } %>
                                     </div>
 
                                     <h3 style="margin: 0 0 8px 0; color: #fff; font-size: 1.15rem; border: none; padding: 0;">
@@ -195,11 +200,51 @@
                                         <div style="font-size: 0.85rem; color: #aaa; margin: 0 0 15px 0; line-height: 1.5; white-space: pre-wrap; flex: 1;"><%= evt.description %></div>
                                     <% } %>
 
-                                    <% if (evt.eventUrl) { %>
-                                        <a href="<%= evt.eventUrl %>" target="_blank" class="btn-cc btn-small <%= isLive ? 'btn-primary' : 'btn-secondary' %>" style="text-decoration: none; width: 100%; box-sizing: border-box; text-align: center; font-weight: bold; margin-top: auto;">
-                                            <%= isLive ? 'Join Live Event ↗' : 'Event Link ↗' %>
-                                        </a>
-                                    <% } %>
+                                    <%
+                                        let streamUrlsObj = {};
+                                        if (evt.streamUrls) {
+                                            try { streamUrlsObj = typeof evt.streamUrls === 'string' ? JSON.parse(evt.streamUrls) : evt.streamUrls; } catch(e) {}
+                                        }
+                                    %>
+
+                                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto;">
+                                        <% if (evt.isStreamedByClubFurn && !isEnded) { %>
+                                            <%
+                                                const twitchUrl = streamUrlsObj.twitch || 'https://twitch.tv/clubfurn';
+                                                const youtubeUrl = streamUrlsObj.youtube || 'https://youtube.com/@clubfurn';
+                                                const tiktokUrl = streamUrlsObj.tiktok || null;
+                                                const otherUrl = streamUrlsObj.other || null;
+                                            %>
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+                                                <% if (twitchUrl) { %>
+                                                    <a href="<%= twitchUrl %>" target="_blank" class="btn-cc btn-small" style="text-decoration: none; text-align: center; background: rgba(168,85,247,0.2); border: 1px solid #a855f7; color: #a855f7; font-weight: bold; padding: 6px 10px;">
+                                                        📺 Twitch ↗
+                                                    </a>
+                                                <% } %>
+                                                <% if (youtubeUrl) { %>
+                                                    <a href="<%= youtubeUrl %>" target="_blank" class="btn-cc btn-small" style="text-decoration: none; text-align: center; background: rgba(255,0,0,0.2); border: 1px solid #ff0000; color: #ff0000; font-weight: bold; padding: 6px 10px;">
+                                                        🔴 YouTube ↗
+                                                    </a>
+                                                <% } %>
+                                                <% if (tiktokUrl) { %>
+                                                    <a href="<%= tiktokUrl %>" target="_blank" class="btn-cc btn-small" style="text-decoration: none; text-align: center; background: rgba(0,242,254,0.2); border: 1px solid #00f2fe; color: #00f2fe; font-weight: bold; padding: 6px 10px;">
+                                                        🎵 TikTok ↗
+                                                    </a>
+                                                <% } %>
+                                                <% if (otherUrl) { %>
+                                                    <a href="<%= otherUrl %>" target="_blank" class="btn-cc btn-small" style="text-decoration: none; text-align: center; background: rgba(83,252,24,0.2); border: 1px solid #53fc18; color: #53fc18; font-weight: bold; padding: 6px 10px;">
+                                                        ⚡ Kick / Live ↗
+                                                    </a>
+                                                <% } %>
+                                            </div>
+                                        <% } %>
+
+                                        <% if (evt.eventUrl && !isEnded) { %>
+                                            <a href="<%= evt.eventUrl %>" target="_blank" class="btn-cc btn-small <%= isLive ? 'btn-primary' : 'btn-secondary' %>" style="text-decoration: none; width: 100%; box-sizing: border-box; text-align: center; font-weight: bold;">
+                                                <%= isLive ? '🌐 Join VRChat Instance ↗' : 'Event Link ↗' %>
+                                            </a>
+                                        <% } %>
+                                    </div>
                                 </div>
                             </div>
                         <% }) %>

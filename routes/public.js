@@ -666,8 +666,8 @@ router.get('/api/public/overlay-data', async (req, res) => {
             };
         };
 
-        const mappedCurrent = await mapPerformer(currentDJ, true);
-        const mappedNext = await Promise.all(upNext.map(item => mapPerformer(item, false)));
+        let mappedCurrent = await mapPerformer(currentDJ, true);
+        let mappedNext = await Promise.all(upNext.map(item => mapPerformer(item, false)));
 
         // VRC Status
         const groupId = process.env.VRC_GROUPID || "FURN.9601";
@@ -690,12 +690,146 @@ router.get('/api/public/overlay-data', async (req, res) => {
             }
         }
 
+        // Check for active Partner Event live stream
+        let activePartnerStream = null;
+        const livePartnerEvent = await PartnerEvent.findOne({
+            where: {
+                isApproved: true,
+                isStreamedByClubFurn: true,
+                startTime: { [Op.lte]: now },
+                endTime: { [Op.gt]: now }
+            },
+            include: [{ model: Partner, as: 'partner' }]
+        });
+
+        if (livePartnerEvent) {
+            let streamUrlsObj = {};
+            if (livePartnerEvent.streamUrls) {
+                try { streamUrlsObj = typeof livePartnerEvent.streamUrls === 'string' ? JSON.parse(livePartnerEvent.streamUrls) : livePartnerEvent.streamUrls; } catch(e) {}
+            }
+            
+            const partnerAccent = livePartnerEvent.partner ? (livePartnerEvent.partner.accentColor || '#f2008d') : '#f2008d';
+            const partnerLogo = livePartnerEvent.partner ? livePartnerEvent.partner.iconUrl : '/cdn/logos/club/Logo.png';
+            const partnerName = livePartnerEvent.partner ? livePartnerEvent.partner.name : 'Partner Club';
+
+            activePartnerStream = {
+                id: livePartnerEvent.id,
+                eventTitle: livePartnerEvent.title,
+                partnerName: partnerName,
+                partnerLogo: partnerLogo,
+                accentColor: partnerAccent,
+                streamUrls: streamUrlsObj
+            };
+
+            // If main VRC status is not active, attempt to fetch population directly from the partner event's VRChat instance URL
+            if ((!vrcStatus.active || vrcStatus.count === 0) && livePartnerEvent.eventUrl && livePartnerEvent.eventUrl.includes('worldId=')) {
+                const partnerVrc = await getInstanceData(livePartnerEvent.eventUrl);
+                if (partnerVrc && partnerVrc.active) {
+                    vrcStatus = {
+                        count: partnerVrc.count,
+                        capacity: partnerVrc.capacity,
+                        active: true
+                    };
+                }
+            }
+
+            // If main Club FuRN schedule is not active, populate currentDJ & upNext from the Partner Event's lineup!
+            if (!mappedCurrent) {
+                let partnerLineup = [];
+                if (livePartnerEvent.lineup) {
+                    try { partnerLineup = typeof livePartnerEvent.lineup === 'string' ? JSON.parse(livePartnerEvent.lineup) : livePartnerEvent.lineup; } catch(e) {}
+                }
+
+                if (Array.isArray(partnerLineup) && partnerLineup.length > 0) {
+                    const evtDateStr = new Date(livePartnerEvent.startTime).toISOString().split('T')[0];
+
+                    const parsedPartnerSlots = partnerLineup.map((slot, idx) => {
+                        let slotStart = null, slotEnd = null;
+                        if (slot.startUtc) slotStart = new Date(slot.startUtc);
+                        else if (slot.start) slotStart = new Date(`${evtDateStr}T${slot.start}:00Z`);
+                        
+                        if (slot.endUtc) slotEnd = new Date(slot.endUtc);
+                        else if (slot.end) slotEnd = new Date(`${evtDateStr}T${slot.end}:00Z`);
+
+                        return { slot, idx, slotStart, slotEnd };
+                    });
+
+                    let currentPartnerSlot = null;
+                    let nextPartnerSlots = [];
+
+                    for (let i = 0; i < parsedPartnerSlots.length; i++) {
+                        const { slot, slotStart, slotEnd } = parsedPartnerSlots[i];
+                        if (slotStart && slotEnd && now >= slotStart && now < slotEnd) {
+                            currentPartnerSlot = parsedPartnerSlots[i];
+                            nextPartnerSlots = parsedPartnerSlots.slice(i + 1, i + 3);
+                            break;
+                        }
+                    }
+
+                    if (!currentPartnerSlot) {
+                        for (let i = 0; i < parsedPartnerSlots.length; i++) {
+                            const { slotStart } = parsedPartnerSlots[i];
+                            if (slotStart && now < slotStart) {
+                                currentPartnerSlot = parsedPartnerSlots[i];
+                                isTransition = true;
+                                nextPartnerSlots = parsedPartnerSlots.slice(i, i + 2);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (currentPartnerSlot) {
+                        const { slot, slotStart, slotEnd } = currentPartnerSlot;
+                        mappedCurrent = {
+                            id: `partner-dj-${slot.idx}`,
+                            timeSlot: slot.start && slot.end ? `${slot.start} - ${slot.end}` : '',
+                            startTime: slotStart ? slotStart.toISOString() : null,
+                            endTime: slotEnd ? slotEnd.toISOString() : null,
+                            genre: slot.genre || 'Electronic',
+                            performers: [{
+                                name: slot.djName || slot.name || partnerName,
+                                image: partnerLogo,
+                                color: partnerAccent
+                            }]
+                        };
+
+                        mappedNext = nextPartnerSlots.map(ps => ({
+                            id: `partner-dj-${ps.idx}`,
+                            timeSlot: ps.slot.start && ps.slot.end ? `${ps.slot.start} - ${ps.slot.end}` : '',
+                            genre: ps.slot.genre || 'Electronic',
+                            performers: [{
+                                name: ps.slot.djName || ps.slot.name || partnerName,
+                                image: partnerLogo,
+                                color: partnerAccent
+                            }]
+                        }));
+                    }
+                }
+
+                // Fallback if no specific slots match
+                if (!mappedCurrent) {
+                    mappedCurrent = {
+                        id: `partner-evt-${livePartnerEvent.id}`,
+                        genre: livePartnerEvent.title || 'Partner Showcase',
+                        startTime: new Date(livePartnerEvent.startTime).toISOString(),
+                        endTime: new Date(livePartnerEvent.endTime).toISOString(),
+                        performers: [{
+                            name: partnerName,
+                            image: partnerLogo,
+                            color: partnerAccent
+                        }]
+                    };
+                }
+            }
+        }
+
         res.json({
             currentDJ: mappedCurrent,
             upNext: mappedNext,
             vrcStatus,
             isTransition,
-            eventTitle: settings ? settings.eventTitle : "Club FuRN"
+            eventTitle: settings ? settings.eventTitle : "Club FuRN",
+            activePartnerStream
         });
     } catch (err) {
         console.error("Overlay Data Error:", err);

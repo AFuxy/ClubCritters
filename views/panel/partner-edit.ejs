@@ -1,4 +1,8 @@
 <%- include('header') %>
+<%
+    const userRole = (user && user.type || "").toLowerCase();
+    const isStaff = ['host', 'staff', 'owner'].some(r => userRole.includes(r));
+%>
 
 <div class="staff-hub">
 
@@ -301,10 +305,46 @@
                 <textarea id="evt-desc" rows="3" placeholder="Additional event details, VRChat world info, or guidelines..."></textarea>
             </div>
 
-            <div class="form-group" style="margin-bottom: 20px;">
+            <div class="form-group" style="margin-bottom: 15px;">
                 <label>Event / World URL (Optional)</label>
                 <input type="url" id="evt-url" placeholder="https://vrc.group/... or VRChat world link">
             </div>
+
+            <!-- OFFICIAL LIVE STREAM OPTIONS (STAFF ONLY) -->
+            <% if (isStaff) { %>
+                <div style="background: rgba(88, 101, 242, 0.08); border: 1px solid rgba(88, 101, 242, 0.3); border-radius: 10px; padding: 14px; margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: #fff; font-weight: bold; font-size: 0.9rem; margin-bottom: 6px;">
+                        <input type="checkbox" id="evt-is-streamed" style="width: 18px; height: 18px; accent-color: #5865F2;" onchange="toggleStreamLinksBox(this.checked)">
+                        <span>📡 Official Live Stream by Club FuRN (Staff Only)</span>
+                    </label>
+                    <p style="margin: 0 0 8px 0; font-size: 0.78rem; color: #aaa;">Enable this if Club FuRN is officially streaming/broadcasting this event live on Twitch, YouTube, or TikTok.</p>
+
+                    <div id="evt-stream-links-box" style="display: none; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; margin-top: 10px; flex-direction: column; gap: 8px;">
+                        <div class="form-group" style="margin-bottom: 6px;">
+                            <label style="font-size: 0.78rem; color: #a855f7;">📺 Twitch Stream URL</label>
+                            <input type="url" id="evt-stream-twitch" placeholder="https://twitch.tv/clubfurn" style="padding: 6px 10px; font-size: 0.8rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 6px;">
+                            <label style="font-size: 0.78rem; color: #ff0000;">🔴 YouTube Stream URL</label>
+                            <input type="url" id="evt-stream-youtube" placeholder="https://youtube.com/@clubfurn/live" style="padding: 6px 10px; font-size: 0.8rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 6px;">
+                            <label style="font-size: 0.78rem; color: #00f2fe;">🎵 TikTok Stream URL</label>
+                            <input type="url" id="evt-stream-tiktok" placeholder="https://tiktok.com/@clubfurn/live" style="padding: 6px 10px; font-size: 0.8rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.78rem; color: #53fc18;">⚡ Kick / Custom Stream URL</label>
+                            <input type="url" id="evt-stream-other" placeholder="https://kick.com/clubfurn" style="padding: 6px 10px; font-size: 0.8rem;">
+                        </div>
+                    </div>
+                </div>
+            <% } else { %>
+                <input type="checkbox" id="evt-is-streamed" style="display: none;">
+                <input type="hidden" id="evt-stream-twitch" value="">
+                <input type="hidden" id="evt-stream-youtube" value="">
+                <input type="hidden" id="evt-stream-tiktok" value="">
+                <input type="hidden" id="evt-stream-other" value="">
+            <% } %>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
                 <button type="button" class="btn-cc btn-secondary" onclick="closeAddEventModal()">Cancel</button>
@@ -364,6 +404,11 @@
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
+    function toggleStreamLinksBox(show) {
+        const box = document.getElementById('evt-stream-links-box');
+        if (box) box.style.display = show ? 'flex' : 'none';
+    }
+
     function openEditEventModal(evt) {
         document.getElementById('event-modal-title').innerText = '✏️ Edit Partner Event';
         document.getElementById('evt-id').value = evt.id;
@@ -376,6 +421,19 @@
         document.getElementById('evt-start').value = formatForDatetimeLocal(evt.startTime);
         document.getElementById('evt-end').value = formatForDatetimeLocal(evt.endTime);
         document.getElementById('evt-url').value = evt.eventUrl || '';
+
+        const isStreamed = evt.isStreamedByClubFurn === true;
+        document.getElementById('evt-is-streamed').checked = isStreamed;
+        toggleStreamLinksBox(isStreamed);
+
+        let streamUrlsObj = {};
+        if (evt.streamUrls) {
+            try { streamUrlsObj = typeof evt.streamUrls === 'string' ? JSON.parse(evt.streamUrls) : evt.streamUrls; } catch(e) {}
+        }
+        document.getElementById('evt-stream-twitch').value = streamUrlsObj.twitch || '';
+        document.getElementById('evt-stream-youtube').value = streamUrlsObj.youtube || '';
+        document.getElementById('evt-stream-tiktok').value = streamUrlsObj.tiktok || '';
+        document.getElementById('evt-stream-other').value = streamUrlsObj.other || '';
         
         if (evt.bannerUrl) {
             document.getElementById('evt-banner-url').value = evt.bannerUrl;
@@ -410,37 +468,42 @@
                 addDjLineupSlot({ start: startStr || slot.start, end: endStr || slot.end, name: slot.djName || slot.name, genre: slot.genre });
             });
             document.getElementById('evt-desc').value = desc.trim();
-        } else if (desc.includes('🎧 LINEUP & TIMETABLE:')) {
-            const parts = desc.split('🎧 LINEUP & TIMETABLE:');
-            const lineupSection = parts[1] ? parts[1].split('\n\n')[0] : '';
-            const customDesc = parts[1] ? parts[1].split('\n\n').slice(1).join('\n\n') : (parts[0] || '');
-
-            document.getElementById('evt-desc').value = (customDesc || '').trim();
-
-            const lines = lineupSection.split('\n');
-            lines.forEach(line => {
-                line = line.trim();
-                if (!line || line.startsWith('🎧')) return;
-                let start = '', end = '', name = '', genre = '';
-                if (line.includes('(') && line.endsWith(')')) {
-                    genre = line.substring(line.lastIndexOf('(') + 1, line.length - 1);
-                    line = line.substring(0, line.lastIndexOf('(')).trim();
-                }
-                if (line.includes('|')) {
-                    const timePart = line.split('|')[0].replace('🕒', '').trim();
-                    name = line.split('|')[1].trim();
-                    if (timePart.includes('-')) {
-                        start = timePart.split('-')[0].trim();
-                        end = timePart.split('-')[1].trim();
-                    }
-                } else {
-                    name = line;
-                }
-                if (name) addDjLineupSlot({ start, end, name, genre });
-            });
         } else {
             document.getElementById('evt-desc').value = desc.trim();
         }
+
+        document.getElementById('event-modal').style.display = 'flex';
+    }
+
+    function openAddEventModal() {
+        document.getElementById('event-modal-title').innerText = '📅 Schedule Partner Event';
+        document.getElementById('evt-id').value = '';
+        document.getElementById('evt-title').value = '';
+        document.getElementById('evt-start').value = '';
+        document.getElementById('evt-end').value = '';
+        document.getElementById('evt-url').value = '';
+        document.getElementById('evt-desc').value = '';
+        document.getElementById('evt-banner-url').value = '';
+        document.getElementById('evt-flyer-img').src = '';
+        document.getElementById('evt-flyer-preview-box').style.display = 'none';
+        document.getElementById('dj-lineup-slots').innerHTML = '';
+
+        document.getElementById('evt-is-streamed').checked = false;
+        document.getElementById('evt-stream-twitch').value = '';
+        document.getElementById('evt-stream-youtube').value = '';
+        document.getElementById('evt-stream-tiktok').value = '';
+        document.getElementById('evt-stream-other').value = '';
+        toggleStreamLinksBox(false);
+
+        try {
+            const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const tzSelect = document.getElementById('evt-timezone');
+            if (tzSelect && userTz) {
+                for (let opt of tzSelect.options) {
+                    if (opt.value === userTz) { opt.selected = true; break; }
+                }
+            }
+        } catch(e) {}
 
         document.getElementById('event-modal').style.display = 'flex';
     }
@@ -671,6 +734,14 @@
 
         const customBio = document.getElementById('evt-desc').value.trim();
 
+        const isStreamed = document.getElementById('evt-is-streamed').checked;
+        const streamUrlsPayload = {
+            twitch: document.getElementById('evt-stream-twitch').value.trim(),
+            youtube: document.getElementById('evt-stream-youtube').value.trim(),
+            tiktok: document.getElementById('evt-stream-tiktok').value.trim(),
+            other: document.getElementById('evt-stream-other').value.trim()
+        };
+
         const payload = {
             partnerId: partnerIdEl.value,
             title: document.getElementById('evt-title').value.trim(),
@@ -680,7 +751,9 @@
             description: customBio,
             lineup: lineupData,
             eventUrl: document.getElementById('evt-url').value.trim(),
-            bannerUrl: document.getElementById('evt-banner-url').value
+            bannerUrl: document.getElementById('evt-banner-url').value,
+            isStreamedByClubFurn: isStreamed,
+            streamUrls: streamUrlsPayload
         };
 
         const endpoint = eventId ? `/api/partner/events/${eventId}` : '/api/partner/events/create';

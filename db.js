@@ -228,7 +228,9 @@ const PartnerEvent = sequelize.define('PartnerEvent', {
     hasPostedDiscordUpcoming: { type: DataTypes.BOOLEAN, defaultValue: false },
     hasPostedDiscordLive: { type: DataTypes.BOOLEAN, defaultValue: false },
     hasPostedDiscordEnded: { type: DataTypes.BOOLEAN, defaultValue: false },
-    discordMessageId: { type: DataTypes.STRING }
+    discordMessageId: { type: DataTypes.STRING },
+    isStreamedByClubFurn: { type: DataTypes.BOOLEAN, defaultValue: false },
+    streamUrls: { type: DataTypes.TEXT }
 });
 
 Partner.hasMany(PartnerEvent, { foreignKey: 'partnerId', as: 'events', onDelete: 'CASCADE' });

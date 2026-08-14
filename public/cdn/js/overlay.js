@@ -26,6 +26,27 @@ async function updateOverlay() {
             else dot.classList.remove('active');
         }
 
+        // Update Embedded Partner Branding Badge
+        const partnerBadge = document.getElementById('partner-overlay-badge');
+        if (partnerBadge) {
+            if (data.activePartnerStream) {
+                const stream = data.activePartnerStream;
+                const nameEl = document.getElementById('partner-badge-name');
+                const logoEl = document.getElementById('partner-badge-logo');
+                if (nameEl) nameEl.innerText = `${stream.partnerName} x Club FuRN`;
+                if (logoEl && stream.partnerLogo) {
+                    logoEl.src = stream.partnerLogo;
+                    logoEl.style.display = 'inline-block';
+                } else if (logoEl) {
+                    logoEl.style.display = 'none';
+                }
+                partnerBadge.style.setProperty('--partner-accent', stream.accentColor || '#5865F2');
+                partnerBadge.style.display = 'inline-flex';
+            } else {
+                partnerBadge.style.display = 'none';
+            }
+        }
+
         // Check for DJ change
         if (!hideNowPlaying) {
             let currentDJ = data.currentDJ;
@@ -39,7 +60,7 @@ async function updateOverlay() {
                     performers: [{
                         name: 'Club Offline',
                         image: '/cdn/logos/club/Logo.png',
-                        color: '#ff00ff' // default accent color
+                        color: data.activePartnerStream ? data.activePartnerStream.accentColor : '#ff00ff'
                     }]
                 };
             }
@@ -88,11 +109,17 @@ async function updateOverlay() {
                 
                 const labelContainer = document.getElementById('current-label-container');
                 if (labelContainer) {
+                    const partnerPrefix = data.activePartnerStream ? ` • ${data.activePartnerStream.partnerName.toUpperCase()}` : '';
                     if (data.isTransition) {
-                        labelContainer.innerHTML = 'UP NEXT <span id="current-countdown" class="set-countdown"></span>';
+                        labelContainer.innerHTML = `UP NEXT${partnerPrefix} <span id="current-countdown" class="set-countdown"></span>`;
                     } else {
-                        labelContainer.innerHTML = 'NOW PLAYING <span id="current-countdown" class="set-countdown"></span>';
+                        labelContainer.innerHTML = `NOW PLAYING${partnerPrefix} <span id="current-countdown" class="set-countdown"></span>`;
                     }
+                }
+
+                const upNextLabel = document.getElementById('up-next-label');
+                if (upNextLabel) {
+                    upNextLabel.innerText = data.activePartnerStream ? `UP NEXT • ${data.activePartnerStream.partnerName.toUpperCase()}` : 'UP NEXT';
                 }
                 
                 const avatarWrapper = document.getElementById('current-dj-avatar-wrapper');
@@ -122,6 +149,10 @@ async function updateOverlay() {
                             container.classList.remove('has-gradient');
                         }
                     }
+                } else if (data.activePartnerStream && data.activePartnerStream.accentColor) {
+                    document.documentElement.style.setProperty('--accent', data.activePartnerStream.accentColor);
+                    const container = document.getElementById('overlay-container');
+                    if (container) container.classList.remove('has-gradient');
                 } else {
                     document.documentElement.style.setProperty('--accent', '#ff00ff');
                     const container = document.getElementById('overlay-container');

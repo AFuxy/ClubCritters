@@ -512,7 +512,7 @@ router.delete('/admin/partners/:id', isAuthenticated, isStaff, async (req, res) 
 // 1. Create Partner Event
 router.post('/partner/events/create', isAuthenticated, isPartnerOrStaff, async (req, res) => {
     try {
-        const { partnerId, title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone } = req.body;
+        const { partnerId, title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone, isStreamedByClubFurn, streamUrls } = req.body;
         
         const userType = (req.user.type || "").toLowerCase();
         const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
@@ -542,7 +542,9 @@ router.post('/partner/events/create', isAuthenticated, isPartnerOrStaff, async (
             eventUrl,
             bannerUrl,
             timezone: timezone || 'UTC',
-            isApproved: true
+            isApproved: true,
+            isStreamedByClubFurn: isStaffUser ? (isStreamedByClubFurn === true || isStreamedByClubFurn === 'true') : false,
+            streamUrls: isStaffUser ? (typeof streamUrls === 'object' ? JSON.stringify(streamUrls) : streamUrls) : null
         });
 
         res.json({ success: true, event: newEvent });
@@ -567,7 +569,7 @@ router.put('/partner/events/:id', isAuthenticated, isPartnerOrStaff, async (req,
             return res.status(403).json({ error: 'Not authorized to edit this event' });
         }
 
-        const { title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone, isApproved } = req.body;
+        const { title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone, isApproved, isStreamedByClubFurn, streamUrls } = req.body;
         
         let updates = {};
         if (title !== undefined) updates.title = title;
@@ -578,7 +580,13 @@ router.put('/partner/events/:id', isAuthenticated, isPartnerOrStaff, async (req,
         if (eventUrl !== undefined) updates.eventUrl = eventUrl;
         if (bannerUrl !== undefined) updates.bannerUrl = bannerUrl;
         if (timezone !== undefined) updates.timezone = timezone;
-        if (isApproved !== undefined && isStaffUser) updates.isApproved = isApproved;
+        
+        // Staff-Only Moderation & Streaming Controls
+        if (isStaffUser) {
+            if (isApproved !== undefined) updates.isApproved = isApproved;
+            if (isStreamedByClubFurn !== undefined) updates.isStreamedByClubFurn = isStreamedByClubFurn === true || isStreamedByClubFurn === 'true';
+            if (streamUrls !== undefined) updates.streamUrls = typeof streamUrls === 'object' ? JSON.stringify(streamUrls) : streamUrls;
+        }
 
         await partnerEvent.update(updates);
 

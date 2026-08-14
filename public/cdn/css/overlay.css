@@ -62,6 +62,31 @@ body {
     padding-left: 24px;
 }
 
+.partner-overlay-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--partner-accent, rgba(255, 255, 255, 0.2));
+    border-radius: 20px;
+    padding: 4px 10px 4px 6px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #ffffff;
+    text-transform: uppercase;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
+}
+
+.partner-overlay-badge img {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 .label {
     font-size: 12px;
     font-weight: 800;
