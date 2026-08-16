@@ -30,6 +30,7 @@
             <div class="dropdown-content-cc">
                 <a href="/djs">DJs</a>
                 <a href="/team">Team</a>
+                <a href="/vips">VIPs</a>
                 <a href="/partners">Partners</a>
                 <a href="/partner-with-us">Partner With Us</a>
             </div>
@@ -40,10 +41,11 @@
         <% if (page !== 'events') { %><a href="/events" class="btn-cc nav-pill-cc">Events</a><% } %>
         <% if (page !== 'gallery') { %><a href="/gallery" class="btn-cc nav-pill-cc">Gallery</a><% } %>
         <div class="dropdown-cc" style="display: inline-block;">
-            <button class="btn-cc nav-pill-cc <%= ['djs', 'team', 'partners', 'partner', 'partner-with-us'].includes(page) ? 'active' : '' %>">Community <span style="font-size: 0.6rem; margin-left: 3px; opacity: 0.7;">▼</span></button>
+            <button class="btn-cc nav-pill-cc <%= ['djs', 'team', 'vips', 'partners', 'partner', 'partner-with-us'].includes(page) ? 'active' : '' %>">Community <span style="font-size: 0.6rem; margin-left: 3px; opacity: 0.7;">▼</span></button>
             <div class="dropdown-content-cc">
                 <% if (page !== 'djs') { %><a href="/djs">DJs</a><% } %>
                 <% if (page !== 'team') { %><a href="/team">Team</a><% } %>
+                <% if (page !== 'vips') { %><a href="/vips">VIPs</a><% } %>
                 <% if (page !== 'partners') { %><a href="/partners">Partners</a><% } %>
                 <% if (page !== 'partner-with-us') { %><a href="/partner-with-us">Partner With Us</a><% } %>
             </div>

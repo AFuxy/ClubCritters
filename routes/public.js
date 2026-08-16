@@ -48,6 +48,8 @@ router.get('/events', (req, res) => { res.render('events', { user: req.user || n
 router.get('/djs', (req, res) => { res.render('djs', { user: req.user || null, page: 'djs' }); });
 router.get('/performers', (req, res) => { res.redirect('/djs'); });
 router.get('/team', (req, res) => { res.render('team', { user: req.user || null, page: 'team' }); });
+router.get('/vips', (req, res) => { res.render('vips', { user: req.user || null, page: 'vips' }); });
+router.get('/vip', (req, res) => { res.redirect('/vips'); });
 router.get('/partner-with-us', (req, res) => { res.render('partner-pitch', { user: req.user || null, page: 'partner-with-us' }); });
 router.get('/partners', async (req, res) => {
     try {

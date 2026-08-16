@@ -32,10 +32,29 @@
         'allmylinks': '#007bff'
     };
 
-    const performerType = (performer && performer.type || "").toLowerCase();
-    const isStaff = ['owner', 'host', 'staff'].some(r => performerType.includes(r));
-    const backUrl = isStaff ? '/team' : '/djs';
-    const backLabel = isStaff ? '&larr; BACK TO TEAM' : '&larr; BACK TO DJS';
+    function parseRolesList(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw.map(r => String(r).toLowerCase().trim());
+        const s = String(raw).trim();
+        if (s.startsWith('[') && s.endsWith(']')) {
+            try { return JSON.parse(s).map(r => String(r).toLowerCase().trim()); } catch(e) {}
+        }
+        return s.split(/\s*,\s*|\s*\/\s*/).map(r => r.toLowerCase().trim()).filter(Boolean);
+    }
+    const performerRoles = parseRolesList(performer && performer.type);
+    const hasDjRole = performerRoles.some(r => ['resident', 'performer', 'dj'].includes(r)) || (archives && archives.length > 0);
+    const hasStaffRole = performerRoles.some(r => ['owner', 'host', 'staff'].includes(r));
+    const isVipOnly = performerRoles.includes('vip') && !hasDjRole && !hasStaffRole;
+
+    let defaultBackUrl = '/djs';
+    let defaultBackLabel = '&larr; BACK TO DJS';
+    if (isVipOnly) {
+        defaultBackUrl = '/vips';
+        defaultBackLabel = '&larr; BACK TO VIPS';
+    } else if (hasStaffRole && !hasDjRole) {
+        defaultBackUrl = '/team';
+        defaultBackLabel = '&larr; BACK TO TEAM';
+    }
 %>
 
 <style>
@@ -312,7 +331,7 @@
 <body style="--accent-gradient: <%= accent %>;">
 
     <div class="hero">
-        <a href="<%= backUrl %>" class="btn-cc nav-pill-cc" style="position: absolute; top: 30px; left: 30px; z-index: 10;"><%- backLabel %></a>
+        <a href="<%= defaultBackUrl %>" id="dynamic-back-btn" class="btn-cc nav-pill-cc" style="position: absolute; top: 30px; left: 30px; z-index: 10;"><%- defaultBackLabel %></a>
         <% if (typeof user !== 'undefined' && user) { %>
             <a href="/panel" class="btn-cc nav-pill-cc" style="position: absolute; top: 30px; right: 30px; z-index: 10; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #fff;">⚙️ Panel</a>
         <% } %>
@@ -677,6 +696,35 @@
                 window.applyGlobalSettings(settings);
             } catch (e) {}
         }
+
+        // Dynamic referrer back navigation
+        (function() {
+            const backBtn = document.getElementById('dynamic-back-btn');
+            if (backBtn && document.referrer) {
+                try {
+                    const refUrl = new URL(document.referrer);
+                    if (refUrl.origin === window.location.origin) {
+                        const path = refUrl.pathname.toLowerCase();
+                        if (path === '/vips' || path === '/vip') {
+                            backBtn.href = '/vips';
+                            backBtn.innerHTML = '&larr; BACK TO VIPS';
+                        } else if (path === '/team') {
+                            backBtn.href = '/team';
+                            backBtn.innerHTML = '&larr; BACK TO TEAM';
+                        } else if (path === '/djs') {
+                            backBtn.href = '/djs';
+                            backBtn.innerHTML = '&larr; BACK TO DJS';
+                        } else if (path === '/archive') {
+                            backBtn.href = '/archive';
+                            backBtn.innerHTML = '&larr; BACK TO ARCHIVE';
+                        } else if (path === '/partners') {
+                            backBtn.href = '/partners';
+                            backBtn.innerHTML = '&larr; BACK TO PARTNERS';
+                        }
+                    }
+                } catch(e) {}
+            }
+        })();
 
         updateLocalTime();
         initGlobal();

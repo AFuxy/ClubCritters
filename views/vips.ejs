@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/head', { title: 'Club VIPs', page: 'vips', description: 'Meet the honored creators, streamers, and artists supporting Club FuRN.' }) %>
+<body>
+
+    <div class="container">
+        <%- include('partials/nav', { page: 'vips' }) %>
+
+        <div class="logo-container">
+            <img src="/cdn/logos/club/Logo.png" class="logo" alt="Logo">
+        </div>
+
+        <h1>Club VIPs</h1>
+        <p id="status-subtext">Honored creators, streamers & artists supporting Club FuRN</p>
+
+        <!-- Search Bar -->
+        <div class="search-container" style="max-width: 480px; margin: 0 auto 30px auto;">
+            <input type="text" id="vip-search-input" class="search-bar" placeholder="Search VIPs...">
+        </div>
+
+        <div id="loading-view">
+            <div class="spinner"></div>
+            <p>Loading VIPs...</p>
+        </div>
+
+        <div id="vip-section" class="hidden">
+            <div id="vip-list" class="team-grid"></div>
+        </div>
+        
+        <p id="empty-msg" class="hidden" style="color:#666; margin-top:20px;">No VIPs found.</p>
+    </div>
+
+    <script src="/cdn/js/theme-engine.js"></script>
+    <script src="/cdn/js/vips.js"></script>
+</body>
+</html>
