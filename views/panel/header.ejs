@@ -80,22 +80,40 @@
             }
         %>
         <a href="<%= returnLink %>" class="btn-cc nav-pill-cc" style="margin-right: 15px; font-size: 0.8rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15);">&larr; <%= returnLabel %></a>
-        <% const userType = (user.type || "").toLowerCase(); %>
+        <%
+            function getRoles(u) {
+                if (!u || !u.type) return [];
+                if (Array.isArray(u.type)) return u.type.map(r => String(r).toLowerCase().trim());
+                const raw = String(u.type).trim();
+                if (raw.startsWith('[') && raw.endsWith(']')) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) return parsed.map(r => String(r).toLowerCase().trim());
+                    } catch(e) {}
+                }
+                return raw.split(/\s*,\s*|\s*\/\s*/).map(r => r.toLowerCase().trim()).filter(Boolean);
+            }
+            const userRoles = getRoles(user);
+            const canSeePartner = ['partner', 'host', 'staff', 'owner'].some(r => userRoles.some(ur => ur.includes(r)));
+            const canSeeArchives = ['resident', 'performer', 'dj', 'guest', 'host', 'staff', 'owner'].some(r => userRoles.some(ur => ur.includes(r))) || !userRoles.includes('partner');
+            const canSeeStaffHub = ['host', 'staff', 'owner'].some(r => userRoles.some(ur => ur.includes(r)));
+            const canSeeMascot = user.hasMascotAccess || userRoles.some(ur => ur.includes('owner'));
+        %>
         <a href="/panel/profile" class="btn-cc nav-pill-cc <%= page === 'profile' ? 'active' : '' %>">👤 Profile</a>
         
-        <% if (userType.includes('partner') || userType.includes('host') || userType.includes('staff') || userType.includes('owner')) { %>
+        <% if (canSeePartner) { %>
             <a href="/panel/partner" class="btn-cc nav-pill-cc <%= page === 'partner' ? 'active' : '' %>">🤝 Partner Profile</a>
         <% } %>
 
-        <% if (!userType.includes('partner')) { %>
+        <% if (canSeeArchives) { %>
             <a href="/panel/archives" class="btn-cc nav-pill-cc <%= page === 'archives' ? 'active' : '' %>">📂 My Archives</a>
         <% } %>
         
-        <% if (user.hasMascotAccess || userType.includes('owner')) { %>
+        <% if (canSeeMascot) { %>
             <a href="/panel/mascot" class="btn-cc nav-pill-cc <%= page === 'mascot' ? 'active' : '' %>">🦊 Mascot</a>
         <% } %>
         
-        <% if (userType.includes('host') || userType.includes('staff') || userType.includes('owner')) { %>
+        <% if (canSeeStaffHub) { %>
             <div class="dropdown-cc">
                 <button class="btn-cc nav-pill-cc <%= ['schedule', 'roster', 'apps', 'stats', 'links', 'settings', 'partners'].includes(page) ? 'active' : '' %>">
                     🛠️ Staff Hub <span style="font-size: 0.6rem; margin-left: 5px; opacity: 0.6;">▼</span>

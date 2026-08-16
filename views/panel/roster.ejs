@@ -1,24 +1,74 @@
 <%- include('header') %>
 
+<%
+    function getRoles(u) {
+        if (!u || !u.type) return [];
+        if (Array.isArray(u.type)) return u.type.map(r => String(r).toLowerCase().trim());
+        const raw = String(u.type).trim();
+        if (raw.startsWith('[') && raw.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) return parsed.map(r => String(r).toLowerCase().trim());
+            } catch(e) {}
+        }
+        return raw.split(/\s*,\s*|\s*\/\s*/).map(r => r.toLowerCase().trim()).filter(Boolean);
+    }
+    const loggedInUserRoles = getRoles(user);
+    const isUserOwner = loggedInUserRoles.some(r => r.includes('owner'));
+    const isUserHost = loggedInUserRoles.some(r => r.includes('host'));
+    const isUserStaff = loggedInUserRoles.some(r => r.includes('staff'));
+%>
+
 <div class="staff-hub">
     <div class="staff-section">
         <h2>Roster Manager</h2>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage the Club FuRN team. Only the Owner can delete users.</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage the Club FuRN team, performers, partners, and VIPs. Only the Owner can delete users.</p>
+
+        <!-- Search & Filter Controls -->
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+            <div class="search-container" style="flex: 1; min-width: 250px; margin-bottom: 0;">
+                <input type="text" id="roster-search-input" class="search-bar" placeholder="Search members by name, title, role, or VRChat..." style="padding: 10px 16px; font-size: 0.9rem;">
+            </div>
+        </div>
+
+        <div class="genre-filter-container" id="roster-role-filters" style="justify-content: flex-start; margin-bottom: 20px; gap: 8px;">
+            <button class="btn-cc btn-small nav-pill-cc active" onclick="setRoleFilter('ALL', this)">ALL</button>
+            <button class="btn-cc btn-small nav-pill-cc" onclick="setRoleFilter('Staff', this)">Staff</button>
+            <button class="btn-cc btn-small nav-pill-cc" onclick="setRoleFilter('Resident', this)">Residents / DJs</button>
+            <button class="btn-cc btn-small nav-pill-cc" onclick="setRoleFilter('Partner', this)">Partners</button>
+            <button class="btn-cc btn-small nav-pill-cc" onclick="setRoleFilter('VIP', this)">VIPs</button>
+            <button class="btn-cc btn-small nav-pill-cc" onclick="setRoleFilter('Banned', this)">Banned</button>
+        </div>
 
         <div id="roster-list" style="display: flex; flex-direction: column; gap: 15px;">
             <!-- Roster items will appear here -->
             <p style="text-align: center; color: #666;">Loading roster...</p>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div id="roster-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap; gap: 10px;">
+            <div id="pagination-info" style="font-size: 0.85rem; color: #888;">Showing 0 members</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button id="btn-prev-page" class="btn-cc btn-small btn-secondary" onclick="changePage(-1)" disabled>&larr; Prev</button>
+                <span id="page-display" style="font-size: 0.85rem; font-weight: bold; color: #eee; min-width: 60px; text-align: center;">1 / 1</span>
+                <button id="btn-next-page" class="btn-cc btn-small btn-secondary" onclick="changePage(1)" disabled>Next &rarr;</button>
+                <select id="limit-select" onchange="changeLimit(this.value)" class="btn-cc btn-small btn-dark" style="margin: 0; padding: 5px 8px; font-size: 0.8rem; background: #1a1a24;">
+                    <option value="15">15 / page</option>
+                    <option value="25">25 / page</option>
+                    <option value="50">50 / page</option>
+                    <option value="all">Show All</option>
+                </select>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Edit User Modal -->
 <div id="edit-user-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center;">
-    <div class="staff-section" style="width: 90%; max-width: 500px; margin-bottom: 0; border: 1px solid var(--primary-blue);">
+    <div class="staff-section" style="width: 90%; max-width: 550px; margin-bottom: 0; border: 1px solid var(--primary-blue); max-height: 90vh; overflow-y: auto;">
         <h2 id="edit-modal-title">Edit User</h2>
         
-        <% const userType = user.type.toLowerCase(); %>
-        <% const isUpperStaff = userType.includes('host') || userType.includes('owner'); %>
+        <% const isUpperStaff = isUserOwner || isUserHost; %>
 
         <div class="form-group">
             <label>Display Name</label>
@@ -29,20 +79,35 @@
         </div>
 
         <div class="form-group">
-            <label>Title (e.g. Event Host)</label>
-            <input type="text" id="edit-user-title">
+            <label>Title (e.g. Event Host, Resident DJ / Techno)</label>
+            <input type="text" id="edit-user-title" placeholder="e.g. Founder, Event Host, Resident DJ">
         </div>
 
         <div class="form-group">
-            <label>Role Type</label>
-            <select id="edit-user-type">
-                <option value="Owner">Owner</option>
-                <option value="Host">Host</option>
-                <option value="Staff">Staff</option>
-                <option value="Resident">Resident</option>
-                <option value="Performer">Performer</option>
-                <option value="Partner">Partner</option>
-            </select>
+            <label style="margin-bottom: 8px; display: block; font-weight: 600; font-size: 0.85rem;">Assigned Roles <span style="font-size: 0.75rem; color: #888; font-weight: normal;">(Click buttons to toggle roles)</span></label>
+            <div id="role-pill-selector" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <button type="button" class="btn-cc btn-small nav-pill-cc role-pill-toggle" data-role="owner" onclick="toggleRolePill('owner')" <%= isUserOwner ? '' : 'disabled style="opacity: 0.3; cursor: not-allowed;"' %>>
+                    👑 Owner
+                </button>
+                <button type="button" class="btn-cc btn-small nav-pill-cc role-pill-toggle" data-role="host" onclick="toggleRolePill('host')" <%= isUserOwner ? '' : 'disabled style="opacity: 0.3; cursor: not-allowed;"' %>>
+                    🎙️ Host
+                </button>
+                <button type="button" class="btn-cc btn-small nav-pill-cc role-pill-toggle" data-role="staff" onclick="toggleRolePill('staff')" <%= (isUserOwner || isUserHost) ? '' : 'disabled style="opacity: 0.3; cursor: not-allowed;"' %>>
+                    🛡️ Staff
+                </button>
+                <button type="button" class="btn-cc btn-small nav-pill-cc role-pill-toggle" data-role="resident" onclick="toggleRolePill('resident')">
+                    🎧 Resident
+                </button>
+                <button type="button" class="btn-cc btn-small nav-pill-cc role-pill-toggle" data-role="performer" onclick="toggleRolePill('performer')">
+                    ✨ Performer
+                </button>
+                <button type="button" class="btn-cc btn-small nav-pill-cc role-pill-toggle" data-role="partner" onclick="toggleRolePill('partner')">
+                    🤝 Partner
+                </button>
+                <button type="button" class="btn-cc btn-small nav-pill-cc role-pill-toggle" data-role="vip" onclick="toggleRolePill('vip')">
+                    ⭐ VIP
+                </button>
+            </div>
         </div>
 
         <% if (isUpperStaff) { %>
@@ -56,7 +121,7 @@
             </div>
         <% } %>
 
-        <% if (user.type.toLowerCase().includes('owner')) { %>
+        <% if (isUserOwner) { %>
             <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
                 <input type="checkbox" id="edit-user-mascot" style="width: auto; cursor: pointer;">
                 <label for="edit-user-mascot" style="margin: 0; color: var(--primary-purple); cursor: pointer;">Authorized Mascot Access</label>
@@ -79,14 +144,50 @@
     const rosterList = document.getElementById('roster-list');
     const editModal = document.getElementById('edit-user-modal');
     const editTitleInput = document.getElementById('edit-user-title');
-    const editTypeSelect = document.getElementById('edit-user-type');
     const editNameInput = document.getElementById('edit-user-name');
     const editBannedCheckbox = document.getElementById('edit-user-banned');
     const editMascotCheckbox = document.getElementById('edit-user-mascot');
+    const searchInput = document.getElementById('roster-search-input');
+    const paginationInfo = document.getElementById('pagination-info');
+    const pageDisplay = document.getElementById('page-display');
+    const btnPrevPage = document.getElementById('btn-prev-page');
+    const btnNextPage = document.getElementById('btn-next-page');
     
-    const isOwner = <%= user.type.toLowerCase().includes('owner') %>;
+    const isOwner = <%= isUserOwner %>;
+    const isHost = <%= isUserHost %>;
+    const isStaff = <%= isUserStaff %>;
     const FALLBACK_IMAGE = "/cdn/logos/club/Logo.png";
+    
     let currentEditId = null;
+    let currentPage = 1;
+    let currentLimit = 15;
+    let currentTotalPages = 1;
+    let currentTotal = 0;
+    let currentRoleFilter = 'ALL';
+    let searchDebounceTimer = null;
+
+    const roleColorStyles = {
+        'owner': 'background: rgba(255, 0, 127, 0.2); border: 1px solid rgba(255, 0, 127, 0.5); color: #ff66b2;',
+        'host': 'background: rgba(255, 145, 0, 0.2); border: 1px solid rgba(255, 145, 0, 0.5); color: #ffb74d;',
+        'staff': 'background: rgba(41, 197, 246, 0.2); border: 1px solid rgba(41, 197, 246, 0.5); color: #81d4fa;',
+        'resident': 'background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #d8b4fe;',
+        'performer': 'background: rgba(0, 230, 118, 0.2); border: 1px solid rgba(0, 230, 118, 0.5); color: #69f0ae;',
+        'partner': 'background: rgba(88, 101, 242, 0.2); border: 1px solid rgba(88, 101, 242, 0.5); color: #a5b4fc;',
+        'vip': 'background: rgba(255, 215, 0, 0.2); border: 1px solid rgba(255, 215, 0, 0.5); color: #ffe082;'
+    };
+
+    function parseRoles(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw.filter(Boolean);
+        if (typeof raw === 'string') {
+            const trimmed = raw.trim();
+            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                try { return JSON.parse(trimmed); } catch(e) {}
+            }
+            return trimmed.split(/\s*,\s*|\s*\/\s*/).map(r => r.trim()).filter(Boolean);
+        }
+        return [];
+    }
 
     function parseColor(val) {
         if (!val) return 'var(--primary-blue)';
@@ -99,21 +200,69 @@
 
     async function loadRoster() {
         try {
-            const res = await fetch('/api/roster/all');
-            const members = await res.json();
+            rosterList.innerHTML = '<p style="text-align: center; color: #666;">Loading roster...</p>';
+            
+            const q = searchInput ? searchInput.value.trim() : '';
+            const params = new URLSearchParams({
+                page: currentPage,
+                limit: currentLimit,
+                role: currentRoleFilter
+            });
+            if (q) params.set('q', q);
+
+            const res = await fetch(`/api/roster/all?${params.toString()}`);
+            const data = await res.json();
+            
+            let members = [];
+            if (data.members) {
+                members = data.members;
+                currentTotal = data.total || 0;
+                currentPage = data.page || 1;
+                currentTotalPages = data.totalPages || 1;
+            } else if (Array.isArray(data)) {
+                members = data;
+                currentTotal = data.length;
+                currentTotalPages = 1;
+            }
+
+            updatePaginationControls();
+
+            if (members.length === 0) {
+                rosterList.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">No roster members found matching criteria.</p>';
+                return;
+            }
             
             rosterList.innerHTML = members.map(m => {
                 const accent = parseColor(m.colorStyle);
                 const isGradient = accent.includes('gradient');
-                const deleteBtn = isOwner && !m.type.toLowerCase().includes('owner') ? 
+                const userRoles = parseRoles(m.type);
+                const isMemberOwner = userRoles.some(r => r.toLowerCase().includes('owner'));
+                const isMemberHost = userRoles.some(r => r.toLowerCase().includes('host'));
+                const isMemberStaff = userRoles.some(r => r.toLowerCase().includes('staff'));
+
+                let canEditMember = false;
+                if (isOwner) canEditMember = true;
+                else if (isHost && !isMemberOwner && !isMemberHost) canEditMember = true;
+                else if (isStaff && !isMemberOwner && !isMemberHost && !isMemberStaff) canEditMember = true;
+
+                const deleteBtn = isOwner && !isMemberOwner ? 
                     `<button class="btn-cc btn-small btn-danger" onclick="deleteUser('${m.discordId}', '${escapeHtml(m.name)}')">Delete</button>` : 
                     '';
                 
+                const editBtn = canEditMember ?
+                    `<button class="btn-cc btn-small btn-dark" onclick='openEditModal(${JSON.stringify(m).replace(/'/g, "&#39;")})'>Edit</button>` :
+                    '';
+
                 const bannedBadge = m.isBanned ? '<span style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 10px;">BANNED</span>' : '';
                 const mascotBadge = m.hasMascotAccess ? '<span style="background: var(--primary-purple); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px;">MASCOT</span>' : '';
                 const vrcBadge = m.vrcUserId ? 
-                    `<span style="display: block; font-size: 0.75rem; color: var(--primary-purple); margin-top: 5px; font-weight: 500;">🦊 VRChat: ${escapeHtml(m.vrcDisplayName)} (${escapeHtml(m.vrcUserId)})</span>` : 
+                    `<span style="display: block; font-size: 0.75rem; color: var(--primary-purple); margin-top: 5px; font-weight: 500;">🦊 VRChat: ${escapeHtml(m.vrcDisplayName || m.vrcUserId)}</span>` : 
                     '';
+
+                const roleBadgesHtml = userRoles.map(r => {
+                    const style = roleColorStyles[r.toLowerCase()] || 'background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #ccc;';
+                    return `<span class="badge-role" style="display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; ${style} margin-right: 4px;">${r}</span>`;
+                }).join('');
 
                 return `
                 <div class="schedule-item" style="--sidebar-color: ${m.isBanned ? 'var(--accent-red)' : accent}; background: var(--card-bg); padding: 15px; border-radius: 12px; opacity: ${m.isBanned ? '0.6' : '1'};">
@@ -124,16 +273,16 @@
                         <div>
                             <strong style="font-size: 1.15rem; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent};">${escapeHtml(m.name)}</strong>
                             ${bannedBadge} ${mascotBadge}
-                            <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 2px;">
-                                <span style="color: var(--primary-blue); font-weight: bold;">${m.type}</span> 
-                                ${m.title ? '• ' + escapeHtml(m.title) : ''}
-                                • <span style="color: #00e676; font-weight: bold;">${m.eventCount || 0} ${m.eventCount === 1 ? 'Event' : 'Events'}</span>
-                            </span>
+                            <div style="margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                                ${roleBadgesHtml}
+                                ${m.title ? '<span style="font-size: 0.8rem; color: #aaa;">• ' + escapeHtml(m.title) + '</span>' : ''}
+                                <span style="font-size: 0.8rem; color: #00e676; font-weight: bold;">• ${m.eventCount || 0} ${m.eventCount === 1 ? 'Event' : 'Events'}</span>
+                            </div>
                             ${vrcBadge}
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <button class="btn-cc btn-small btn-dark" onclick="openEditModal('${m.discordId}', '${escapeHtml(m.name)}', '${escapeHtml(m.title || '')}', '${m.type}', ${m.isBanned}, ${m.hasMascotAccess || false}, '${m.vrcUserId || ''}', '${escapeHtml(m.vrcDisplayName || '')}', '${escapeHtml(m.vrcUsername || '')}')">Edit</button>
+                        ${editBtn}
                         ${deleteBtn}
                     </div>
                 </div>
@@ -144,28 +293,114 @@
         }
     }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    function updatePaginationControls() {
+        if (!paginationInfo) return;
+        
+        const start = currentTotal === 0 ? 0 : (currentPage - 1) * (currentLimit === 'all' ? currentTotal : currentLimit) + 1;
+        const end = currentLimit === 'all' ? currentTotal : Math.min(currentPage * currentLimit, currentTotal);
+        paginationInfo.innerText = `Showing ${start}-${end} of ${currentTotal} members`;
+
+        if (pageDisplay) pageDisplay.innerText = `${currentPage} / ${Math.max(currentTotalPages, 1)}`;
+        if (btnPrevPage) btnPrevPage.disabled = currentPage <= 1;
+        if (btnNextPage) btnNextPage.disabled = currentPage >= currentTotalPages;
     }
 
-    function openEditModal(id, name, title, type, isBanned = false, hasMascotAccess = false, vrcUserId = '', vrcDisplayName = '', vrcUsername = '') {
-        currentEditId = id;
-        document.getElementById('edit-modal-title').innerText = `Edit ${name}`;
-        editNameInput.value = name;
-        editTitleInput.value = title;
-        editBannedCheckbox.checked = isBanned;
-        if (editMascotCheckbox) editMascotCheckbox.checked = hasMascotAccess;
-        if (Array.from(editTypeSelect.options).some(opt => opt.value === type)) {
-            editTypeSelect.value = type;
+    function changePage(delta) {
+        const next = currentPage + delta;
+        if (next >= 1 && next <= currentTotalPages) {
+            currentPage = next;
+            loadRoster();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+    }
+
+    function changeLimit(newLimit) {
+        currentLimit = newLimit === 'all' ? 'all' : parseInt(newLimit);
+        currentPage = 1;
+        loadRoster();
+    }
+
+    function setRoleFilter(role, btnElement) {
+        currentRoleFilter = role;
+        document.querySelectorAll('#roster-role-filters .nav-pill-cc').forEach(b => b.classList.remove('active'));
+        if (btnElement) btnElement.classList.add('active');
+        currentPage = 1;
+        loadRoster();
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                currentPage = 1;
+                loadRoster();
+            }, 300);
+        });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    let currentEditRoles = new Set();
+
+    const roleDefinitions = {
+        'owner': { name: 'Owner', activeStyle: 'background: rgba(255, 0, 127, 0.25); border-color: #ff007f; color: #fff; box-shadow: 0 0 12px rgba(255, 0, 127, 0.35);' },
+        'host': { name: 'Host', activeStyle: 'background: rgba(255, 145, 0, 0.25); border-color: #ff9100; color: #fff; box-shadow: 0 0 12px rgba(255, 145, 0, 0.35);' },
+        'staff': { name: 'Staff', activeStyle: 'background: rgba(41, 197, 246, 0.25); border-color: #29c5f6; color: #fff; box-shadow: 0 0 12px rgba(41, 197, 246, 0.35);' },
+        'resident': { name: 'Resident', activeStyle: 'background: rgba(168, 85, 247, 0.25); border-color: #a855f7; color: #fff; box-shadow: 0 0 12px rgba(168, 85, 247, 0.35);' },
+        'performer': { name: 'Performer', activeStyle: 'background: rgba(0, 230, 118, 0.25); border-color: #00e676; color: #fff; box-shadow: 0 0 12px rgba(0, 230, 118, 0.35);' },
+        'partner': { name: 'Partner', activeStyle: 'background: rgba(88, 101, 242, 0.25); border-color: #5865f2; color: #fff; box-shadow: 0 0 12px rgba(88, 101, 242, 0.35);' },
+        'vip': { name: 'VIP', activeStyle: 'background: rgba(255, 215, 0, 0.25); border-color: #ffd700; color: #fff; box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);' }
+    };
+
+    function updateRolePillsUI() {
+        document.querySelectorAll('#role-pill-selector .role-pill-toggle').forEach(btn => {
+            const role = (btn.dataset.role || '').toLowerCase();
+            const isSelected = currentEditRoles.has(role);
+            const def = roleDefinitions[role];
+            const isDisabled = btn.hasAttribute('disabled');
+            const disabledPrefix = isDisabled ? 'opacity: 0.3; cursor: not-allowed; ' : '';
+            
+            if (isSelected && def) {
+                btn.style.cssText = disabledPrefix + def.activeStyle;
+                btn.classList.add('active');
+            } else {
+                btn.style.cssText = disabledPrefix + 'background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.12); color: #888; box-shadow: none;';
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    function toggleRolePill(role) {
+        const lower = role.toLowerCase();
+        if (currentEditRoles.has(lower)) {
+            currentEditRoles.delete(lower);
+        } else {
+            currentEditRoles.add(lower);
+        }
+        updateRolePillsUI();
+    }
+
+    function openEditModal(m) {
+        currentEditId = m.discordId;
+        document.getElementById('edit-modal-title').innerText = `Edit ${m.name}`;
+        editNameInput.value = m.name;
+        editTitleInput.value = m.title || '';
+        editBannedCheckbox.checked = !!m.isBanned;
+        if (editMascotCheckbox) editMascotCheckbox.checked = !!m.hasMascotAccess;
+
+        const roles = parseRoles(m.type).map(r => r.toLowerCase());
+        currentEditRoles = new Set(roles.map(r => r === 'dj' ? 'performer' : r));
+        updateRolePillsUI();
 
         const editVrcInput = document.getElementById('edit-user-vrc');
         const editVrcInfo = document.getElementById('edit-user-vrc-info');
         if (editVrcInput) {
-            editVrcInput.value = vrcUserId || '';
-            if (vrcUserId) {
-                editVrcInfo.innerText = `Linked: ${vrcDisplayName || 'Unresolved'} (${vrcUserId})`;
+            editVrcInput.value = m.vrcUserId || '';
+            if (m.vrcUserId) {
+                editVrcInfo.innerText = `Linked: ${m.vrcDisplayName || 'Unresolved'} (${m.vrcUserId})`;
                 editVrcInfo.style.color = 'var(--primary-purple)';
             } else {
                 editVrcInfo.innerText = 'Not linked to VRChat';
@@ -179,6 +414,18 @@
     function closeEditModal() {
         editModal.style.display = 'none';
         currentEditId = null;
+        currentEditRoles.clear();
+    }
+
+    function getSelectedRoles() {
+        const roles = [];
+        Object.keys(roleDefinitions).forEach(k => {
+            if (currentEditRoles.has(k)) {
+                roles.push(roleDefinitions[k].name);
+            }
+        });
+        if (roles.length === 0) roles.push('Performer');
+        return roles;
     }
 
     async function saveUserEdit() {
@@ -187,7 +434,7 @@
         const payload = { 
             name: editNameInput.value.trim(),
             title: editTitleInput.value.trim(), 
-            type: editTypeSelect.value,
+            roles: getSelectedRoles(),
             isBanned: editBannedCheckbox.checked
         };
 
@@ -254,3 +501,4 @@
 </script>
 
 <%- include('footer') %>
+

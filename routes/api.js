@@ -7,7 +7,7 @@ const sharp = require('sharp');
 const { sequelize, Roster, Settings, Schedule, Archive, Stats, AppSlot, ApplicationSubmission, InstanceLog, InstanceLogPerformers, Partner, PartnerEvent } = require('../db');
 const { getGuildMember, getDiscordStatus } = require('../bot');
 const { getInstanceData, verifyVRC, getVrcStatus, getUserInfo, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole } = require('../utils/vrc-api');
-const { isStaff, isHostOrOwner, isAuthenticated, isOwner, isPartnerOrStaff } = require('../middleware/auth');
+const { isStaff, isHostOrOwner, isAuthenticated, isOwner, isPartnerOrStaff, getUserRoles, hasRole, hasAnyRole } = require('../middleware/auth');
 const { parseGenres, POPULAR_GENRES } = require('../utils/genre-taxonomy');
 
 // Multer Setup (Memory Storage for Sharp processing)
@@ -1032,24 +1032,96 @@ router.get('/roster/search', isStaff, async (req, res) => {
 
 router.get('/roster/all', isStaff, async (req, res) => {
     try {
-        const members = await Roster.findAll({ order: [['name', 'ASC']] });
-        
-        // Fetch event counts for all performers
-        const counts = await InstanceLogPerformers.findAll({
-            attributes: ['performerId', [sequelize.fn('COUNT', sequelize.col('instanceLogId')), 'count']],
-            group: ['performerId']
+        const { Op } = require('sequelize');
+        const q = req.query.q ? req.query.q.trim() : '';
+        const roleFilter = req.query.role ? req.query.role.trim() : '';
+        const page = parseInt(req.query.page) || 1;
+        const limitParam = req.query.limit;
+        const isPaginated = req.query.page !== undefined || (limitParam !== undefined && limitParam !== 'all');
+        const limit = limitParam === 'all' ? null : (parseInt(limitParam) || 15);
+        const offset = limit ? (page - 1) * limit : 0;
+
+        const whereClause = {};
+
+        if (q) {
+            whereClause[Op.or] = [
+                { name: { [Op.like]: `%${q}%` } },
+                { title: { [Op.like]: `%${q}%` } },
+                { type: { [Op.like]: `%${q}%` } },
+                { discordId: { [Op.like]: `%${q}%` } },
+                { vrcDisplayName: { [Op.like]: `%${q}%` } },
+                { vrcUserId: { [Op.like]: `%${q}%` } }
+            ];
+        }
+
+        if (roleFilter && roleFilter.toUpperCase() !== 'ALL') {
+            if (roleFilter.toLowerCase() === 'banned') {
+                whereClause.isBanned = true;
+            } else if (roleFilter.toLowerCase() === 'staff') {
+                whereClause[Op.and] = [
+                    whereClause[Op.and] || {},
+                    {
+                        [Op.or]: [
+                            { type: { [Op.like]: '%owner%' } },
+                            { type: { [Op.like]: '%host%' } },
+                            { type: { [Op.like]: '%staff%' } }
+                        ]
+                    }
+                ];
+            } else if (roleFilter.toLowerCase() === 'resident' || roleFilter.toLowerCase() === 'dj' || roleFilter.toLowerCase() === 'performer') {
+                whereClause[Op.and] = [
+                    whereClause[Op.and] || {},
+                    {
+                        [Op.or]: [
+                            { type: { [Op.like]: '%resident%' } },
+                            { type: { [Op.like]: '%performer%' } },
+                            { type: { [Op.like]: '%dj%' } }
+                        ]
+                    }
+                ];
+            } else {
+                whereClause.type = { [Op.like]: `%${roleFilter}%` };
+            }
+        }
+
+        const { count, rows: members } = await Roster.findAndCountAll({
+            where: whereClause,
+            order: [['name', 'ASC']],
+            limit: limit || undefined,
+            offset: limit ? offset : undefined
         });
         
+        // Fetch event counts for performers on this slice
+        const performerIds = members.map(m => m.discordId);
         const countsMap = {};
-        counts.forEach(c => {
-            countsMap[c.performerId] = parseInt(c.get('count')) || 0;
-        });
+        if (performerIds.length > 0) {
+            const counts = await InstanceLogPerformers.findAll({
+                attributes: ['performerId', [sequelize.fn('COUNT', sequelize.col('instanceLogId')), 'count']],
+                where: { performerId: performerIds },
+                group: ['performerId']
+            });
+            counts.forEach(c => {
+                countsMap[c.performerId] = parseInt(c.get('count')) || 0;
+            });
+        }
 
         const mapped = members.map(m => {
             const json = m.toJSON();
+            json.roles = getUserRoles(m);
             json.eventCount = countsMap[m.discordId] || 0;
             return json;
         });
+
+        if (isPaginated) {
+            const totalPages = limit ? Math.ceil(count / limit) : 1;
+            return res.json({
+                members: mapped,
+                total: count,
+                page: page,
+                totalPages: totalPages,
+                limit: limit || count
+            });
+        }
 
         res.json(mapped);
     } catch (err) { 
@@ -1060,48 +1132,98 @@ router.get('/roster/all', isStaff, async (req, res) => {
 
 router.patch('/roster/:id', isStaff, async (req, res) => {
     try {
-        const { title, type, name, isBanned, hasMascotAccess } = req.body;
+        const { title, type, roles, name, isBanned, hasMascotAccess } = req.body;
         
         const targetUser = await Roster.findByPk(req.params.id);
         if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
-        const userType = (req.user?.type || "").toLowerCase();
-        const isOwner = userType.includes('owner');
-        const isHost = userType.includes('host');
-        
-        const targetType = (targetUser.type || "").toLowerCase();
-        const targetIsOwner = targetType.includes('owner');
+        const isCallerOwner = hasRole(req.user, 'owner');
+        const isCallerHost = hasRole(req.user, 'host');
+        const isCallerStaff = hasRole(req.user, 'staff');
 
-        // SECURITY: Non-owners cannot modify an Owner's account (except maybe their own title, but let's be strict)
-        if (targetIsOwner && !isOwner) {
-            return res.status(403).json({ error: 'You do not have permission to modify an Owner account.' });
+        const targetIsOwner = hasRole(targetUser, 'owner');
+        const targetIsHost = hasRole(targetUser, 'host');
+        const targetIsStaff = hasRole(targetUser, 'staff');
+
+        // SECURITY 1: Hierarchy on TARGET user
+        if (targetIsOwner && !isCallerOwner) {
+            return res.status(403).json({ error: 'Only Owners can modify an Owner account.' });
+        }
+        if (targetIsHost && !isCallerOwner) {
+            return res.status(403).json({ error: 'Only Owners can modify a Host account.' });
+        }
+        if (targetIsStaff && !isCallerOwner && !isCallerHost) {
+            return res.status(403).json({ error: 'Staff cannot modify another Staff account.' });
         }
 
-        const updateData = { title };
+        const updateData = {};
+        if (title !== undefined) updateData.title = title;
         
-        // Role Change Logic
-        if (type && type !== targetUser.type) {
-            const newTypeLower = type.toLowerCase();
-            if (newTypeLower.includes('owner')) {
-                if (isOwner) updateData.type = type;
-                else return res.status(403).json({ error: 'Only Owners can grant the Owner role.' });
-            } else {
-                // demoting/changing role to non-owner
-                // isStaff middleware ensures they are at least Staff/Host/Owner
-                updateData.type = type;
+        // SECURITY 2: Hierarchy on ROLES being granted/revoked
+        const rawNewRoles = roles !== undefined ? roles : (type !== undefined ? type : null);
+        if (rawNewRoles !== null) {
+            let parsedNewRoles = [];
+            if (Array.isArray(rawNewRoles)) {
+                parsedNewRoles = rawNewRoles.map(r => String(r).trim()).filter(Boolean);
+            } else if (typeof rawNewRoles === 'string') {
+                if (rawNewRoles.startsWith('[') && rawNewRoles.endsWith(']')) {
+                    try { parsedNewRoles = JSON.parse(rawNewRoles); } catch(e) {}
+                } else {
+                    parsedNewRoles = rawNewRoles.split(/\s*,\s*|\s*\/\s*/).map(r => r.trim()).filter(Boolean);
+                }
             }
+
+            // Standardize role casing
+            const roleNameMap = {
+                'owner': 'Owner',
+                'host': 'Host',
+                'staff': 'Staff',
+                'resident': 'Resident',
+                'performer': 'Performer',
+                'partner': 'Partner',
+                'vip': 'VIP'
+            };
+            const normalizedNewRoles = parsedNewRoles.map(r => roleNameMap[r.toLowerCase()] || (r.charAt(0).toUpperCase() + r.slice(1)));
+            const newLowerRoles = normalizedNewRoles.map(r => r.toLowerCase());
+            const currentTargetRoles = getUserRoles(targetUser);
+
+            const wantsOwner = newLowerRoles.includes('owner');
+            const hadOwner = currentTargetRoles.includes('owner');
+            if (wantsOwner !== hadOwner && !isCallerOwner) {
+                return res.status(403).json({ error: 'Only Owners can grant or revoke the Owner role.' });
+            }
+
+            const wantsHost = newLowerRoles.includes('host');
+            const hadHost = currentTargetRoles.includes('host');
+            if (wantsHost !== hadHost && !isCallerOwner) {
+                return res.status(403).json({ error: 'Only Owners can grant or revoke the Host role.' });
+            }
+
+            const wantsStaff = newLowerRoles.includes('staff');
+            const hadStaff = currentTargetRoles.includes('staff');
+            if (wantsStaff !== hadStaff && !isCallerOwner && !isCallerHost) {
+                return res.status(403).json({ error: 'Only Owners and Hosts can grant or revoke the Staff role.' });
+            }
+
+            if (normalizedNewRoles.length === 0) {
+                normalizedNewRoles.push('Performer');
+            }
+
+            updateData.type = JSON.stringify(normalizedNewRoles);
         }
         
-        // Name and Ban status (Host or Owner only)
-        if (isHost || isOwner) {
+        // Name, Ban status, Mascot, and VRChat sync (Host or Owner only)
+        if (isCallerHost || isCallerOwner) {
             if (name) updateData.name = name;
             if (isBanned !== undefined) updateData.isBanned = isBanned;
+            if (hasMascotAccess !== undefined && isCallerOwner) {
+                updateData.hasMascotAccess = hasMascotAccess;
+            }
 
             if (req.body.vrcUserId !== undefined) {
                 const inputVal = req.body.vrcUserId ? req.body.vrcUserId.trim() : "";
                 if (inputVal === "") {
                     updateData.vrcUserId = null;
-                    updateData.vrcUsername = null;
                     updateData.vrcDisplayName = null;
                 } else {
                     const parsedId = parseVrcUserId(inputVal);
@@ -1138,7 +1260,6 @@ router.patch('/roster/:id', isStaff, async (req, res) => {
                         return res.status(404).json({ error: 'VRChat user not found.' });
                     }
                     updateData.vrcUserId = details.id;
-                    updateData.vrcUsername = details.username;
                     updateData.vrcDisplayName = details.displayName;
                 }
             }

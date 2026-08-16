@@ -38,11 +38,17 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN)
 async function registerSlashCommands() {
     try {
         console.log(`[BOT] 📡 Refreshing ${slashCommands.length} slash commands...`);
+        // Overwrites and deletes any removed guild commands (e.g. /add-performer)
         await rest.put(
             Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
             { body: slashCommands },
         );
-        console.log('\x1b[32m[BOT] ✅ Slash commands registered successfully.\x1b[0m');
+        // Clear any global commands so no duplicate or ghost commands linger
+        await rest.put(
+            Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),
+            { body: [] }
+        ).catch(() => {});
+        console.log('\x1b[32m[BOT] ✅ Slash commands synced (old commands removed).\x1b[0m');
     } catch (error) {
         console.error('\x1b[31m[BOT] ❌ Error registering slash commands:\x1b[0m', error);
     }

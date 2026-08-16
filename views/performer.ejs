@@ -338,7 +338,23 @@
                 </div>
 
                 <span class="title">
-                    <%= performer.title || performer.type %>
+                    <% 
+                        let displaySubtitle = performer.title;
+                        if (!displaySubtitle) {
+                            function parseRawRoles(raw) {
+                                if (!raw) return ['Performer'];
+                                if (Array.isArray(raw)) return raw;
+                                const s = String(raw).trim();
+                                if (s.startsWith('[') && s.endsWith(']')) {
+                                    try { return JSON.parse(s); } catch(e) {}
+                                }
+                                return s.split(/\s*,\s*|\s*\/\s*/).filter(Boolean);
+                            }
+                            const rList = parseRawRoles(performer.type);
+                            displaySubtitle = rList.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' • ');
+                        }
+                    %>
+                    <%= displaySubtitle %>
                     <% if (activeSlot) { %>
                         <span id="local-time-slot" style="color: white; opacity: 0.5; margin-left: 10px; font-size: 0.9rem; text-transform: none; letter-spacing: 0;">
                             • Playing at <%= activeSlot.timeSlot %>

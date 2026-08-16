@@ -108,26 +108,38 @@ function processStatus(settings, schedule) {
     }
 }
 
+function parseMemberRoles(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.map(r => String(r).toLowerCase().trim()).filter(Boolean);
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try { return JSON.parse(trimmed).map(r => String(r).toLowerCase().trim()).filter(Boolean); } catch(e) {}
+        }
+        return trimmed.split(/\s*,\s*|\s*\/\s*/).map(r => r.toLowerCase().trim()).filter(Boolean);
+    }
+    return [];
+}
+
 function processDjs(members) {
     const djs = [];
 
     members.forEach(member => {
-        const type = (member.type || "").toLowerCase();
-        if (type === 'partner') return;
+        const roles = parseMemberRoles(member.type);
+        const isPerformer = roles.some(r => r.includes('resident') || r.includes('performer') || r.includes('dj')) || !!member.genre;
         
-        // Exclude accounts that are strictly staff without DJ role
-        if (!type.includes('owner') && !type.includes('host') && !type.includes('staff')) {
+        if (isPerformer) {
             djs.push(member);
-        } else if (type.includes('resident') || type.includes('dj') || member.genre) {
+        } else if (!roles.some(r => r.includes('owner') || r.includes('host') || r.includes('staff') || r.includes('partner') || r.includes('vip'))) {
             djs.push(member);
         }
     });
 
     djs.sort((a, b) => {
-        const tA = (a.type || "").toLowerCase();
-        const tB = (b.type || "").toLowerCase();
-        const wA = tA.includes('resident') ? 1 : 2;
-        const wB = tB.includes('resident') ? 1 : 2;
+        const rolesA = parseMemberRoles(a.type);
+        const rolesB = parseMemberRoles(b.type);
+        const wA = rolesA.some(r => r.includes('resident')) ? 1 : 2;
+        const wB = rolesB.some(r => r.includes('resident')) ? 1 : 2;
         if (wA !== wB) return wA - wB;
         return (a.name || "").localeCompare(b.name || "");
     });
@@ -146,6 +158,17 @@ function renderDjs(djsToRender) {
         djSection.classList.add('hidden');
         emptyMsg.classList.remove('hidden');
     }
+}
+
+function getDjDisplayTitle(member) {
+    if (member.genre && member.genre.trim()) return member.genre.trim();
+    if (member.title && member.title.trim()) return member.title.trim();
+    const roles = parseMemberRoles(member.type);
+    const djRoles = roles.filter(r => ['resident', 'performer', 'dj'].includes(r.toLowerCase()));
+    if (djRoles.length > 0) {
+        return djRoles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' • ');
+    }
+    return roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' • ') || 'Resident DJ';
 }
 
 function renderCards(members, container) {
@@ -172,7 +195,7 @@ function renderCards(members, container) {
             <img src="${member.imageUrl || '/cdn/logos/club/Logo.png'}" alt="${member.name}" class="dj-img">
             <div class="dj-content">
                 <div class="dj-header"><h3>${coloredName} ${playingBadge}</h3></div>
-                <span class="genre">${member.genre || member.title || member.type}</span>
+                <span class="genre">${getDjDisplayTitle(member)}</span>
                 ${linksHtml}
             </div>`;
         container.appendChild(card);

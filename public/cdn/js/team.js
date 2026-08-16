@@ -106,23 +106,34 @@ function processStatus(settings, schedule) {
     }
 }
 
+function parseMemberRoles(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.map(r => String(r).toLowerCase().trim()).filter(Boolean);
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try { return JSON.parse(trimmed).map(r => String(r).toLowerCase().trim()).filter(Boolean); } catch(e) {}
+        }
+        return trimmed.split(/\s*,\s*|\s*\/\s*/).map(r => r.toLowerCase().trim()).filter(Boolean);
+    }
+    return [];
+}
+
 function processRoster(members) {
     const staffMembers = [];
 
     members.forEach(member => {
-        const type = (member.type || "").toLowerCase();
-        if (type === 'partner') return;
-        
-        if (type.includes('owner') || type.includes('host') || type.includes('staff')) {
+        const roles = parseMemberRoles(member.type);
+        if (roles.some(r => r.includes('owner') || r.includes('host') || r.includes('staff'))) {
             staffMembers.push(member);
         }
     });
 
     staffMembers.sort((a, b) => {
-        const tA = a.type.toLowerCase();
-        const tB = b.type.toLowerCase();
-        const wA = tA.includes('owner') ? 1 : (tA.includes('host') ? 2 : 3);
-        const wB = tB.includes('owner') ? 1 : (tB.includes('host') ? 2 : 3);
+        const rolesA = parseMemberRoles(a.type);
+        const rolesB = parseMemberRoles(b.type);
+        const wA = rolesA.some(r => r.includes('owner')) ? 1 : (rolesA.some(r => r.includes('host')) ? 2 : 3);
+        const wB = rolesB.some(r => r.includes('owner')) ? 1 : (rolesB.some(r => r.includes('host')) ? 2 : 3);
         return wA - wB;
     });
 
@@ -137,6 +148,16 @@ function renderRoster(staff) {
     } else {
         emptyMsg.classList.remove('hidden');
     }
+}
+
+function getStaffDisplayTitle(member) {
+    if (member.title && member.title.trim()) return member.title.trim();
+    const roles = parseMemberRoles(member.type);
+    const staffRoles = roles.filter(r => ['owner', 'host', 'staff'].includes(r.toLowerCase()));
+    if (staffRoles.length > 0) {
+        return staffRoles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' • ');
+    }
+    return roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' • ') || 'Staff';
 }
 
 function renderCards(members, container) {
@@ -163,7 +184,7 @@ function renderCards(members, container) {
             <img src="${member.imageUrl || '/cdn/logos/club/Logo.png'}" alt="${member.name}" class="dj-img">
             <div class="dj-content">
                 <div class="dj-header"><h3>${coloredName} ${playingBadge}</h3></div>
-                <span class="genre">${member.title || member.type}</span>
+                <span class="genre">${getStaffDisplayTitle(member)}</span>
                 ${linksHtml}
             </div>`;
         container.appendChild(card);
