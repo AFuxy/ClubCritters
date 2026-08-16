@@ -44,6 +44,8 @@ const verifyTurnstile = async (token) => {
 router.get('/', (req, res) => { res.render('index', { user: req.user || null, page: 'index' }); });
 router.get('/archive', (req, res) => { res.render('archive', { user: req.user || null, page: 'archive' }); });
 router.get('/events', (req, res) => { res.render('events', { user: req.user || null, page: 'events' }); });
+router.get('/djs', (req, res) => { res.render('djs', { user: req.user || null, page: 'djs' }); });
+router.get('/performers', (req, res) => { res.redirect('/djs'); });
 router.get('/team', (req, res) => { res.render('team', { user: req.user || null, page: 'team' }); });
 router.get('/partner-with-us', (req, res) => { res.render('partner-pitch', { user: req.user || null, page: 'partner-with-us' }); });
 router.get('/partners', async (req, res) => {

@@ -31,6 +31,11 @@
         'linktree': '#43e55e',
         'allmylinks': '#007bff'
     };
+
+    const performerType = (performer && performer.type || "").toLowerCase();
+    const isStaff = ['owner', 'host', 'staff'].some(r => performerType.includes(r));
+    const backUrl = isStaff ? '/team' : '/djs';
+    const backLabel = isStaff ? '&larr; BACK TO TEAM' : '&larr; BACK TO DJS';
 %>
 
 <style>
@@ -58,16 +63,16 @@
         align-items: center; 
         gap: 40px; 
         max-width: 1200px; 
-        width: 90%; 
-        height: 100%;
-        padding: 0;
-        box-sizing: border-box;
-        z-index: 2; 
+        width: 100%; 
+        padding: 0 40px;
+        position: relative;
+        z-index: 2;
     }
 
     /* GRADIENT BORDER LOGIC FOR CIRCLE */
     .profile-img-wrap {
-        width: 180px; height: 180px;
+        width: 180px;
+        height: 180px;
         border-radius: 50%;
         padding: 6px;
         background: var(--accent-gradient);
@@ -307,7 +312,7 @@
 <body style="--accent-gradient: <%= accent %>;">
 
     <div class="hero">
-        <a href="/team" class="btn-cc nav-pill-cc" style="position: absolute; top: 30px; left: 30px; z-index: 10;">&larr; BACK TO TEAM</a>
+        <a href="<%= backUrl %>" class="btn-cc nav-pill-cc" style="position: absolute; top: 30px; left: 30px; z-index: 10;"><%- backLabel %></a>
         
         <div class="profile-header">
             <div class="profile-img-wrap">

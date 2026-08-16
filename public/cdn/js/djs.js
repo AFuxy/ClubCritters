@@ -1,6 +1,6 @@
 /**
- * CLUB FuRN - TEAM LOGIC (V3.0 - MYSQL API)
- * Fetching from local Node.js backend.
+ * CLUB FuRN - DJS & PERFORMERS LOGIC (V3.0 - MYSQL API)
+ * Fetching and rendering club DJs from local backend.
  */
 
 // ==========================================
@@ -14,17 +14,19 @@ const API_TRACK = "/api/stats/track";
 
 // Console Theme
 const logStyle = { 
-    banner: "background: #00e676; color: #000; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;", 
-    tag: "background: #151e29; color: #00e676; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;", 
+    banner: "background: #a855f7; color: #000; font-weight: bold; padding: 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px;", 
+    tag: "background: #151e29; color: #a855f7; font-weight: bold; padding: 4px 10px; border-radius: 0 4px 4px 0; font-size: 12px;", 
     info: "color: #888; font-weight: bold;", 
-    success: "color: #00e676; font-style: italic;" 
+    success: "color: #a855f7; font-style: italic;" 
 };
 
 const loadingView = document.getElementById('loading-view');
-const staffSection = document.getElementById('staff-section');
-const staffList = document.getElementById('staff-list');
+const djSection = document.getElementById('dj-section');
+const djList = document.getElementById('dj-list');
 const emptyMsg = document.getElementById('empty-msg');
+const searchInput = document.getElementById('dj-search-input');
 
+let allDjs = [];
 let currentActiveDjId = null;
 let isEventLive = false;
 
@@ -34,7 +36,7 @@ let isEventLive = false;
 
 async function init() {
     console.clear();
-    console.log("%c CLUB FuRN %c TEAM V3 STARTUP ", logStyle.banner, logStyle.tag);
+    console.log("%c CLUB FuRN %c DJS V3 STARTUP ", logStyle.banner, logStyle.tag);
 
     // Track Page View
     fetch(API_TRACK, {
@@ -42,8 +44,8 @@ async function init() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             type: 'page_view', 
-            targetId: 'team', 
-            metadata: { page: 'team' } 
+            targetId: 'djs', 
+            metadata: { page: 'djs' } 
         })
     }).catch(() => {});
 
@@ -61,7 +63,7 @@ async function init() {
             
             window.applyGlobalSettings(settings);
             processStatus(settings, schedule);
-            processRoster(roster);
+            processDjs(roster);
         }
     } catch (error) {
         console.warn("Network error", error);
@@ -99,42 +101,49 @@ function processStatus(settings, schedule) {
             if (sh < start.getUTCHours() - 6) { djStart.setDate(djStart.getDate() + 1); djEnd.setDate(djEnd.getDate() + 1); }
             else if (djEnd < djStart) { djEnd.setDate(djEnd.getDate() + 1); }
 
-            if (now >= djStart && now < djEnd) {
+            if (now >= djStart && now < djEnd && item.performer) {
                 currentActiveDjId = item.performer.name.toLowerCase();
             }
         });
     }
 }
 
-function processRoster(members) {
-    const staffMembers = [];
+function processDjs(members) {
+    const djs = [];
 
     members.forEach(member => {
         const type = (member.type || "").toLowerCase();
         if (type === 'partner') return;
         
-        if (type.includes('owner') || type.includes('host') || type.includes('staff')) {
-            staffMembers.push(member);
+        // Exclude accounts that are strictly staff without DJ role
+        if (!type.includes('owner') && !type.includes('host') && !type.includes('staff')) {
+            djs.push(member);
+        } else if (type.includes('resident') || type.includes('dj') || member.genre) {
+            djs.push(member);
         }
     });
 
-    staffMembers.sort((a, b) => {
-        const tA = a.type.toLowerCase();
-        const tB = b.type.toLowerCase();
-        const wA = tA.includes('owner') ? 1 : (tA.includes('host') ? 2 : 3);
-        const wB = tB.includes('owner') ? 1 : (tB.includes('host') ? 2 : 3);
-        return wA - wB;
+    djs.sort((a, b) => {
+        const tA = (a.type || "").toLowerCase();
+        const tB = (b.type || "").toLowerCase();
+        const wA = tA.includes('resident') ? 1 : 2;
+        const wB = tB.includes('resident') ? 1 : 2;
+        if (wA !== wB) return wA - wB;
+        return (a.name || "").localeCompare(b.name || "");
     });
 
-    renderRoster(staffMembers);
+    allDjs = djs;
+    renderDjs(allDjs);
 }
 
-function renderRoster(staff) {
+function renderDjs(djsToRender) {
     loadingView.classList.add('hidden');
-    if (staff.length > 0) {
-        staffSection.classList.remove('hidden');
-        renderCards(staff, staffList);
+    if (djsToRender.length > 0) {
+        djSection.classList.remove('hidden');
+        emptyMsg.classList.add('hidden');
+        renderCards(djsToRender, djList);
     } else {
+        djSection.classList.add('hidden');
         emptyMsg.classList.remove('hidden');
     }
 }
@@ -163,10 +172,26 @@ function renderCards(members, container) {
             <img src="${member.imageUrl || '/cdn/logos/club/Logo.png'}" alt="${member.name}" class="dj-img">
             <div class="dj-content">
                 <div class="dj-header"><h3>${coloredName} ${playingBadge}</h3></div>
-                <span class="genre">${member.title || member.type}</span>
+                <span class="genre">${member.genre || member.title || member.type}</span>
                 ${linksHtml}
             </div>`;
         container.appendChild(card);
+    });
+}
+
+// Search Filter
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase();
+        if (!q) {
+            renderDjs(allDjs);
+            return;
+        }
+        const filtered = allDjs.filter(dj => {
+            const name = (dj.name || "").toLowerCase();
+            return name.includes(q);
+        });
+        renderDjs(filtered);
     });
 }
 
@@ -179,44 +204,21 @@ window.trackSocialClick = function(event, discordId) {
         body: JSON.stringify({ 
             type: 'link_click', 
             targetId: discordId, 
-            metadata: { page: 'team', label: label } 
+            metadata: { page: 'djs', label: label } 
         })
     }).catch(() => {});
 };
 
 function processColorValue(val) {
     if (!val) return null;
+    val = val.trim();
     if (val.startsWith('[') && val.endsWith(']')) {
-        const colors = val.slice(1, -1).split(',').map(c => c.trim());
-        const processed = colors.map(c => ensureReadableColor(c));
-        return `linear-gradient(135deg, ${processed.join(', ')})`;
+        const colors = val.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean);
+        if (colors.length === 0) return null;
+        if (colors.length === 1) return colors[0];
+        return `linear-gradient(135deg, ${colors.join(', ')})`;
     }
-    return (val.startsWith('#')) ? ensureReadableColor(val) : val;
+    return val;
 }
 
-function ensureReadableColor(hex) {
-    if (!hex || !hex.startsWith('#')) return hex;
-    hex = hex.replace(/^#/, '');
-    if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
-    let r = parseInt(hex.substring(0, 2), 16) / 255;
-    let g = parseInt(hex.substring(2, 4), 16) / 255;
-    let b = parseInt(hex.substring(4, 6), 16) / 255;
-    let max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h, s, l = (max + min) / 2;
-    if (max === min) { h = s = 0; } 
-    else {
-        let d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-            case g: h = (b - r) / d + 2; break;
-            case b: h = (r - g) / d + 4; break;
-        }
-        h /= 6;
-    }
-    if (l < 0.6) l = 0.6;
-    h = Math.round(h * 360); s = Math.round(s * 100); l = Math.round(l * 100);
-    return `hsl(${h}, ${s}%, ${l}%)`;
-}
-
-init();
+document.addEventListener('DOMContentLoaded', init);

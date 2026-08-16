@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/head', { title: 'Club DJs', page: 'djs', description: 'Meet and discover the resident and guest DJs of Club FuRN.' }) %>
+<body>
+
+    <div class="container">
+        <%- include('partials/nav', { page: 'djs' }) %>
+
+        <div class="logo-container">
+            <img src="/cdn/logos/club/Logo.png" class="logo" alt="Logo">
+        </div>
+
+        <h1>Club DJs</h1>
+        <p id="status-subtext">The artists behind the sound</p>
+
+        <!-- Search Bar -->
+        <div class="search-container" style="max-width: 480px; margin: 0 auto 30px auto;">
+            <input type="text" id="dj-search-input" class="search-bar" placeholder="Search DJs...">
+        </div>
+
+        <div id="loading-view">
+            <div class="spinner"></div>
+            <p>Loading DJs...</p>
+        </div>
+
+        <div id="dj-section" class="hidden">
+            <div id="dj-list" class="team-grid"></div>
+        </div>
+        
+        <p id="empty-msg" class="hidden" style="color:#666; margin-top:20px;">No DJs found.</p>
+    </div>
+
+    <script src="/cdn/js/theme-engine.js"></script>
+    <script src="/cdn/js/djs.js"></script>
+</body>
+</html>
