@@ -33,9 +33,14 @@
                 <label>Date</label>
                 <input type="date" id="archive-date">
             </div>
-            <div class="form-group">
-                <label>Genre</label>
-                <input type="text" id="archive-genre" placeholder="House / Techno">
+            <div class="form-group" style="position: relative;">
+                <label>Genres <span style="font-size: 0.75rem; color: #888;">(Type to search & press Enter)</span></label>
+                <div id="genre-tags-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 20px;"></div>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="archive-genre-input" placeholder="e.g. Melodic Trance, DNB, Tech House..." autocomplete="off" style="flex: 1;">
+                    <button type="button" class="btn-cc btn-secondary btn-small" onclick="addGenreFromInput()" style="margin: 0; padding: 6px 14px; white-space: nowrap;">+ Add</button>
+                </div>
+                <div id="genre-suggestions" class="autocomplete-results" style="display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 50; max-height: 180px; overflow-y: auto; background: #1a1a24; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);"></div>
             </div>
             <div class="form-group">
                 <label>Listen Link (SoundCloud, Mixcloud, etc.)</label>
@@ -67,8 +72,114 @@
 <script>
     const archiveList = document.getElementById('user-archive-list');
     const allArchiveList = document.getElementById('all-archive-list');
+    const genreInput = document.getElementById('archive-genre-input');
+    const genreTagsContainer = document.getElementById('genre-tags-container');
+    const genreSuggestions = document.getElementById('genre-suggestions');
+
     let myArchives = [];
     let allArchives = [];
+    let selectedGenres = [];
+    let availableGenres = [];
+
+    // Helper to parse genre strings or JSON
+    function parseGenreList(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw.filter(Boolean);
+        if (typeof raw === 'string') {
+            const trimmed = raw.trim();
+            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                try { return JSON.parse(trimmed); } catch(e) {}
+            }
+            return trimmed.split(/\s*[\/,|;+]\s*/).map(g => g.trim()).filter(Boolean);
+        }
+        return [];
+    }
+
+    // Multi-Genre Tag Management
+    function renderGenreTags() {
+        if (!genreTagsContainer) return;
+        if (selectedGenres.length === 0) {
+            genreTagsContainer.innerHTML = '<span style="font-size:0.75rem; color:#666; font-style:italic;">No genres added yet</span>';
+            return;
+        }
+        genreTagsContainer.innerHTML = selectedGenres.map((g, idx) => `
+            <span class="genre-tag-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #fff; padding: 4px 10px; border-radius: 14px; font-size: 0.8rem; font-weight: 600;">
+                ${g}
+                <span onclick="removeGenre(${idx})" style="cursor: pointer; opacity: 0.7; font-size: 0.9rem; margin-left: 2px;" title="Remove">&times;</span>
+            </span>
+        `).join('');
+    }
+
+    function addGenre(genre) {
+        const clean = genre.trim();
+        if (!clean) return;
+        if (!selectedGenres.some(g => g.toLowerCase() === clean.toLowerCase())) {
+            selectedGenres.push(clean);
+            renderGenreTags();
+        }
+        if (genreInput) genreInput.value = '';
+        if (genreSuggestions) genreSuggestions.style.display = 'none';
+    }
+
+    function addGenreFromInput() {
+        if (!genreInput) return;
+        const val = genreInput.value.trim();
+        if (val) {
+            val.split(',').forEach(g => addGenre(g));
+        }
+    }
+
+    function removeGenre(index) {
+        selectedGenres.splice(index, 1);
+        renderGenreTags();
+    }
+
+    // Autocomplete handling
+    if (genreInput && genreSuggestions) {
+        genreInput.addEventListener('input', (e) => {
+            const q = e.target.value.trim().toLowerCase();
+            if (!q) {
+                genreSuggestions.style.display = 'none';
+                return;
+            }
+            const matches = availableGenres.filter(g => g.toLowerCase().includes(q) && !selectedGenres.some(sg => sg.toLowerCase() === g.toLowerCase())).slice(0, 8);
+            if (matches.length === 0) {
+                genreSuggestions.style.display = 'none';
+                return;
+            }
+            genreSuggestions.innerHTML = matches.map(m => `
+                <div class="autocomplete-item" style="padding: 8px 14px; cursor: pointer; color: #eee; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05);" onmousedown="addGenre('${m.replace(/'/g, "\\'")}')">
+                    ${m}
+                </div>
+            `).join('');
+            genreSuggestions.style.display = 'block';
+        });
+
+        genreInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addGenreFromInput();
+            } else if (e.key === ',') {
+                e.preventDefault();
+                addGenreFromInput();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!genreInput.contains(e.target) && !genreSuggestions.contains(e.target)) {
+                genreSuggestions.style.display = 'none';
+            }
+        });
+    }
+
+    async function loadGenres() {
+        try {
+            const res = await fetch('/api/archives/genres');
+            if (res.ok) {
+                availableGenres = await res.json();
+            }
+        } catch (e) {}
+    }
 
     async function loadArchives() {
         const [archiveRes, statsRes] = await Promise.all([
@@ -94,36 +205,46 @@
             breakdownEl.innerHTML = '<span style="font-size:0.7rem; color:#666;">No clicks yet.</span>';
         }
 
-        archiveList.innerHTML = myArchives.map(item => `
-            <li class="schedule-item" style="border-left: 4px solid var(--primary-blue);">
-                <div style="flex:1;">
-                    <strong>${item.date}</strong> - ${item.title} <span style="opacity: 0.6; font-size: 0.8rem;">(${item.genre})</span>
-                    <div style="margin-top: 5px; font-size: 0.7rem; color: #888;">📊 ${stats.archiveClicks[item.id] || 0} clicks</div>
-                </div>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <button onclick="editArchive('${item.id}')" class="btn-cc btn-small btn-secondary">Edit</button>
-                    <button onclick="deleteArchive('${item.id}')" class="btn-cc btn-small btn-danger">Delete</button>
-                    <a href="${item.linkUrl}" target="_blank" class="btn-cc btn-small btn-primary">View</a>
-                </div>
-            </li>
-        `).join('');
-
-        if (allArchiveList) {
-            const allRes = await fetch('/api/archives/all');
-            allArchives = await allRes.json();
-            allArchiveList.innerHTML = allArchives.map(item => `
-                <li class="schedule-item" style="border-left: 4px solid var(--primary-purple);">
+        archiveList.innerHTML = myArchives.map(item => {
+            const genres = parseGenreList(item.genre);
+            const genreTags = genres.map(g => `<span class="tag-badge" style="font-size: 0.75rem; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 4px; color: #ccc;">${g}</span>`).join(' ');
+            return `
+                <li class="schedule-item" style="border-left: 4px solid var(--primary-blue);">
                     <div style="flex:1;">
-                        <strong>${item.date}</strong> - ${item.title} <span style="opacity: 0.6; font-size: 0.8rem;">(${item.genre})</span>
-                        <div style="margin-top: 5px; font-size: 0.7rem; color: #888;">👤 By: ${item.Roster ? item.Roster.name : 'Unknown'}</div>
+                        <strong>${item.date}</strong> - ${item.title} 
+                        <div style="margin-top: 4px;">${genreTags}</div>
+                        <div style="margin-top: 5px; font-size: 0.7rem; color: #888;">📊 ${stats.archiveClicks[item.id] || 0} clicks</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <button onclick="editArchive('${item.id}', true)" class="btn-cc btn-small btn-secondary">Edit</button>
+                        <button onclick="editArchive('${item.id}')" class="btn-cc btn-small btn-secondary">Edit</button>
                         <button onclick="deleteArchive('${item.id}')" class="btn-cc btn-small btn-danger">Delete</button>
                         <a href="${item.linkUrl}" target="_blank" class="btn-cc btn-small btn-primary">View</a>
                     </div>
                 </li>
-            `).join('');
+            `;
+        }).join('');
+
+        if (allArchiveList) {
+            const allRes = await fetch('/api/archives/all');
+            allArchives = await allRes.json();
+            allArchiveList.innerHTML = allArchives.map(item => {
+                const genres = parseGenreList(item.genre);
+                const genreTags = genres.map(g => `<span class="tag-badge" style="font-size: 0.75rem; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 4px; color: #ccc;">${g}</span>`).join(' ');
+                return `
+                    <li class="schedule-item" style="border-left: 4px solid var(--primary-purple);">
+                        <div style="flex:1;">
+                            <strong>${item.date}</strong> - ${item.title}
+                            <div style="margin-top: 4px;">${genreTags}</div>
+                            <div style="margin-top: 5px; font-size: 0.7rem; color: #888;">👤 By: ${item.Roster ? item.Roster.name : 'Unknown'}</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <button onclick="editArchive('${item.id}', true)" class="btn-cc btn-small btn-secondary">Edit</button>
+                            <button onclick="deleteArchive('${item.id}')" class="btn-cc btn-small btn-danger">Delete</button>
+                            <a href="${item.linkUrl}" target="_blank" class="btn-cc btn-small btn-primary">View</a>
+                        </div>
+                    </li>
+                `;
+            }).join('');
         }
     }
 
@@ -134,8 +255,10 @@
         document.getElementById('edit-archive-id').value = item.id;
         document.getElementById('archive-title').value = item.title;
         document.getElementById('archive-date').value = item.date;
-        document.getElementById('archive-genre').value = item.genre;
         document.getElementById('archive-link').value = item.linkUrl;
+        
+        selectedGenres = parseGenreList(item.genre);
+        renderGenreTags();
 
         document.getElementById('form-title').innerText = 'Edit Set Archive';
         document.getElementById('btn-save').innerText = 'Update Set';
@@ -148,8 +271,10 @@
         document.getElementById('edit-archive-id').value = '';
         document.getElementById('archive-title').value = '';
         document.getElementById('archive-date').value = '';
-        document.getElementById('archive-genre').value = '';
         document.getElementById('archive-link').value = '';
+        if (genreInput) genreInput.value = '';
+        selectedGenres = [];
+        renderGenreTags();
 
         document.getElementById('form-title').innerText = 'Upload Set Archive';
         document.getElementById('btn-save').innerText = 'Upload Set';
@@ -160,8 +285,11 @@
         const id = document.getElementById('edit-archive-id').value;
         const title = document.getElementById('archive-title').value;
         const date = document.getElementById('archive-date').value;
-        const genre = document.getElementById('archive-genre').value;
         const linkUrl = document.getElementById('archive-link').value;
+
+        if (genreInput && genreInput.value.trim()) {
+            addGenreFromInput();
+        }
 
         if (!title || !date || !linkUrl) return showNotify('Fill in all required fields!', 'error');
 
@@ -172,7 +300,7 @@
             const response = await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, date, genre, linkUrl })
+                body: JSON.stringify({ title, date, genres: selectedGenres, linkUrl })
             });
 
             if (response.ok) {
@@ -203,6 +331,8 @@
         }
     }
 
+    renderGenreTags();
+    loadGenres();
     loadArchives();
 </script>
 

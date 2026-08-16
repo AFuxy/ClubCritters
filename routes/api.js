@@ -8,6 +8,7 @@ const { sequelize, Roster, Settings, Schedule, Archive, Stats, AppSlot, Applicat
 const { getGuildMember, getDiscordStatus } = require('../bot');
 const { getInstanceData, verifyVRC, getVrcStatus, getUserInfo, getGroupMember, getGroupRoles, addGroupMemberRole, removeGroupMemberRole } = require('../utils/vrc-api');
 const { isStaff, isHostOrOwner, isAuthenticated, isOwner, isPartnerOrStaff } = require('../middleware/auth');
+const { parseGenres, POPULAR_GENRES } = require('../utils/genre-taxonomy');
 
 // Multer Setup (Memory Storage for Sharp processing)
 const upload = multer({
@@ -1225,17 +1226,23 @@ router.get('/archives/all', isAuthenticated, isHostOrOwner, async (req, res) => 
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
+router.get('/archives/genres', (req, res) => {
+    res.json(POPULAR_GENRES);
+});
+
 router.post('/archives/add', isAuthenticated, async (req, res) => {
     try {
-        const { title, date, genre, linkUrl } = req.body;
-        await Archive.create({ performerId: req.user.discordId, title, date, genre, linkUrl });
+        const { title, date, genre, genres, linkUrl } = req.body;
+        const parsedGenres = parseGenres(genres !== undefined ? genres : genre);
+        const genreValue = JSON.stringify(parsedGenres);
+        await Archive.create({ performerId: req.user.discordId, title, date, genre: genreValue, linkUrl });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
 router.patch('/archives/:id', isAuthenticated, async (req, res) => {
     try {
-        const { title, date, genre, linkUrl } = req.body;
+        const { title, date, genre, genres, linkUrl } = req.body;
         const archive = await Archive.findByPk(req.params.id);
         if (!archive) return res.status(404).json({ error: 'Archive not found' });
 
@@ -1246,7 +1253,10 @@ router.patch('/archives/:id', isAuthenticated, async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
-        await archive.update({ title, date, genre, linkUrl });
+        const parsedGenres = parseGenres(genres !== undefined ? genres : genre);
+        const genreValue = JSON.stringify(parsedGenres);
+
+        await archive.update({ title, date, genre: genreValue, linkUrl });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });

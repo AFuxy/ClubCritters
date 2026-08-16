@@ -405,7 +405,10 @@
                                 <div class="row-info">
                                     <div class="row-title">
                                         <%= arc.title %> 
-                                        <span class="genre-tag"><%= arc.genre %></span>
+                                        <% const setGenres = arc.parsedGenres || (arc.genre ? [arc.genre] : []); %>
+                                        <% setGenres.forEach(g => { %>
+                                            <span class="genre-tag"><%= g %></span>
+                                        <% }); %>
                                     </div>
                                     <div class="row-date"><%= new Date(arc.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) %></div>
                                 </div>

@@ -188,6 +188,47 @@ function ensureReadableColor(hex) {
     return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
+const GENRE_TAXONOMY = {
+    'Drum & Bass': ['dnb', 'd&b', 'drum & bass', 'drum and bass', 'drum n bass', 'liquid', 'neurofunk', 'jump up', 'jungle', 'halftime', 'roller', 'deep dnb'],
+    'Trance': ['trance', 'melodic trance', 'psytrance', 'psy trance', 'uplifting trance', 'tech trance', 'vocal trance', 'progressive trance', 'goa', 'hard trance', '138'],
+    'House': ['house', 'tech house', 'deep house', 'bass house', 'progressive house', 'electro house', 'future house', 'acid house', 'funky house', 'afro house', 'melodic house', 'speed house'],
+    'Techno': ['techno', 'hard techno', 'melodic techno', 'industrial techno', 'raw techno', 'dark techno', 'acid techno', 'minimal techno', 'peak time techno'],
+    'Hard Dance': ['hardstyle', 'rawstyle', 'euphoric hardstyle', 'hardcore', 'frenchcore', 'uptempo', 'gabber', 'happy hardcore', 'uk hardcore', 'reverse bass'],
+    'Dubstep & Bass': ['dubstep', 'riddim', 'tearout', 'melodic dubstep', 'color bass', 'trap', 'wave', 'future bass', 'hybrid trap', 'midtempo', 'glitch hop'],
+    'Garage & UK Bass': ['uk garage', 'ukg', 'garage', '2-step', 'bassline', 'speed garage', 'uk bass', 'breaks', 'breakbeat'],
+    'Synth & Cyberpunk': ['synthwave', 'retrowave', 'darksynth', 'outrun', 'vaporwave', 'future funk', 'cyberpunk', 'chiptune'],
+    'Ambient & Chill': ['ambient', 'downtempo', 'chillout', 'lo-fi', 'lofi', 'idm', 'experimental', 'drone', 'cinematic'],
+    'Disco & Funk': ['disco', 'nu-disco', 'nudisco', 'funk', 'electro funk', 'groove']
+};
+
+function parseGenreList(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try { return JSON.parse(trimmed); } catch(e) {}
+        }
+        return trimmed.split(/\s*[\/,|;+]\s*/).map(g => g.trim()).filter(Boolean);
+    }
+    return [];
+}
+
+function getParentCategory(genreString) {
+    if (!genreString) return 'Other';
+    const clean = genreString.toLowerCase().trim().replace(/[^a-z0-9&]/g, ' ').replace(/\s+/g, ' ');
+
+    for (const [categoryName, aliases] of Object.entries(GENRE_TAXONOMY)) {
+        if (aliases.some(alias => {
+            const aliasClean = alias.toLowerCase().replace(/[^a-z0-9&]/g, ' ').replace(/\s+/g, ' ');
+            return clean === aliasClean || clean.includes(aliasClean) || aliasClean.includes(clean);
+        })) {
+            return categoryName;
+        }
+    }
+    return genreString.charAt(0).toUpperCase() + genreString.slice(1);
+}
+
 function processData(roster, archives) {
     rosterMap = {};
     roster.forEach(m => {
@@ -199,6 +240,8 @@ function processData(roster, archives) {
 
     allSets = archives.map(arc => {
         const ros = rosterMap[arc.djName.toLowerCase()];
+        const genres = parseGenreList(arc.genres || arc.genre);
+        const parentCategories = genres.map(g => getParentCategory(g));
         return {
             id: arc.id,
             dj: arc.djName,
@@ -207,7 +250,8 @@ function processData(roster, archives) {
             title: arc.title,
             date: arc.date,
             displayDate: new Date(arc.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
-            genre: arc.genre,
+            genres: genres,
+            parentCategories: parentCategories,
             link: arc.link
         };
     });
@@ -223,11 +267,13 @@ function revealContent() {
 
 function buildGenreFilters() {
     if (!genreContainer) return;
-    const genres = new Set();
-    allSets.forEach(set => { if(set.genre) genres.add(set.genre); });
+    const categories = new Set();
+    allSets.forEach(set => {
+        set.parentCategories.forEach(cat => categories.add(cat));
+    });
     let html = `<button class="btn-cc btn-small nav-pill-cc ${activeGenre === 'ALL' ? 'active' : ''}" onclick="filterGenre('ALL', this)">ALL</button>`;
-    Array.from(genres).sort().forEach(g => {
-        html += `<button class="btn-cc btn-small nav-pill-cc ${activeGenre === g ? 'active' : ''}" onclick="filterGenre('${g}', this)">${g}</button>`;
+    Array.from(categories).sort().forEach(cat => {
+        html += `<button class="btn-cc btn-small nav-pill-cc ${activeGenre === cat ? 'active' : ''}" onclick="filterGenre('${cat.replace(/'/g, "\\'")}', this)">${cat}</button>`;
     });
     genreContainer.innerHTML = html;
 }
@@ -244,8 +290,15 @@ function renderSets(searchTerm = "") {
     listContainer.innerHTML = "";
     const term = searchTerm.toLowerCase();
     const filtered = allSets.filter(set => {
-        const matchesSearch = set.dj.toLowerCase().includes(term) || set.title.toLowerCase().includes(term);
-        const matchesGenre = activeGenre === 'ALL' || set.genre === activeGenre;
+        const matchesSearch = !term || 
+            set.dj.toLowerCase().includes(term) || 
+            set.title.toLowerCase().includes(term) ||
+            set.genres.some(g => g.toLowerCase().includes(term));
+            
+        const matchesGenre = activeGenre === 'ALL' || 
+            set.parentCategories.includes(activeGenre) ||
+            set.genres.some(g => g.toLowerCase() === activeGenre.toLowerCase());
+            
         return matchesSearch && matchesGenre;
     });
 
@@ -266,12 +319,15 @@ function renderSets(searchTerm = "") {
         const group = grouped[djName];
         let setsHtml = '';
         group.sets.forEach(set => {
+            const genreTagsHtml = set.genres.length > 0
+                ? set.genres.map(g => `<span class="genre-tag">${g}</span>`).join(' ')
+                : '';
             setsHtml += `
                 <div class="archive-row">
                     <div class="row-info">
                         <div class="row-title" style="color:#eee;">
                             ${set.title} 
-                            <span class="genre-tag">${set.genre}</span>
+                            ${genreTagsHtml}
                         </div>
                         <div class="row-date" style="color:${group.color}; opacity:0.8;">${set.displayDate}</div>
                     </div>

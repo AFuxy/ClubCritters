@@ -3,6 +3,7 @@ const router = express.Router();
 const { Roster, Settings, Schedule, Archive, Gallery, AppSlot, ApplicationSubmission, InstanceLog, Partner, PartnerEvent, sequelize } = require('../db');
 const { getGuildMember } = require('../bot');
 const { getInstanceData, getGroupInstanceData, getGroupStats, getUserInfo, getVrcStatus } = require('../utils/vrc-api');
+const { parseGenres, getParentCategory } = require('../utils/genre-taxonomy');
 const { Op } = require('sequelize');
 
 // Helper to handle Sequelize/MySQL/MariaDB JSON parsing inconsistencies
@@ -175,6 +176,9 @@ router.get('/performer/:id', async (req, res) => {
         let displayName = performer.name;
         if (performer.useDiscordName) { const member = await getGuildMember(performer.discordId); if (member) displayName = member.nickname; }
         const archives = await Archive.findAll({ where: { performerId: performer.discordId }, order: [['date', 'DESC'], ['createdAt', 'DESC']] });
+        archives.forEach(arc => {
+            arc.parsedGenres = parseGenres(arc.genre);
+        });
         
         // Count how many events this performer has played in (using InstanceLogPerformers many-to-many relationship)
         const { sequelize } = require('../db');
@@ -373,7 +377,18 @@ router.get('/api/public/archives', async (req, res) => {
                 const member = await getGuildMember(arc.performerId); 
                 if (member) djName = member.nickname; 
             } 
-            return { id: arc.id, performerId: arc.performerId, title: arc.title, date: arc.date, genre: arc.genre, link: arc.linkUrl, djName: djName, djImage: arc.Roster.imageUrl }; 
+            const parsedGenres = parseGenres(arc.genre);
+            return { 
+                id: arc.id, 
+                performerId: arc.performerId, 
+                title: arc.title, 
+                date: arc.date, 
+                genre: parsedGenres.join(' / '), 
+                genres: parsedGenres,
+                link: arc.linkUrl, 
+                djName: djName, 
+                djImage: arc.Roster.imageUrl 
+            }; 
         })); 
         res.json(mapped); 
     } catch (err) { res.status(500).json({ error: 'Failed' }); } 
