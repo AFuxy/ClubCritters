@@ -44,11 +44,15 @@
     const performerRoles = parseRolesList(performer && performer.type);
     const hasDjRole = performerRoles.some(r => ['resident', 'performer', 'dj'].includes(r)) || (archives && archives.length > 0);
     const hasStaffRole = performerRoles.some(r => ['owner', 'host', 'staff'].includes(r));
+    const isPartnerOnly = performerRoles.includes('partner') && !hasDjRole && !hasStaffRole && !performerRoles.includes('vip');
     const isVipOnly = performerRoles.includes('vip') && !hasDjRole && !hasStaffRole;
 
     let defaultBackUrl = '/djs';
     let defaultBackLabel = '&larr; BACK TO DJS';
-    if (isVipOnly) {
+    if (isPartnerOnly) {
+        defaultBackUrl = '/partners';
+        defaultBackLabel = '&larr; BACK TO PARTNERS';
+    } else if (isVipOnly) {
         defaultBackUrl = '/vips';
         defaultBackLabel = '&larr; BACK TO VIPS';
     } else if (hasStaffRole && !hasDjRole) {
@@ -385,6 +389,15 @@
                     <span style="background: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.3); color: #00e676; font-size: 0.75rem; font-weight: 800; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; display: inline-flex; align-items: center; gap: 6px;">
                         ⚡ Played <%= eventCount %> <%= eventCount === 1 ? 'Event' : 'Events' %>
                     </span>
+                    <% if (typeof partneredClubs !== 'undefined' && partneredClubs && partneredClubs.length > 0) { %>
+                        <% partneredClubs.forEach(club => { %>
+                            <% const isClubOwner = club.ownerDiscordId === performer.discordId; %>
+                            <a href="/partner/<%= club.slug %>" style="text-decoration: none; background: rgba(88, 101, 242, 0.15); border: 1px solid rgba(88, 101, 242, 0.35); color: #fff; font-size: 0.75rem; font-weight: bold; padding: 4px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
+                                <span><%= isClubOwner ? '👑' : '🤝' %></span>
+                                <span><%= club.name %></span>
+                            </a>
+                        <% }); %>
+                    <% } %>
                 </div>
 
                 <% if (performer.vrcUserId) { %>
@@ -406,6 +419,34 @@
                 <h2>About</h2>
                 <div class="bio-text"><%= performer.bio || 'No bio available yet.' %></div>
             </div>
+
+            <% if (typeof partneredClubs !== 'undefined' && partneredClubs && partneredClubs.length > 0) { %>
+                <div class="section-box" style="margin-bottom: 25px;">
+                    <h2>Partner Clubs</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <% partneredClubs.forEach(club => { %>
+                            <% 
+                                const isClubOwner = club.ownerDiscordId === performer.discordId;
+                                const clubAccent = club.accentColor || '#f2008d';
+                            %>
+                            <a href="/partner/<%= club.slug %>" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px; transition: all 0.2s ease;">
+                                <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                                    <img src="<%= club.iconUrl || '/cdn/logos/club/Logo.png' %>" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid <%= clubAccent %>; flex-shrink: 0;">
+                                    <div style="overflow: hidden;">
+                                        <div style="font-weight: bold; color: #fff; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            <%= club.name %>
+                                        </div>
+                                        <div style="font-size: 0.7rem; color: <%= isClubOwner ? '#ffd700' : '#5865f2' %>; font-weight: bold;">
+                                            <%= isClubOwner ? '👑 Club Owner' : '🤝 Co-Owner' %>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span style="font-size: 0.8rem; color: #888; flex-shrink: 0;">&rarr;</span>
+                            </a>
+                        <% }); %>
+                    </div>
+                </div>
+            <% } %>
 
             <div class="section-box">
                 <h2>Connect</h2>
@@ -705,7 +746,13 @@
                     const refUrl = new URL(document.referrer);
                     if (refUrl.origin === window.location.origin) {
                         const path = refUrl.pathname.toLowerCase();
-                        if (path === '/vips' || path === '/vip') {
+                        if (path.startsWith('/partner/')) {
+                            backBtn.href = refUrl.pathname + refUrl.search;
+                            backBtn.innerHTML = '&larr; BACK TO PARTNER';
+                        } else if (path === '/partners') {
+                            backBtn.href = '/partners';
+                            backBtn.innerHTML = '&larr; BACK TO PARTNERS';
+                        } else if (path === '/vips' || path === '/vip') {
                             backBtn.href = '/vips';
                             backBtn.innerHTML = '&larr; BACK TO VIPS';
                         } else if (path === '/team') {
@@ -717,9 +764,6 @@
                         } else if (path === '/archive') {
                             backBtn.href = '/archive';
                             backBtn.innerHTML = '&larr; BACK TO ARCHIVE';
-                        } else if (path === '/partners') {
-                            backBtn.href = '/partners';
-                            backBtn.innerHTML = '&larr; BACK TO PARTNERS';
                         }
                     }
                 } catch(e) {}

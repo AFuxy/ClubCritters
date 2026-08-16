@@ -18,6 +18,7 @@ router.get('/archives', isAuthenticated, (req, res) => { res.render('panel/archi
 // Partner Edit Route
 router.get('/partner', isAuthenticated, isPartnerOrStaff, async (req, res) => {
     try {
+        const { Op } = require('sequelize');
         let partner = null;
         const userType = (req.user.type || "").toLowerCase();
         const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
@@ -30,7 +31,30 @@ router.get('/partner', isAuthenticated, isPartnerOrStaff, async (req, res) => {
         if (isStaffUser && req.query.id) {
             partner = await Partner.findByPk(req.query.id, { include: includeOptions });
         } else {
-            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId }, include: includeOptions });
+            // Find by primary owner OR co-owners
+            partner = await Partner.findOne({
+                where: {
+                    [Op.or]: [
+                        { ownerDiscordId: req.user.discordId },
+                        { coOwnerDiscordIds: { [Op.like]: `%"${req.user.discordId}"%` } },
+                        { coOwnerDiscordIds: { [Op.like]: `%${req.user.discordId}%` } }
+                    ]
+                },
+                include: includeOptions
+            });
+        }
+
+        let coOwners = [];
+        if (partner && partner.coOwnerDiscordIds) {
+            let coOwnerIds = [];
+            try {
+                coOwnerIds = typeof partner.coOwnerDiscordIds === 'string' ? JSON.parse(partner.coOwnerDiscordIds) : partner.coOwnerDiscordIds;
+            } catch(e) {}
+            if (Array.isArray(coOwnerIds) && coOwnerIds.length > 0) {
+                coOwners = await Roster.findAll({
+                    where: { discordId: coOwnerIds }
+                });
+            }
         }
 
         if (partner && partner.events) {
@@ -56,10 +80,14 @@ router.get('/partner', isAuthenticated, isPartnerOrStaff, async (req, res) => {
             });
         }
 
+        const isPrimary = partner ? (partner.ownerDiscordId === req.user.discordId || isStaffUser) : false;
+
         res.render('panel/partner-edit', {
             user: req.user,
             page: 'partner',
-            partner: partner || null
+            partner: partner || null,
+            coOwners: coOwners,
+            isPrimaryOwner: isPrimary
         });
     } catch (err) {
         console.error("Error loading partner page:", err);

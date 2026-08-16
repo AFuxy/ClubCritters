@@ -237,29 +237,71 @@ function slugify(text) {
 // --- PARTNER API ENDPOINTS ---
 
 // 1. Partner Profile Update (Owner or Staff)
+function getPartnerCoOwners(partner) {
+    if (!partner || !partner.coOwnerDiscordIds) return [];
+    if (Array.isArray(partner.coOwnerDiscordIds)) return partner.coOwnerDiscordIds;
+    try {
+        const parsed = JSON.parse(partner.coOwnerDiscordIds);
+        if (Array.isArray(parsed)) return parsed;
+    } catch(e) {}
+    return String(partner.coOwnerDiscordIds).split(/\s*,\s*/).filter(Boolean);
+}
+
+function canManagePartner(partner, user) {
+    if (!partner || !user) return false;
+    const userType = (user.type || "").toLowerCase();
+    const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+    if (isStaffUser) return true;
+    if (partner.ownerDiscordId === user.discordId) return true;
+    const coOwners = getPartnerCoOwners(partner);
+    return coOwners.includes(user.discordId);
+}
+
+function isPrimaryPartnerOwner(partner, user) {
+    if (!partner || !user) return false;
+    const userType = (user.type || "").toLowerCase();
+    const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
+    if (isStaffUser) return true;
+    return partner.ownerDiscordId === user.discordId;
+}
+
+// 1. Update Partner Club Info
 router.post('/partner/update', isAuthenticated, isPartnerOrStaff, async (req, res) => {
     try {
         const { id, name, description, customSlug, accentColor, vrcGroupUrl, discordInvite, websiteUrl } = req.body;
+        const { Op } = require('sequelize');
         let partner = null;
         
         const userType = (req.user.type || "").toLowerCase();
         const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
 
-        if (id && isStaffUser) {
+        if (id) {
             partner = await Partner.findByPk(id);
         } else {
-            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+            partner = await Partner.findOne({
+                where: {
+                    [Op.or]: [
+                        { ownerDiscordId: req.user.discordId },
+                        { coOwnerDiscordIds: { [Op.like]: `%"${req.user.discordId}"%` } },
+                        { coOwnerDiscordIds: { [Op.like]: `%${req.user.discordId}%` } }
+                    ]
+                }
+            });
         }
 
         if (!partner && !isStaffUser) {
             partner = await Partner.create({
                 ownerDiscordId: req.user.discordId,
                 name: name || `${req.user.name}'s Club`,
-                slug: slugify(customSlug || name || req.user.name || "partner")
+                slug: slugify(customSlug || name || req.user.name || "partner"),
+                coOwnerDiscordIds: '[]'
             });
         }
 
         if (!partner) return res.status(404).json({ error: 'Partner profile not found' });
+        if (!canManagePartner(partner, req.user)) {
+            return res.status(403).json({ error: 'Not authorized to edit this partner club' });
+        }
 
         // Handle custom slug
         let finalSlug = partner.slug;
@@ -302,6 +344,133 @@ router.post('/partner/update', isAuthenticated, isPartnerOrStaff, async (req, re
     }
 });
 
+// Co-Owners Management Endpoints
+router.post('/partner/:id/co-owners/add', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const partner = await Partner.findByPk(req.params.id);
+        if (!partner) return res.status(404).json({ error: 'Partner club not found' });
+
+        if (!isPrimaryPartnerOwner(partner, req.user)) {
+            return res.status(403).json({ error: 'Only the Primary Owner or Staff can add co-owners.' });
+        }
+
+        const { targetDiscordId } = req.body;
+        if (!targetDiscordId || !targetDiscordId.trim()) {
+            return res.status(400).json({ error: 'Discord ID or user is required.' });
+        }
+        const discordId = targetDiscordId.trim();
+
+        if (discordId === partner.ownerDiscordId) {
+            return res.status(400).json({ error: 'User is already the Primary Owner of this club.' });
+        }
+
+        let coOwners = getPartnerCoOwners(partner);
+        if (coOwners.includes(discordId)) {
+            return res.status(400).json({ error: 'User is already a Co-Owner of this club.' });
+        }
+
+        // Find or create in Roster
+        let targetRoster = await Roster.findByPk(discordId);
+        if (!targetRoster) {
+            const guildMember = await getGuildMember(discordId).catch(() => null);
+            const initialName = guildMember ? (guildMember.nickname || guildMember.user.username) : `User ${discordId.slice(-4)}`;
+            const initialAvatar = (guildMember && guildMember.user) ? guildMember.user.displayAvatarURL({ extension: 'png', size: 512 }) : '';
+
+            targetRoster = await Roster.create({
+                discordId: discordId,
+                name: initialName,
+                type: JSON.stringify(['Partner']),
+                title: 'Partner Co-Owner',
+                imageUrl: initialAvatar,
+                links: {}
+            });
+        } else {
+            const currentRoles = getUserRoles(targetRoster);
+            if (!currentRoles.includes('partner')) {
+                const updatedRoles = [...currentRoles.map(r => r.charAt(0).toUpperCase() + r.slice(1)), 'Partner'];
+                await targetRoster.update({ type: JSON.stringify(updatedRoles) });
+            }
+        }
+
+        coOwners.push(discordId);
+        await partner.update({ coOwnerDiscordIds: JSON.stringify(coOwners) });
+
+        const updatedCoOwners = await Roster.findAll({ where: { discordId: coOwners } });
+        res.json({ success: true, coOwners: updatedCoOwners, addedUser: targetRoster });
+    } catch (err) {
+        console.error('[PARTNER API] Add Co-Owner Error:', err);
+        res.status(500).json({ error: 'Failed to add co-owner.' });
+    }
+});
+
+router.delete('/partner/:id/co-owners/:discordId', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const partner = await Partner.findByPk(req.params.id);
+        if (!partner) return res.status(404).json({ error: 'Partner club not found' });
+
+        if (!isPrimaryPartnerOwner(partner, req.user)) {
+            return res.status(403).json({ error: 'Only the Primary Owner or Staff can remove co-owners.' });
+        }
+
+        const targetDiscordId = req.params.discordId;
+        let coOwners = getPartnerCoOwners(partner);
+        coOwners = coOwners.filter(id => id !== targetDiscordId);
+
+        await partner.update({ coOwnerDiscordIds: JSON.stringify(coOwners) });
+
+        const updatedCoOwners = await Roster.findAll({ where: { discordId: coOwners } });
+        res.json({ success: true, coOwners: updatedCoOwners });
+    } catch (err) {
+        console.error('[PARTNER API] Remove Co-Owner Error:', err);
+        res.status(500).json({ error: 'Failed to remove co-owner.' });
+    }
+});
+
+router.post('/partner/:id/transfer-ownership', isAuthenticated, isPartnerOrStaff, async (req, res) => {
+    try {
+        const partner = await Partner.findByPk(req.params.id);
+        if (!partner) return res.status(404).json({ error: 'Partner club not found' });
+
+        if (!isPrimaryPartnerOwner(partner, req.user)) {
+            return res.status(403).json({ error: 'Only the Primary Owner or Staff can transfer club ownership.' });
+        }
+
+        const { targetDiscordId } = req.body;
+        if (!targetDiscordId || targetDiscordId === partner.ownerDiscordId) {
+            return res.status(400).json({ error: 'Invalid target user for ownership transfer.' });
+        }
+
+        const oldOwnerDiscordId = partner.ownerDiscordId;
+        let coOwners = getPartnerCoOwners(partner);
+
+        // Remove new owner from co-owners list and add old owner as co-owner
+        coOwners = coOwners.filter(id => id !== targetDiscordId);
+        if (!coOwners.includes(oldOwnerDiscordId)) {
+            coOwners.push(oldOwnerDiscordId);
+        }
+
+        await partner.update({
+            ownerDiscordId: targetDiscordId,
+            coOwnerDiscordIds: JSON.stringify(coOwners)
+        });
+
+        // Ensure new owner has Partner role in Roster
+        const targetRoster = await Roster.findByPk(targetDiscordId);
+        if (targetRoster) {
+            const currentRoles = getUserRoles(targetRoster);
+            if (!currentRoles.includes('partner')) {
+                const updatedRoles = [...currentRoles.map(r => r.charAt(0).toUpperCase() + r.slice(1)), 'Partner'];
+                await targetRoster.update({ type: JSON.stringify(updatedRoles) });
+            }
+        }
+
+        res.json({ success: true, newOwnerDiscordId: targetDiscordId });
+    } catch (err) {
+        console.error('[PARTNER API] Transfer Ownership Error:', err);
+        res.status(500).json({ error: 'Failed to transfer ownership.' });
+    }
+});
+
 // 2. Partner Icon Upload
 router.post('/partner/upload-icon', isAuthenticated, isPartnerOrStaff, handleUpload('icon'), async (req, res) => {
     try {
@@ -313,18 +482,23 @@ router.post('/partner/upload-icon', isAuthenticated, isPartnerOrStaff, handleUpl
         }
 
         const partnerId = req.body.partnerId;
-        const userType = (req.user.type || "").toLowerCase();
-        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
-
+        const { Op } = require('sequelize');
         let partner = null;
         if (partnerId) {
             partner = await Partner.findByPk(partnerId);
-        }
-        if (!partner) {
-            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+        } else {
+            partner = await Partner.findOne({
+                where: {
+                    [Op.or]: [
+                        { ownerDiscordId: req.user.discordId },
+                        { coOwnerDiscordIds: { [Op.like]: `%"${req.user.discordId}"%` } },
+                        { coOwnerDiscordIds: { [Op.like]: `%${req.user.discordId}%` } }
+                    ]
+                }
+            });
         }
 
-        if (partner && !isStaffUser && partner.ownerDiscordId !== req.user.discordId) {
+        if (partner && !canManagePartner(partner, req.user)) {
             return res.status(403).json({ error: 'Not authorized to update this partner profile' });
         }
 
@@ -369,18 +543,23 @@ router.post('/partner/upload-banner', isAuthenticated, isPartnerOrStaff, handleU
         }
 
         const partnerId = req.body.partnerId;
-        const userType = (req.user.type || "").toLowerCase();
-        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
-
+        const { Op } = require('sequelize');
         let partner = null;
         if (partnerId) {
             partner = await Partner.findByPk(partnerId);
-        }
-        if (!partner) {
-            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+        } else {
+            partner = await Partner.findOne({
+                where: {
+                    [Op.or]: [
+                        { ownerDiscordId: req.user.discordId },
+                        { coOwnerDiscordIds: { [Op.like]: `%"${req.user.discordId}"%` } },
+                        { coOwnerDiscordIds: { [Op.like]: `%${req.user.discordId}%` } }
+                    ]
+                }
+            });
         }
 
-        if (partner && !isStaffUser && partner.ownerDiscordId !== req.user.discordId) {
+        if (partner && !canManagePartner(partner, req.user)) {
             return res.status(403).json({ error: 'Not authorized to update this partner profile' });
         }
 
@@ -388,7 +567,8 @@ router.post('/partner/upload-banner', isAuthenticated, isPartnerOrStaff, handleU
             partner = await Partner.create({
                 ownerDiscordId: req.user.discordId,
                 name: `${req.user.name}'s Club`,
-                slug: slugify(req.user.name || "partner") + `-${Date.now()}`
+                slug: slugify(req.user.name || "partner") + `-${Date.now()}`,
+                coOwnerDiscordIds: '[]'
             });
         }
 
@@ -414,89 +594,105 @@ router.post('/partner/upload-banner', isAuthenticated, isPartnerOrStaff, handleU
     }
 });
 
-// 4. Staff Partner Management APIs
+// --- ADMIN / STAFF PARTNER MANAGEMENT ENDPOINTS ---
+
+// Admin: Create Partner
 router.post('/admin/partners/create', isAuthenticated, isStaff, async (req, res) => {
     try {
-        const { ownerDiscordId, name, description, vrcGroupUrl, discordInvite, websiteUrl } = req.body;
+        const { ownerDiscordId, name, slug, description, accentColor, vrcGroupUrl, discordInvite, websiteUrl, isApproved, order } = req.body;
         if (!ownerDiscordId || !name) {
             return res.status(400).json({ error: 'Owner Discord ID and Name are required' });
         }
 
-        let slug = slugify(name);
-        const existingSlug = await Partner.findOne({ where: { slug } });
-        if (existingSlug) {
-            slug = `${slug}-${Date.now()}`;
+        const cleanSlug = slugify(slug || name);
+        const existing = await Partner.findOne({ where: { slug: cleanSlug } });
+        if (existing) {
+            return res.status(400).json({ error: `The slug "${cleanSlug}" is already in use by another club.` });
         }
 
-        const newPartner = await Partner.create({
+        const partner = await Partner.create({
             ownerDiscordId,
             name,
-            slug,
+            slug: cleanSlug,
             description,
+            accentColor: accentColor || '#f2008d',
             vrcGroupUrl,
             discordInvite,
             websiteUrl,
-            isApproved: true
+            isApproved: isApproved !== undefined ? isApproved : true,
+            order: order ? parseInt(order) : 0,
+            coOwnerDiscordIds: '[]'
         });
 
-        res.json({ success: true, partner: newPartner });
+        res.json({ success: true, partner });
     } catch (err) {
         console.error("[ADMIN PARTNER API] Create Error:", err);
-        res.status(500).json({ error: 'Failed to create partner' });
+        res.status(500).json({ error: 'Failed to create partner profile' });
     }
 });
 
+// Admin: Update Partner
 router.put('/admin/partners/:id', isAuthenticated, isStaff, async (req, res) => {
     try {
         const partner = await Partner.findByPk(req.params.id);
         if (!partner) return res.status(404).json({ error: 'Partner not found' });
 
-        const { name, isApproved, order, description, vrcGroupUrl, discordInvite, websiteUrl, ownerDiscordId } = req.body;
+        const { ownerDiscordId, name, slug, description, accentColor, vrcGroupUrl, discordInvite, websiteUrl, isApproved, order } = req.body;
         
-        let updates = {};
-        if (name !== undefined) {
-            updates.name = name;
-            updates.slug = slugify(name);
+        let finalSlug = partner.slug;
+        if (slug && slug !== partner.slug) {
+            const cleanSlug = slugify(slug);
+            const existing = await Partner.findOne({ where: { slug: cleanSlug } });
+            if (existing && existing.id !== partner.id) {
+                return res.status(400).json({ error: `The slug "${cleanSlug}" is already in use.` });
+            }
+            finalSlug = cleanSlug;
         }
-        if (isApproved !== undefined) updates.isApproved = isApproved;
-        if (order !== undefined) updates.order = parseInt(order, 10) || 0;
-        if (description !== undefined) updates.description = description;
-        if (vrcGroupUrl !== undefined) updates.vrcGroupUrl = vrcGroupUrl;
-        if (discordInvite !== undefined) updates.discordInvite = discordInvite;
-        if (websiteUrl !== undefined) updates.websiteUrl = websiteUrl;
-        if (ownerDiscordId !== undefined) updates.ownerDiscordId = ownerDiscordId;
 
-        await partner.update(updates);
+        await partner.update({
+            ownerDiscordId: ownerDiscordId !== undefined ? ownerDiscordId : partner.ownerDiscordId,
+            name: name !== undefined ? name : partner.name,
+            slug: finalSlug,
+            description: description !== undefined ? description : partner.description,
+            accentColor: accentColor !== undefined ? accentColor : partner.accentColor,
+            vrcGroupUrl: vrcGroupUrl !== undefined ? vrcGroupUrl : partner.vrcGroupUrl,
+            discordInvite: discordInvite !== undefined ? discordInvite : partner.discordInvite,
+            websiteUrl: websiteUrl !== undefined ? websiteUrl : partner.websiteUrl,
+            isApproved: isApproved !== undefined ? isApproved : partner.isApproved,
+            order: order !== undefined ? parseInt(order) : partner.order
+        });
+
         res.json({ success: true, partner });
     } catch (err) {
         console.error("[ADMIN PARTNER API] Update Error:", err);
-        res.status(500).json({ error: 'Failed to update partner' });
+        res.status(500).json({ error: 'Failed to update partner profile' });
     }
 });
 
+// Admin: Delete Partner
 router.delete('/admin/partners/:id', isAuthenticated, isStaff, async (req, res) => {
     try {
-        const partner = await Partner.findByPk(req.params.id);
+        const partner = await Partner.findByPk(req.params.id, {
+            include: [{ model: PartnerEvent, as: 'events' }]
+        });
         if (!partner) return res.status(404).json({ error: 'Partner not found' });
 
-        // 1. Clean up uploaded icon file
         if (partner.iconUrl && partner.iconUrl.startsWith('/uploads/partners/')) {
             const iconPath = path.join(__dirname, '..', 'public', partner.iconUrl);
             if (fs.existsSync(iconPath)) fs.unlinkSync(iconPath);
         }
 
-        // 2. Clean up uploaded banner file
         if (partner.bannerUrl && partner.bannerUrl.startsWith('/uploads/partners/')) {
             const bannerPath = path.join(__dirname, '..', 'public', partner.bannerUrl);
             if (fs.existsSync(bannerPath)) fs.unlinkSync(bannerPath);
         }
 
-        // 3. Clean up any uploaded partner event flyer files
-        const events = await PartnerEvent.findAll({ where: { partnerId: partner.id } });
-        for (const evt of events) {
-            if (evt.bannerUrl && evt.bannerUrl.startsWith('/uploads/partners/')) {
-                const flyerPath = path.join(__dirname, '..', 'public', evt.bannerUrl);
-                if (fs.existsSync(flyerPath)) fs.unlinkSync(flyerPath);
+        if (partner.events && partner.events.length > 0) {
+            for (const evt of partner.events) {
+                if (evt.bannerUrl && evt.bannerUrl.startsWith('/uploads/partners/')) {
+                    const flyerPath = path.join(__dirname, '..', 'public', evt.bannerUrl);
+                    if (fs.existsSync(flyerPath)) fs.unlinkSync(flyerPath);
+                }
             }
         }
 
@@ -514,19 +710,31 @@ router.delete('/admin/partners/:id', isAuthenticated, isStaff, async (req, res) 
 router.post('/partner/events/create', isAuthenticated, isPartnerOrStaff, async (req, res) => {
     try {
         const { partnerId, title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone, isStreamedByClubFurn, streamUrls } = req.body;
-        
+        const { Op } = require('sequelize');
         const userType = (req.user.type || "").toLowerCase();
         const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
 
         let partner = null;
-        if (partnerId && isStaffUser) {
+        if (partnerId) {
             partner = await Partner.findByPk(partnerId);
         } else {
-            partner = await Partner.findOne({ where: { ownerDiscordId: req.user.discordId } });
+            partner = await Partner.findOne({
+                where: {
+                    [Op.or]: [
+                        { ownerDiscordId: req.user.discordId },
+                        { coOwnerDiscordIds: { [Op.like]: `%"${req.user.discordId}"%` } },
+                        { coOwnerDiscordIds: { [Op.like]: `%${req.user.discordId}%` } }
+                    ]
+                }
+            });
         }
 
         if (!partner) {
             return res.status(403).json({ error: 'Partner profile not found. Please create a partner profile first.' });
+        }
+
+        if (!canManagePartner(partner, req.user)) {
+            return res.status(403).json({ error: 'Not authorized to create events for this club.' });
         }
 
         if (!title || !startTime || !endTime) {
@@ -562,14 +770,12 @@ router.put('/partner/events/:id', isAuthenticated, isPartnerOrStaff, async (req,
         const partnerEvent = await PartnerEvent.findByPk(eventId, { include: [{ model: Partner, as: 'partner' }] });
         if (!partnerEvent) return res.status(404).json({ error: 'Event not found' });
 
-        const userType = (req.user.type || "").toLowerCase();
-        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
-        const isOwnerOfPartner = partnerEvent.partner && partnerEvent.partner.ownerDiscordId === req.user.discordId;
-
-        if (!isStaffUser && !isOwnerOfPartner) {
+        if (!canManagePartner(partnerEvent.partner, req.user)) {
             return res.status(403).json({ error: 'Not authorized to edit this event' });
         }
 
+        const userType = (req.user.type || "").toLowerCase();
+        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
         const { title, description, lineup, startTime, endTime, eventUrl, bannerUrl, timezone, isApproved, isStreamedByClubFurn, streamUrls } = req.body;
         
         let updates = {};
@@ -616,11 +822,7 @@ router.delete('/partner/events/:id', isAuthenticated, isPartnerOrStaff, async (r
         const partnerEvent = await PartnerEvent.findByPk(eventId, { include: [{ model: Partner, as: 'partner' }] });
         if (!partnerEvent) return res.status(404).json({ error: 'Event not found' });
 
-        const userType = (req.user.type || "").toLowerCase();
-        const isStaffUser = ['host', 'staff', 'owner'].some(r => userType.includes(r));
-        const isOwnerOfPartner = partnerEvent.partner && partnerEvent.partner.ownerDiscordId === req.user.discordId;
-
-        if (!isStaffUser && !isOwnerOfPartner) {
+        if (!canManagePartner(partnerEvent.partner, req.user)) {
             return res.status(403).json({ error: 'Not authorized to delete this event' });
         }
 

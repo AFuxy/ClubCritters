@@ -201,7 +201,8 @@ const Partner = sequelize.define('Partner', {
     websiteUrl: { type: DataTypes.STRING },
     accentColor: { type: DataTypes.STRING, defaultValue: '#f2008d' },
     isApproved: { type: DataTypes.BOOLEAN, defaultValue: true },
-    order: { type: DataTypes.INTEGER, defaultValue: 0 }
+    order: { type: DataTypes.INTEGER, defaultValue: 0 },
+    coOwnerDiscordIds: { type: DataTypes.TEXT, allowNull: true, defaultValue: '[]' }
 });
 
 // Partner Relationships

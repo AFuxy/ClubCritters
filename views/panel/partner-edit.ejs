@@ -194,6 +194,101 @@
                 </div>
             <% } %>
 
+            <!-- CO-OWNERS & TEAM SECTION -->
+            <% if (partner && partner.id) { %>
+                <div class="staff-section">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #fff;">
+                                👥 Club Leads & Co-Owners
+                            </h3>
+                            <p style="font-size: 0.78rem; color: #888; margin: 4px 0 0 0;">
+                                Co-owners have full permissions to edit club branding and manage showcase events.
+                            </p>
+                        </div>
+                        <% if (!isPrimaryOwner) { %>
+                            <span style="font-size: 0.75rem; background: rgba(88, 101, 242, 0.15); border: 1px solid #5865f2; color: #5865f2; padding: 4px 10px; border-radius: 20px; font-weight: bold;">
+                                🤝 You are a Co-Owner
+                            </span>
+                        <% } %>
+                    </div>
+
+                    <!-- Primary Owner Card -->
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Primary Club Owner</label>
+                        <div style="background: rgba(255, 215, 0, 0.05); border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 10px; padding: 12px 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <img src="<%= (partner.owner && partner.owner.imageUrl) ? partner.owner.imageUrl : '/cdn/logos/club/Logo.png' %>" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #ffd700;">
+                                <div>
+                                    <div style="font-weight: bold; color: #fff; font-size: 0.95rem;">
+                                        <%= partner.owner ? partner.owner.name : 'Unknown User' %>
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: #aaa;">ID: <code style="color: #ffd700;"><%= partner.ownerDiscordId %></code></div>
+                                </div>
+                            </div>
+                            <span style="font-size: 0.75rem; background: rgba(255, 215, 0, 0.2); border: 1px solid #ffd700; color: #ffd700; padding: 3px 10px; border-radius: 12px; font-weight: bold;">
+                                👑 Primary Owner
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Co-Owners List -->
+                    <div>
+                        <label style="font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Active Co-Owners</label>
+                        <div id="co-owners-list" style="display: flex; flex-direction: column; gap: 8px;">
+                            <% if (typeof coOwners !== 'undefined' && coOwners && coOwners.length > 0) { %>
+                                <% coOwners.forEach(co => { %>
+                                    <div class="co-owner-item" data-id="<%= co.discordId %>" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: all 0.2s ease;">
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <img src="<%= co.imageUrl || '/cdn/logos/club/Logo.png' %>" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid #5865f2;">
+                                            <div>
+                                                <div style="font-weight: bold; color: #fff; font-size: 0.9rem;"><%= co.name %></div>
+                                                <div style="font-size: 0.72rem; color: #777;">ID: <code><%= co.discordId %></code></div>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <span style="font-size: 0.72rem; background: rgba(88, 101, 242, 0.15); border: 1px solid rgba(88, 101, 242, 0.4); color: #5865f2; padding: 2px 8px; border-radius: 10px;">
+                                                🤝 Co-Owner
+                                            </span>
+                                            <% if (isPrimaryOwner) { %>
+                                                <button type="button" class="btn-cc btn-small" style="font-size: 0.72rem; padding: 3px 8px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: #ffd700;" onclick="transferOwnership('<%= co.discordId %>', '<%= co.name.replace(/'/g, "\\'") %>')">
+                                                    👑 Transfer Owner
+                                                </button>
+                                                <button type="button" class="btn-cc btn-small btn-danger" style="font-size: 0.72rem; padding: 3px 8px;" onclick="removeCoOwner('<%= co.discordId %>', '<%= co.name.replace(/'/g, "\\'") %>')">
+                                                    ✕ Remove
+                                                </button>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            <% } else { %>
+                                <p id="no-co-owners-msg" style="font-size: 0.8rem; color: #777; font-style: italic; margin: 0; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                                    No co-owners assigned yet.
+                                </p>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <!-- Add Co-Owner Form (Primary Owner / Staff Only) -->
+                    <% if (isPrimaryOwner) { %>
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
+                            <label style="font-size: 0.8rem; color: #fff; font-weight: bold; margin-bottom: 6px; display: block;">
+                                ➕ Add New Co-Owner
+                            </label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="add-co-owner-input" placeholder="Paste Discord ID (e.g. 123456789012345678)" style="flex: 1; font-size: 0.85rem;">
+                                <button type="button" class="btn-cc btn-primary btn-small" onclick="addCoOwner()" style="white-space: nowrap;">
+                                    + Add Co-Owner
+                                </button>
+                            </div>
+                            <p style="font-size: 0.72rem; color: #777; margin-top: 5px; margin-bottom: 0;">
+                                Note: Adding a co-owner grants them immediate edit and event management access to this club profile.
+                            </p>
+                        </div>
+                    <% } %>
+                </div>
+            <% } %>
+
         </div>
 
         <!-- RIGHT: Live Showcase Preview -->
@@ -841,6 +936,89 @@
                 confirmBtn.disabled = false;
                 confirmBtn.innerText = 'Post Announcement Now';
             }
+        }
+    }
+
+    // --- CO-OWNERS MANAGEMENT HANDLERS ---
+    async function addCoOwner() {
+        const partnerId = document.getElementById('partner-id') ? document.getElementById('partner-id').value : null;
+        if (!partnerId) {
+            showNotify('Please save your partner club first before adding co-owners.', 'error');
+            return;
+        }
+
+        const input = document.getElementById('add-co-owner-input');
+        const discordId = input ? input.value.trim() : '';
+        if (!discordId) {
+            showNotify('Please enter a Discord ID to add as a co-owner.', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/partner/${partnerId}/co-owners/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetDiscordId: discordId })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showNotify(`Successfully added ${data.addedUser ? data.addedUser.name : 'user'} as a Co-Owner!`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showNotify(data.error || 'Failed to add co-owner', 'error');
+            }
+        } catch(e) {
+            showNotify('Network error adding co-owner', 'error');
+        }
+    }
+
+    async function removeCoOwner(discordId, name) {
+        const partnerId = document.getElementById('partner-id') ? document.getElementById('partner-id').value : null;
+        if (!partnerId) return;
+
+        if (!confirm(`Are you sure you want to remove ${name} from this club's co-owners?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/partner/${partnerId}/co-owners/${discordId}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showNotify(`Removed ${name} from co-owners.`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showNotify(data.error || 'Failed to remove co-owner', 'error');
+            }
+        } catch(e) {
+            showNotify('Network error removing co-owner', 'error');
+        }
+    }
+
+    async function transferOwnership(discordId, name) {
+        const partnerId = document.getElementById('partner-id') ? document.getElementById('partner-id').value : null;
+        if (!partnerId) return;
+
+        if (!confirm(`⚠️ ARE YOU SURE?\n\nYou are about to transfer PRIMARY OWNERSHIP of this club to ${name}.\n\nYou will remain a Co-Owner.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/partner/${partnerId}/transfer-ownership`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetDiscordId: discordId })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showNotify(`Primary ownership transferred to ${name}!`, 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showNotify(data.error || 'Failed to transfer ownership', 'error');
+            }
+        } catch(e) {
+            showNotify('Network error transferring ownership', 'error');
         }
     }
 </script>

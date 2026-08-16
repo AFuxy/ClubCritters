@@ -80,6 +80,53 @@
                     </h3>
                     <div style="color: #ccc; line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap;"><%= partner.description || 'No detailed description provided yet.' %></div>
                 </div>
+
+                <!-- Club Leads & Team Section -->
+                <% 
+                    const teamMembers = [];
+                    if (partner.owner) {
+                        teamMembers.push({
+                            discordId: partner.owner.discordId,
+                            name: partner.owner.name,
+                            imageUrl: partner.owner.imageUrl,
+                            title: partner.owner.title || 'Club Owner',
+                            isOwner: true
+                        });
+                    }
+                    if (typeof coOwners !== 'undefined' && coOwners && coOwners.length > 0) {
+                        coOwners.forEach(co => {
+                            if (co.discordId !== partner.ownerDiscordId) {
+                                teamMembers.push({
+                                    discordId: co.discordId,
+                                    name: co.name,
+                                    imageUrl: co.imageUrl,
+                                    title: co.title || 'Club Co-Owner',
+                                    isOwner: false
+                                });
+                            }
+                        });
+                    }
+                %>
+                <% if (teamMembers.length > 0) { %>
+                    <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px 20px; margin-top: 15px;">
+                        <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 0.9rem; color: <%= accent %>; text-transform: uppercase; letter-spacing: 1px;">
+                            Club Team & Hosts
+                        </h3>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            <% teamMembers.forEach(tm => { %>
+                                <a href="/performer/<%= tm.discordId %>" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 8px 14px; border-radius: 12px; transition: all 0.2s ease;">
+                                    <img src="<%= tm.imageUrl || '/cdn/logos/club/Logo.png' %>" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid <%= tm.isOwner ? '#ffd700' : accent %>;">
+                                    <div>
+                                        <div style="font-weight: bold; font-size: 0.85rem; color: #fff;">
+                                            <%= tm.name %> <%= tm.isOwner ? '👑' : '' %>
+                                        </div>
+                                        <div style="font-size: 0.72rem; color: #888;"><%= tm.title %></div>
+                                    </div>
+                                </a>
+                            <% }) %>
+                        </div>
+                    </div>
+                <% } %>
             </div>
         </div>
 

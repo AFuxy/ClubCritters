@@ -504,7 +504,7 @@ async function postPartnerEventAnnouncement(client, partnerEventId, options = {}
     if (isLive) {
         embedTitle = `⚡ LIVE NOW: ${evt.title}`;
         embedColor = 0xff1744; // Glowing Red
-        messageContent = `🚨 **${partner.name} is LIVE NOW in VRChat!** @everyone`;
+        messageContent = `🚨 **${partner.name} is LIVE NOW in VRChat!** <@&1537971879330058250>`;
     } else if (isEnded) {
         embedTitle = `🏁 EVENT CONCLUDED: ${evt.title}`;
         embedColor = 0x555555; // Muted Dark Gray

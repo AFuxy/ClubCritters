@@ -105,7 +105,20 @@ router.get('/partner/:slug', async (req, res) => {
             });
         }
 
-        res.render('partner', { user: req.user || null, page: 'partner', partner });
+        let coOwners = [];
+        if (partner.coOwnerDiscordIds) {
+            let coOwnerIds = [];
+            try {
+                coOwnerIds = typeof partner.coOwnerDiscordIds === 'string' ? JSON.parse(partner.coOwnerDiscordIds) : partner.coOwnerDiscordIds;
+            } catch(e) {}
+            if (Array.isArray(coOwnerIds) && coOwnerIds.length > 0) {
+                coOwners = await Roster.findAll({
+                    where: { discordId: coOwnerIds, isBanned: false }
+                });
+            }
+        }
+
+        res.render('partner', { user: req.user || null, page: 'partner', partner, coOwners });
     } catch (err) {
         console.error("Error loading partner detail page:", err);
         res.status(500).send("Error loading partner page");
@@ -221,11 +234,24 @@ router.get('/performer/:id', async (req, res) => {
                 activeSlot = scheduleItem;
             }
         }
+        // Find partnered clubs this user owns or belongs to as co-owner
+        const partneredClubs = await Partner.findAll({
+            where: {
+                isApproved: true,
+                [Op.or]: [
+                    { ownerDiscordId: performer.discordId },
+                    { coOwnerDiscordIds: { [Op.like]: `%"${performer.discordId}"%` } },
+                    { coOwnerDiscordIds: { [Op.like]: `%${performer.discordId}%` } }
+                ]
+            }
+        });
+
         res.render('performer', { 
             performer, 
             displayName, 
             archives, 
             eventCount,
+            partneredClubs,
             liveStatus, 
             activeSlot, 
             eventStartTime: settings ? settings.eventStartTime : null,
