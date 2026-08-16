@@ -1,4 +1,26 @@
 <div id="main-nav" class="nav-container">
+    <% if (typeof user !== 'undefined' && user) { %>
+        <% 
+            let panelLink = '/panel';
+            let panelLabel = 'Panel';
+            const navUserType = (user.type || "").toLowerCase();
+            const isStaffNavUser = ['host', 'staff', 'owner'].some(r => navUserType.includes(r));
+            if (page === 'archive') {
+                panelLink = '/panel/archives';
+                panelLabel = 'Archive Panel';
+            } else if (page === 'events' && isStaffNavUser) {
+                panelLink = '/panel/schedule';
+                panelLabel = 'Schedule Panel';
+            } else if ((page === 'partners' || page === 'partner') && (isStaffNavUser || navUserType.includes('partner'))) {
+                panelLink = '/panel/partner';
+                panelLabel = 'Partner Panel';
+            }
+        %>
+        <a href="<%= panelLink %>" class="btn-cc nav-pill-cc floating-panel-btn" style="position: fixed; top: 20px; left: 20px; z-index: 999; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); backdrop-filter: blur(10px); color: #fff; font-size: 0.8rem; padding: 6px 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); text-transform: none; letter-spacing: 0.5px; transition: all 0.2s ease;">
+            ⚙️ <%= panelLabel %>
+        </a>
+    <% } %>
+
     <% if (page === 'index') { %>
         <a href="/archive" id="archive-link" class="btn-cc nav-pill-cc">Archive</a>
         <a href="/events" id="events-link" class="btn-cc nav-pill-cc">Events</a>

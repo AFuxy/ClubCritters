@@ -227,6 +227,7 @@ router.get('/performer/:id', async (req, res) => {
             liveStatus, 
             activeSlot, 
             eventStartTime: settings ? settings.eventStartTime : null,
+            user: req.user || null,
             page: 'performer'
         });
     } catch (err) { res.status(500).send('Error'); }

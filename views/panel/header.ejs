@@ -62,6 +62,24 @@
 
     <div class="nav-bar">
         <img src="/cdn/logos/club/Logo.png" alt="Logo" class="nav-logo">
+        <%
+            let returnLink = '/';
+            let returnLabel = 'Public Hub';
+            if (page === 'archives') {
+                returnLink = '/archive';
+                returnLabel = 'Public Archive';
+            } else if (page === 'schedule') {
+                returnLink = '/events';
+                returnLabel = 'Public Events';
+            } else if (page === 'partner' || page === 'partners') {
+                returnLink = '/partners';
+                returnLabel = 'Public Partners';
+            } else if (page === 'roster') {
+                returnLink = '/djs';
+                returnLabel = 'Public DJs';
+            }
+        %>
+        <a href="<%= returnLink %>" class="btn-cc nav-pill-cc" style="margin-right: 15px; font-size: 0.8rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15);">&larr; <%= returnLabel %></a>
         <% const userType = (user.type || "").toLowerCase(); %>
         <a href="/panel/profile" class="btn-cc nav-pill-cc <%= page === 'profile' ? 'active' : '' %>">👤 Profile</a>
         

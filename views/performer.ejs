@@ -313,6 +313,9 @@
 
     <div class="hero">
         <a href="<%= backUrl %>" class="btn-cc nav-pill-cc" style="position: absolute; top: 30px; left: 30px; z-index: 10;"><%- backLabel %></a>
+        <% if (typeof user !== 'undefined' && user) { %>
+            <a href="/panel" class="btn-cc nav-pill-cc" style="position: absolute; top: 30px; right: 30px; z-index: 10; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #fff;">⚙️ Panel</a>
+        <% } %>
         
         <div class="profile-header">
             <div class="profile-img-wrap">
