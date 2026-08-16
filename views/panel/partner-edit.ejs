@@ -180,7 +180,7 @@
                                             <button type="button" class="btn-cc btn-small btn-dark" onclick="triggerEditEvent(<%= evt.id %>)">
                                                 Edit
                                             </button>
-                                            <button type="button" class="btn-cc btn-small btn-danger" onclick="deletePartnerEvent(<%= evt.id %>)">
+                                            <button type="button" class="btn-cc btn-small btn-danger" onclick="openDeleteEventModal(<%= evt.id %>)">
                                                 Delete
                                             </button>
                                         </div>
@@ -251,10 +251,10 @@
                                                 🤝 Co-Owner
                                             </span>
                                             <% if (isPrimaryOwner) { %>
-                                                <button type="button" class="btn-cc btn-small" style="font-size: 0.72rem; padding: 3px 8px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: #ffd700;" onclick="transferOwnership('<%= co.discordId %>', '<%= co.name.replace(/'/g, "\\'") %>')">
+                                                <button type="button" class="btn-cc btn-small" style="font-size: 0.72rem; padding: 3px 8px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: #ffd700;" onclick="openTransferModal('<%= co.discordId %>', '<%= co.name.replace(/'/g, "\\'") %>')">
                                                     👑 Transfer Owner
                                                 </button>
-                                                <button type="button" class="btn-cc btn-small btn-danger" style="font-size: 0.72rem; padding: 3px 8px;" onclick="removeCoOwner('<%= co.discordId %>', '<%= co.name.replace(/'/g, "\\'") %>')">
+                                                <button type="button" class="btn-cc btn-small btn-danger" style="font-size: 0.72rem; padding: 3px 8px;" onclick="openRemoveCoOwnerModal('<%= co.discordId %>', '<%= co.name.replace(/'/g, "\\'") %>')">
                                                     ✕ Remove
                                                 </button>
                                             <% } %>
@@ -872,21 +872,49 @@
         }
     }
 
-    async function deletePartnerEvent(eventId) {
-        if (!confirm('Are you sure you want to delete this event?')) return;
+    // --- DELETE EVENT MODAL LOGIC ---
+    let pendingDeleteEventId = null;
+
+    function openDeleteEventModal(eventId) {
+        pendingDeleteEventId = eventId;
+        const modal = document.getElementById('delete-event-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeDeleteEventModal() {
+        pendingDeleteEventId = null;
+        const modal = document.getElementById('delete-event-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmDeletePartnerEvent() {
+        if (!pendingDeleteEventId) return;
+        const btn = document.getElementById('delete-event-confirm-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Deleting...';
+        }
+
         try {
-            const res = await fetch(`/api/partner/events/${eventId}`, {
+            const res = await fetch(`/api/partner/events/${pendingDeleteEventId}`, {
                 method: 'DELETE'
             });
             const data = await res.json();
+            closeDeleteEventModal();
             if (data.success) {
-                showNotify('Event deleted', 'success');
+                showNotify('Event deleted successfully', 'success');
                 setTimeout(() => window.location.reload(), 500);
             } else {
                 showNotify(data.error || 'Failed to delete event', 'error');
             }
         } catch (err) {
+            closeDeleteEventModal();
             showNotify('Error deleting event', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'Delete Event';
+            }
         }
     }
 
@@ -972,53 +1000,105 @@
         }
     }
 
-    async function removeCoOwner(discordId, name) {
-        const partnerId = document.getElementById('partner-id') ? document.getElementById('partner-id').value : null;
-        if (!partnerId) return;
+    // --- REMOVE CO-OWNER MODAL LOGIC ---
+    let pendingRemoveCoOwnerId = null;
 
-        if (!confirm(`Are you sure you want to remove ${name} from this club's co-owners?`)) {
-            return;
+    function openRemoveCoOwnerModal(discordId, name) {
+        pendingRemoveCoOwnerId = discordId;
+        const nameEl = document.getElementById('remove-coowner-name');
+        if (nameEl) nameEl.innerText = name;
+        const modal = document.getElementById('remove-coowner-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeRemoveCoOwnerModal() {
+        pendingRemoveCoOwnerId = null;
+        const modal = document.getElementById('remove-coowner-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmRemoveCoOwner() {
+        const partnerId = document.getElementById('partner-id') ? document.getElementById('partner-id').value : null;
+        if (!partnerId || !pendingRemoveCoOwnerId) return;
+
+        const btn = document.getElementById('remove-coowner-confirm-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Removing...';
         }
 
         try {
-            const res = await fetch(`/api/partner/${partnerId}/co-owners/${discordId}`, {
+            const res = await fetch(`/api/partner/${partnerId}/co-owners/${pendingRemoveCoOwnerId}`, {
                 method: 'DELETE'
             });
             const data = await res.json();
+            closeRemoveCoOwnerModal();
             if (res.ok && data.success) {
-                showNotify(`Removed ${name} from co-owners.`, 'success');
+                showNotify('Removed co-owner successfully.', 'success');
                 setTimeout(() => window.location.reload(), 1000);
             } else {
                 showNotify(data.error || 'Failed to remove co-owner', 'error');
             }
         } catch(e) {
+            closeRemoveCoOwnerModal();
             showNotify('Network error removing co-owner', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = '✕ Remove Co-Owner';
+            }
         }
     }
 
-    async function transferOwnership(discordId, name) {
-        const partnerId = document.getElementById('partner-id') ? document.getElementById('partner-id').value : null;
-        if (!partnerId) return;
+    // --- TRANSFER OWNERSHIP MODAL LOGIC ---
+    let pendingTransferDiscordId = null;
 
-        if (!confirm(`⚠️ ARE YOU SURE?\n\nYou are about to transfer PRIMARY OWNERSHIP of this club to ${name}.\n\nYou will remain a Co-Owner.`)) {
-            return;
+    function openTransferModal(discordId, name) {
+        pendingTransferDiscordId = discordId;
+        const nameEl = document.getElementById('transfer-owner-target-name');
+        if (nameEl) nameEl.innerText = name;
+        const modal = document.getElementById('transfer-owner-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeTransferModal() {
+        pendingTransferDiscordId = null;
+        const modal = document.getElementById('transfer-owner-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmTransferOwnership() {
+        const partnerId = document.getElementById('partner-id') ? document.getElementById('partner-id').value : null;
+        if (!partnerId || !pendingTransferDiscordId) return;
+
+        const btn = document.getElementById('transfer-owner-confirm-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Transferring...';
         }
 
         try {
             const res = await fetch(`/api/partner/${partnerId}/transfer-ownership`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetDiscordId: discordId })
+                body: JSON.stringify({ targetDiscordId: pendingTransferDiscordId })
             });
             const data = await res.json();
+            closeTransferModal();
             if (res.ok && data.success) {
-                showNotify(`Primary ownership transferred to ${name}!`, 'success');
+                showNotify('Primary ownership transferred successfully!', 'success');
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 showNotify(data.error || 'Failed to transfer ownership', 'error');
             }
         } catch(e) {
+            closeTransferModal();
             showNotify('Network error transferring ownership', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = '👑 Confirm & Transfer Ownership';
+            }
         }
     }
 </script>
@@ -1043,6 +1123,80 @@
             </button>
             <button id="discord-modal-confirm-btn" type="button" class="btn-cc btn-small btn-primary" style="background: #5865F2; border-color: #5865F2;" onclick="confirmPostDiscordAnnouncement()">
                 Post Announcement Now
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- TRANSFER OWNERSHIP CONFIRMATION MODAL -->
+<div id="transfer-owner-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div style="background: #121821; border: 1px solid #ffd700; border-radius: 16px; width: 90%; max-width: 480px; padding: 25px; box-shadow: 0 15px 40px rgba(255,215,0,0.25); position: relative; text-align: left;">
+        <h3 style="margin-top: 0; margin-bottom: 8px; color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+            <span style="color: #ffd700;">👑</span> Transfer Club Ownership
+        </h3>
+        
+        <p style="font-size: 0.95rem; color: #fff; line-height: 1.5; margin-bottom: 12px;">
+            Are you sure you want to transfer <strong>Primary Ownership</strong> of this club to <strong id="transfer-owner-target-name" style="color: #ffd700;"></strong>?
+        </p>
+        
+        <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 20px; background: rgba(255,215,0,0.08); border: 1px solid rgba(255,215,0,0.25); padding: 12px 14px; border-radius: 10px;">
+            ⚠️ <strong style="color: #ffd700;">Important:</strong> They will become the primary owner. You will remain an active <strong>Co-Owner</strong> with full editing permissions unless removed.
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" class="btn-cc btn-small btn-dark" onclick="closeTransferModal()">
+                Cancel
+            </button>
+            <button id="transfer-owner-confirm-btn" type="button" class="btn-cc btn-small" style="background: #ffd700; color: #000; font-weight: bold; border-color: #ffd700;" onclick="confirmTransferOwnership()">
+                👑 Confirm & Transfer Ownership
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- REMOVE CO-OWNER CONFIRMATION MODAL -->
+<div id="remove-coowner-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div style="background: #121821; border: 1px solid #ef4444; border-radius: 16px; width: 90%; max-width: 460px; padding: 25px; box-shadow: 0 15px 40px rgba(239,68,68,0.25); position: relative; text-align: left;">
+        <h3 style="margin-top: 0; margin-bottom: 8px; color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+            <span style="color: #ef4444;">✕</span> Remove Co-Owner
+        </h3>
+        
+        <p style="font-size: 0.95rem; color: #fff; line-height: 1.5; margin-bottom: 12px;">
+            Are you sure you want to remove <strong id="remove-coowner-name" style="color: #ef4444;"></strong> from this club's co-owners?
+        </p>
+        
+        <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 20px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); padding: 12px 14px; border-radius: 10px;">
+            They will immediately lose access to edit this club profile and manage its showcase events.
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" class="btn-cc btn-small btn-dark" onclick="closeRemoveCoOwnerModal()">
+                Cancel
+            </button>
+            <button id="remove-coowner-confirm-btn" type="button" class="btn-cc btn-small btn-danger" onclick="confirmRemoveCoOwner()">
+                ✕ Remove Co-Owner
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE EVENT CONFIRMATION MODAL -->
+<div id="delete-event-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div style="background: #121821; border: 1px solid #ef4444; border-radius: 16px; width: 90%; max-width: 440px; padding: 25px; box-shadow: 0 15px 40px rgba(239,68,68,0.25); position: relative; text-align: left;">
+        <h3 style="margin-top: 0; margin-bottom: 8px; color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+            <span style="color: #ef4444;">🗑️</span> Delete Partner Event
+        </h3>
+        
+        <p style="font-size: 0.95rem; color: #fff; line-height: 1.5; margin-bottom: 20px;">
+            Are you sure you want to permanently delete this event? This action cannot be undone.
+        </p>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" class="btn-cc btn-small btn-dark" onclick="closeDeleteEventModal()">
+                Cancel
+            </button>
+            <button id="delete-event-confirm-btn" type="button" class="btn-cc btn-small btn-danger" onclick="confirmDeletePartnerEvent()">
+                Delete Event
             </button>
         </div>
     </div>
