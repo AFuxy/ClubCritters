@@ -380,7 +380,7 @@ router.post('/partner/:id/co-owners/add', isAuthenticated, isPartnerOrStaff, asy
                 discordId: discordId,
                 name: initialName,
                 type: JSON.stringify(['Partner']),
-                title: 'Partner Co-Owner',
+                title: '',
                 imageUrl: initialAvatar,
                 links: {}
             });

@@ -179,12 +179,12 @@ router.get('/discord', (req, res) => {
 router.get('/flyer', (req, res) => { res.render('flyer', { user: req.user || null, page: 'flyer' }); });
 router.get('/overlay', (req, res) => { res.render('overlay', { layout: false }); });
 
-router.get('/performer/:id', async (req, res) => {
+router.get('/profile/:id', async (req, res) => {
     try {
         const performer = await Roster.findByPk(req.params.id);
         if (!performer || performer.isBanned) return res.status(404).render('error', {
             title: 'Lost the Scent!',
-            message: "This performer's trail has gone cold. They might have left the club or moved on to new adventures!",
+            message: "This member's trail has gone cold. They might have left the club or moved on to new adventures!",
             icon: '🐾',
             buttons: [{ label: 'Back to the Den', link: '/', class: 'btn-primary' }]
         });
@@ -246,7 +246,7 @@ router.get('/performer/:id', async (req, res) => {
             }
         });
 
-        res.render('performer', { 
+        res.render('profile', { 
             performer, 
             displayName, 
             archives, 
@@ -256,9 +256,13 @@ router.get('/performer/:id', async (req, res) => {
             activeSlot, 
             eventStartTime: settings ? settings.eventStartTime : null,
             user: req.user || null,
-            page: 'performer'
+            page: 'profile'
         });
     } catch (err) { res.status(500).send('Error'); }
+});
+
+router.get('/performer/:id', (req, res) => {
+    res.redirect(301, `/profile/${req.params.id}`);
 });
 
 router.get('/login-error', (req, res) => { 

@@ -110,7 +110,7 @@ function renderEvents(events) {
                     <div class="lineup-djs-grid" style="display:flex; flex-wrap:wrap; gap:12px; width:100%;">
                         ${event.performers.map(p => {
                             const nameColor = p.colorStyle || 'inherit';
-                            const profileUrl = `/performer/${p.discordId}`;
+                            const profileUrl = `/profile/${p.discordId}`;
                             
                             const links = p.links || {};
                             const linksHtml = Object.keys(links).map(label => 

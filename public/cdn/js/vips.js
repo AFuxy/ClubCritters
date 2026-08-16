@@ -167,7 +167,7 @@ function renderCards(members, container) {
         if (processedColor) card.style.setProperty('--accent-color', processedColor);
 
         card.style.cursor = "pointer";
-        card.onclick = () => window.location.href = `/performer/${member.discordId}`;
+        card.onclick = () => window.location.href = `/profile/${member.discordId}`;
 
         card.innerHTML = `
             <img src="${member.imageUrl || '/cdn/logos/club/Logo.png'}" alt="${member.name}" class="dj-img" style="border-color: rgba(255, 215, 0, 0.4);">
