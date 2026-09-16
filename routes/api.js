@@ -1497,6 +1497,108 @@ router.post('/roster/:id/sync-vrc-roles', isHostOrOwner, async (req, res) => {
     }
 });
 
+// Upload Avatar for a Roster Member (Staff/Host/Owner)
+router.post('/roster/:id/upload-avatar', isStaff, handleUpload('avatar'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const targetUser = await Roster.findByPk(req.params.id);
+        if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+        const isCallerOwner = hasRole(req.user, 'owner');
+        const isCallerHost = hasRole(req.user, 'host');
+
+        const targetIsOwner = hasRole(targetUser, 'owner');
+        const targetIsHost = hasRole(targetUser, 'host');
+        const targetIsStaff = hasRole(targetUser, 'staff');
+
+        // Security hierarchy
+        if (targetIsOwner && !isCallerOwner) {
+            return res.status(403).json({ error: 'Only Owners can modify an Owner account.' });
+        }
+        if (targetIsHost && !isCallerOwner) {
+            return res.status(403).json({ error: 'Only Owners can modify a Host account.' });
+        }
+        if (targetIsStaff && !isCallerOwner && !isCallerHost) {
+            return res.status(403).json({ error: 'Staff cannot modify another Staff account.' });
+        }
+
+        const isAnimated = req.file.mimetype === 'image/gif' || req.file.mimetype === 'image/webp';
+        const filename = `${targetUser.discordId}_${Date.now()}.webp`;
+        const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'avatars');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const filePath = path.join(uploadDir, filename);
+        const webPath = `/uploads/avatars/${filename}`;
+
+        let pipeline = sharp(req.file.buffer, { animated: isAnimated });
+        pipeline = pipeline.resize(512, 512, { fit: 'cover', position: 'center' });
+
+        await pipeline.webp({ effort: 6, quality: 80, lossless: false }).toFile(filePath);
+
+        // Delete old custom avatar if it exists
+        if (targetUser.imageUrl && targetUser.imageUrl.startsWith('/uploads/avatars/')) {
+            const oldPath = path.join(__dirname, '..', 'public', targetUser.imageUrl);
+            if (fs.existsSync(oldPath)) {
+                try { fs.unlinkSync(oldPath); } catch (e) {}
+            }
+        }
+
+        await targetUser.update({ imageUrl: webPath });
+
+        res.json({ success: true, imageUrl: webPath });
+    } catch (err) {
+        console.error("Staff Avatar Upload Error:", err);
+        res.status(500).json({ error: err.message || 'Failed to upload avatar' });
+    }
+});
+
+// Reset Avatar to Discord for a Roster Member (Staff/Host/Owner)
+router.post('/roster/:id/reset-avatar', isStaff, async (req, res) => {
+    try {
+        const targetUser = await Roster.findByPk(req.params.id);
+        if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+        const isCallerOwner = hasRole(req.user, 'owner');
+        const isCallerHost = hasRole(req.user, 'host');
+
+        const targetIsOwner = hasRole(targetUser, 'owner');
+        const targetIsHost = hasRole(targetUser, 'host');
+        const targetIsStaff = hasRole(targetUser, 'staff');
+
+        // Security hierarchy
+        if (targetIsOwner && !isCallerOwner) {
+            return res.status(403).json({ error: 'Only Owners can modify an Owner account.' });
+        }
+        if (targetIsHost && !isCallerOwner) {
+            return res.status(403).json({ error: 'Only Owners can modify a Host account.' });
+        }
+        if (targetIsStaff && !isCallerOwner && !isCallerHost) {
+            return res.status(403).json({ error: 'Staff cannot modify another Staff account.' });
+        }
+
+        // Delete old custom avatar if it exists
+        if (targetUser.imageUrl && targetUser.imageUrl.startsWith('/uploads/avatars/')) {
+            const oldPath = path.join(__dirname, '..', 'public', targetUser.imageUrl);
+            if (fs.existsSync(oldPath)) {
+                try { fs.unlinkSync(oldPath); } catch (e) {}
+            }
+        }
+
+        // Fetch fresh Discord avatar
+        const member = await getGuildMember(targetUser.discordId).catch(() => null);
+        const discordAvatar = member && member.avatar ? member.avatar : '/cdn/logos/club/Logo.png';
+
+        await targetUser.update({ imageUrl: discordAvatar });
+
+        res.json({ success: true, imageUrl: discordAvatar });
+    } catch (err) {
+        console.error("Staff Avatar Reset Error:", err);
+        res.status(500).json({ error: err.message || 'Failed to reset avatar' });
+    }
+});
+
 router.delete('/roster/:id', isAuthenticated, isOwner, async (req, res) => {
     try {
         await Roster.destroy({ where: { discordId: req.params.id } });

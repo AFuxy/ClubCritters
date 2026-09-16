@@ -68,6 +68,29 @@
     <div class="staff-section" style="width: 90%; max-width: 550px; margin-bottom: 0; border: 1px solid var(--primary-blue); max-height: 90vh; overflow-y: auto;">
         <h2 id="edit-modal-title">Edit User</h2>
         
+        <!-- Profile Picture Section -->
+        <div class="form-group" style="display: flex; align-items: center; gap: 16px; background: rgba(0,0,0,0.25); padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;">
+            <div style="position: relative; width: 68px; height: 68px; flex-shrink: 0;">
+                <img id="edit-user-avatar-preview" src="/cdn/logos/club/Logo.png" alt="Avatar" onerror="this.src='/cdn/logos/club/Logo.png'" style="width: 68px; height: 68px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-blue); box-shadow: 0 0 15px rgba(41, 197, 246, 0.25);">
+                <div id="avatar-upload-spinner" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.65); border-radius: 50%; align-items: center; justify-content: center;">
+                    <div style="width: 22px; height: 22px; border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--primary-blue); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                </div>
+            </div>
+            <div style="flex: 1; min-width: 0;">
+                <label style="margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #fff;">Profile Picture</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" id="edit-user-avatar-upload-btn" class="btn-cc btn-small btn-secondary" style="font-size: 0.75rem; padding: 5px 12px; margin: 0; background: rgba(41, 197, 246, 0.2); border-color: rgba(41, 197, 246, 0.5);" onclick="document.getElementById('edit-user-avatar-file').click()">
+                        📁 Upload PFP
+                    </button>
+                    <button type="button" id="edit-user-avatar-reset" class="btn-cc btn-small btn-dark" style="font-size: 0.75rem; padding: 5px 10px; margin: 0; color: #aaa;" onclick="resetUserAvatar()">
+                        🔄 Reset to Discord
+                    </button>
+                </div>
+                <input type="file" id="edit-user-avatar-file" accept="image/png, image/jpeg, image/gif, image/webp" style="display: none;" onchange="uploadMemberAvatar(this)">
+                <p style="font-size: 0.7rem; color: #777; margin: 6px 0 0 0;">Supports PNG, JPG, GIF, WebP (Max 10MB). Automatically formatted.</p>
+            </div>
+        </div>
+
         <% const isUpperStaff = isUserOwner || isUserHost; %>
 
         <div class="form-group">
@@ -159,6 +182,7 @@
     const FALLBACK_IMAGE = "/cdn/logos/club/Logo.png";
     
     let currentEditId = null;
+    let currentEditMember = null;
     let currentPage = 1;
     let currentLimit = 15;
     let currentTotalPages = 1;
@@ -269,6 +293,8 @@
                     <div style="flex: 1; display: flex; align-items: center; gap: 15px; padding-left: 10px;">
                         <img src="${m.imageUrl || FALLBACK_IMAGE}" 
                              onerror="this.src='${FALLBACK_IMAGE}'"
+                             class="roster-avatar-img"
+                             data-id="${m.discordId}"
                              style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid; border-color: ${m.isBanned ? 'var(--accent-red)' : (isGradient ? 'var(--primary-blue)' : accent)};">
                         <div>
                             <strong style="font-size: 1.15rem; background: ${accent}; -webkit-background-clip: text; -webkit-text-fill-color: ${isGradient ? 'transparent' : 'initial'}; color: ${isGradient ? 'transparent' : accent};">${escapeHtml(m.name)}</strong>
@@ -385,7 +411,18 @@
 
     function openEditModal(m) {
         currentEditId = m.discordId;
+        currentEditMember = m;
         document.getElementById('edit-modal-title').innerText = `Edit ${m.name}`;
+        
+        const avatarPreview = document.getElementById('edit-user-avatar-preview');
+        if (avatarPreview) {
+            avatarPreview.src = m.imageUrl || FALLBACK_IMAGE;
+        }
+        const fileInput = document.getElementById('edit-user-avatar-file');
+        if (fileInput) fileInput.value = '';
+        const spinner = document.getElementById('avatar-upload-spinner');
+        if (spinner) spinner.style.display = 'none';
+
         editNameInput.value = m.name;
         editTitleInput.value = m.title || '';
         editBannedCheckbox.checked = !!m.isBanned;
@@ -414,7 +451,12 @@
     function closeEditModal() {
         editModal.style.display = 'none';
         currentEditId = null;
+        currentEditMember = null;
         currentEditRoles.clear();
+        const fileInput = document.getElementById('edit-user-avatar-file');
+        if (fileInput) fileInput.value = '';
+        const spinner = document.getElementById('avatar-upload-spinner');
+        if (spinner) spinner.style.display = 'none';
     }
 
     function getSelectedRoles() {
@@ -485,6 +527,95 @@
             }
         } catch (e) {
             showNotify('Network error syncing roles.', 'error');
+        }
+    }
+
+    async function uploadMemberAvatar(input) {
+        if (!currentEditId || !input.files || !input.files[0]) return;
+        const file = input.files[0];
+
+        // Max 10MB check
+        if (file.size > 10 * 1024 * 1024) {
+            showNotify('File is too large! Maximum allowed size is 10MB.', 'error');
+            input.value = '';
+            return;
+        }
+
+        const spinner = document.getElementById('avatar-upload-spinner');
+        const uploadBtn = document.getElementById('edit-user-avatar-upload-btn');
+        const resetBtn = document.getElementById('edit-user-avatar-reset');
+        if (spinner) spinner.style.display = 'flex';
+        if (uploadBtn) uploadBtn.disabled = true;
+        if (resetBtn) resetBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        showNotify('Uploading profile picture...');
+        try {
+            const res = await fetch(`/api/roster/${currentEditId}/upload-avatar`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                const newUrl = data.imageUrl + '?t=' + Date.now();
+                const avatarPreview = document.getElementById('edit-user-avatar-preview');
+                if (avatarPreview) avatarPreview.src = newUrl;
+
+                if (currentEditMember) currentEditMember.imageUrl = data.imageUrl;
+                const listItemImg = document.querySelector(`.roster-avatar-img[data-id="${currentEditId}"]`);
+                if (listItemImg) listItemImg.src = newUrl;
+
+                showNotify('Profile picture updated successfully!');
+            } else {
+                showNotify(data.error || 'Failed to upload avatar.', 'error');
+            }
+        } catch (err) {
+            showNotify('Network error uploading avatar.', 'error');
+        } finally {
+            if (spinner) spinner.style.display = 'none';
+            if (uploadBtn) uploadBtn.disabled = false;
+            if (resetBtn) resetBtn.disabled = false;
+            input.value = '';
+        }
+    }
+
+    async function resetUserAvatar() {
+        if (!currentEditId) return;
+
+        const spinner = document.getElementById('avatar-upload-spinner');
+        const uploadBtn = document.getElementById('edit-user-avatar-upload-btn');
+        const resetBtn = document.getElementById('edit-user-avatar-reset');
+        if (spinner) spinner.style.display = 'flex';
+        if (uploadBtn) uploadBtn.disabled = true;
+        if (resetBtn) resetBtn.disabled = true;
+
+        showNotify('Resetting avatar to Discord...');
+        try {
+            const res = await fetch(`/api/roster/${currentEditId}/reset-avatar`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                const newUrl = data.imageUrl + '?t=' + Date.now();
+                const avatarPreview = document.getElementById('edit-user-avatar-preview');
+                if (avatarPreview) avatarPreview.src = newUrl;
+
+                if (currentEditMember) currentEditMember.imageUrl = data.imageUrl;
+                const listItemImg = document.querySelector(`.roster-avatar-img[data-id="${currentEditId}"]`);
+                if (listItemImg) listItemImg.src = newUrl;
+
+                showNotify('Avatar reset to Discord profile picture!');
+            } else {
+                showNotify(data.error || 'Failed to reset avatar.', 'error');
+            }
+        } catch (err) {
+            showNotify('Network error resetting avatar.', 'error');
+        } finally {
+            if (spinner) spinner.style.display = 'none';
+            if (uploadBtn) uploadBtn.disabled = false;
+            if (resetBtn) resetBtn.disabled = false;
         }
     }
 
