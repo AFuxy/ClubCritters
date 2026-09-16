@@ -557,8 +557,14 @@
                 method: 'POST',
                 body: formData
             });
-            const data = await res.json();
-            if (res.ok && data.success) {
+
+            let data = null;
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                data = await res.json().catch(() => null);
+            }
+
+            if (res.ok && data && data.success) {
                 const newUrl = data.imageUrl + '?t=' + Date.now();
                 const avatarPreview = document.getElementById('edit-user-avatar-preview');
                 if (avatarPreview) avatarPreview.src = newUrl;
@@ -568,8 +574,10 @@
                 if (listItemImg) listItemImg.src = newUrl;
 
                 showNotify('Profile picture updated successfully!');
+            } else if (res.status === 413) {
+                showNotify('Upload rejected by web server (413 Payload Too Large). If behind Nginx, client_max_body_size must be set to 25M.', 'error');
             } else {
-                showNotify(data.error || 'Failed to upload avatar.', 'error');
+                showNotify((data && data.error) || `Upload failed with status ${res.status}`, 'error');
             }
         } catch (err) {
             showNotify('Network error uploading avatar.', 'error');

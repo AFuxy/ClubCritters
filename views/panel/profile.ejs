@@ -301,8 +301,15 @@
                 showNotify('Profile picture updated!');
                 document.querySelector('.dj-img').src = data.imageUrl;
                 document.getElementById('pfp-input').value = '';
+            } else if (xhr.status === 413) {
+                showNotify('Upload rejected by web server (413 Payload Too Large). If behind Nginx, client_max_body_size must be set to 25M.', 'error');
             } else {
-                showNotify('Upload failed', 'error');
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    showNotify(data.error || 'Upload failed', 'error');
+                } catch(e) {
+                    showNotify(`Upload failed (Status ${xhr.status})`, 'error');
+                }
             }
         };
 
