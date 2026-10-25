@@ -3,12 +3,12 @@
 <div class="staff-hub">
     <div class="staff-section">
         <h2>Application Manager</h2>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage what roles are open for applications on the public site.</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage recruitment roles, form deadlines, and approval automations for Club FuRN.</p>
 
-        <div id="add-app-form" class="grid-2" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; margin-bottom: 30px;">
+        <div id="add-app-form" class="grid-2" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
             <div class="form-group">
                 <label>Role Name</label>
-                <input type="text" id="app-role-name" placeholder="DJ, Staff, etc.">
+                <input type="text" id="app-role-name" placeholder="DJ, Staff, Dancer, etc.">
             </div>
             <div class="form-group">
                 <label>Role Type (Form Style)</label>
@@ -22,7 +22,7 @@
             </div>
             <div class="form-group">
                 <label>Display Deadline</label>
-                <input type="text" id="app-deadline" placeholder="March 15th">
+                <input type="text" id="app-deadline" placeholder="e.g. March 15th, Midnight UTC">
             </div>
             <div class="form-group">
                 <label>Auto-Close Date (UTC)</label>
@@ -35,26 +35,97 @@
                     <option value="closed">Closed</option>
                 </select>
             </div>
-            <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
-                <input type="checkbox" id="app-is-internal" style="width: auto;" onchange="toggleFormUrl()">
-                <label style="margin: 0;">Use Internal Form</label>
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 25px;">
+                <input type="checkbox" id="app-is-internal" style="width: auto; cursor: pointer;" onchange="toggleFormUrl()">
+                <label style="margin: 0; cursor: pointer;" for="app-is-internal">Use Internal Site Form</label>
             </div>
             <div class="form-group" id="form-url-group">
                 <label>External Form URL</label>
                 <input type="text" id="app-form-url" placeholder="https://forms.gle/...">
             </div>
             <div class="form-group" style="grid-column: span 2;">
-                <label>Description</label>
-                <textarea id="app-description" placeholder="Requirements..."></textarea>
+                <label>Description / Requirements</label>
+                <textarea id="app-description" rows="3" placeholder="Brief requirements or instructions for applicants..."></textarea>
             </div>
-            <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px; grid-column: span 2;">
+
+            <!-- Approval Automations Section -->
+            <div class="form-group" style="grid-column: span 2; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px; margin-top: 5px; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 10px;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+                            <span>⚡</span> On-Approval Automations
+                        </h4>
+                        <p style="font-size: 0.75rem; color: #888; margin: 3px 0 0 0;">Actions executed instantly by the bot when staff clicks "Approve" on an applicant's ticket.</p>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Discord Role Granting -->
+                    <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; user-select: none;">
+                                <input type="checkbox" id="app-give-discord-role" style="width: auto; cursor: pointer;" onchange="toggleDiscordRoleFields()">
+                                <span style="font-weight: 600; font-size: 0.88rem; color: #e0e0e0;">Grant Discord Role</span>
+                            </label>
+                            <span style="font-size: 0.72rem; color: #888;">Assigns a role to the applicant in Discord</span>
+                        </div>
+
+                        <div id="discord-role-config" style="margin-top: 12px; display: none;">
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <select id="app-discord-role-select" style="flex: 1; padding: 8px 12px; border-radius: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff;" onchange="handleDiscordRoleSelectChange()">
+                                    <option value="">-- Loading Discord Roles... --</option>
+                                </select>
+                                <button type="button" class="btn-cc btn-small btn-dark" onclick="fetchDiscordRoles(true)" title="Refresh Roles from Discord" style="padding: 7px 12px; font-size: 0.8rem;">↻ Refresh</button>
+                            </div>
+                            <div id="discord-role-manual-container" style="margin-top: 8px; display: none;">
+                                <input type="text" id="app-discord-role-manual" placeholder="Enter manual Role ID (e.g. 107384920491829...)" style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 0.8rem; border-radius: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                                <span style="font-size: 0.7rem; color: #888; margin-top: 4px; display: block;">Enter the Snowflake ID of the Discord role to assign.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Site Account Creation -->
+                    <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; user-select: none;">
+                                <input type="checkbox" id="app-create-site-account" style="width: auto; cursor: pointer;" onchange="toggleSiteAccountFields()">
+                                <span style="font-weight: 600; font-size: 0.88rem; color: #e0e0e0;">Auto-Create Site Account</span>
+                            </label>
+                            <span style="font-size: 0.72rem; color: #888;">Adds user to roster directory & enables panel login</span>
+                        </div>
+
+                        <div id="site-account-config" style="margin-top: 12px; display: none;">
+                            <label style="font-size: 0.75rem; color: #aaa; margin-bottom: 8px; display: block;">On-Site Roles to Assign:</label>
+                            <div id="site-role-pills" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                <!-- Rendered dynamically -->
+                            </div>
+                            <span style="font-size: 0.7rem; color: #888; margin-top: 8px; display: block;">Click to toggle role tags. If the user already has a roster profile, these roles will be merged into their account.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 10px; grid-column: span 2; margin-top: 10px;">
                 <button id="add-app-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addAppSlot()">Create Slot</button>
                 <button id="cancel-app-edit-btn" class="btn-cc btn-dark btn-small" style="margin: 0; display: none;" onclick="cancelAppEdit()">Cancel</button>
             </div>
         </div>
 
         <div id="apps-list" style="display: flex; flex-direction: column; gap: 15px;">
-            <p style="text-align: center; color: #666;">Loading...</p>
+            <p style="text-align: center; color: #666;">Loading application slots...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Confirmation Modal for Slot Deletion -->
+<div id="delete-slot-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 10000; justify-content: center; align-items: center;">
+    <div style="background: var(--card-bg, #1a1a1a); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 24px; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);">
+        <div style="font-size: 2.2rem; margin-bottom: 12px;">⚠️</div>
+        <h3 style="margin: 0 0 10px 0; font-size: 1.15rem; color: #fff;">Delete Application Slot</h3>
+        <p id="delete-slot-modal-msg" style="font-size: 0.85rem; color: #aaa; margin: 0 0 20px 0; line-height: 1.4;">Are you sure you want to delete this slot? All submissions linked to this slot will remain archived in the database.</p>
+        <div style="display: flex; justify-content: center; gap: 12px;">
+            <button class="btn-cc btn-dark btn-small" onclick="closeDeleteSlotModal()" style="min-width: 90px;">Cancel</button>
+            <button class="btn-cc btn-danger btn-small" id="confirm-delete-slot-btn" onclick="executeDeleteSlot()" style="min-width: 90px;">Delete</button>
         </div>
     </div>
 </div>
@@ -73,7 +144,54 @@
     const addAppBtn = document.getElementById('add-app-btn');
     const cancelAppEditBtn = document.getElementById('cancel-app-edit-btn');
 
+    // Automations inputs
+    const giveDiscordRoleInput = document.getElementById('app-give-discord-role');
+    const discordRoleConfig = document.getElementById('discord-role-config');
+    const discordRoleSelect = document.getElementById('app-discord-role-select');
+    const discordRoleManualContainer = document.getElementById('discord-role-manual-container');
+    const discordRoleManualInput = document.getElementById('app-discord-role-manual');
+
+    const createSiteAccountInput = document.getElementById('app-create-site-account');
+    const siteAccountConfig = document.getElementById('site-account-config');
+    const siteRolePillsContainer = document.getElementById('site-role-pills');
+
     let editAppId = null;
+    let allSlots = [];
+    let discordRolesCache = [];
+    let pendingDeleteId = null;
+
+    const roleDefinitions = {
+        'performer': { name: 'Performer', activeStyle: 'background: rgba(0, 230, 118, 0.25); border-color: #00e676; color: #fff; box-shadow: 0 0 12px rgba(0, 230, 118, 0.35);' },
+        'resident': { name: 'Resident', activeStyle: 'background: rgba(168, 85, 247, 0.25); border-color: #a855f7; color: #fff; box-shadow: 0 0 12px rgba(168, 85, 247, 0.35);' },
+        'staff': { name: 'Staff', activeStyle: 'background: rgba(41, 197, 246, 0.25); border-color: #29c5f6; color: #fff; box-shadow: 0 0 12px rgba(41, 197, 246, 0.35);' },
+        'host': { name: 'Host', activeStyle: 'background: rgba(255, 145, 0, 0.25); border-color: #ff9100; color: #fff; box-shadow: 0 0 12px rgba(255, 145, 0, 0.35);' },
+        'partner': { name: 'Partner', activeStyle: 'background: rgba(88, 101, 242, 0.25); border-color: #5865f2; color: #fff; box-shadow: 0 0 12px rgba(88, 101, 242, 0.35);' },
+        'vip': { name: 'VIP', activeStyle: 'background: rgba(255, 215, 0, 0.25); border-color: #ffd700; color: #fff; box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);' }
+    };
+
+    let selectedSiteRoles = new Set(['performer']);
+
+    function renderSiteRolePills() {
+        siteRolePillsContainer.innerHTML = Object.entries(roleDefinitions).map(([key, def]) => {
+            const isSelected = selectedSiteRoles.has(key);
+            const style = isSelected ? def.activeStyle : 'background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.12); color: #888; box-shadow: none;';
+            return `<button type="button" class="btn-cc btn-small" data-role="${key}" onclick="toggleSiteRole('${key}')" style="border: 1px solid; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; transition: all 0.2s ease; cursor: pointer; ${style}">${def.name}</button>`;
+        }).join('');
+    }
+
+    function toggleSiteRole(roleKey) {
+        if (selectedSiteRoles.has(roleKey)) {
+            if (selectedSiteRoles.size > 1) {
+                selectedSiteRoles.delete(roleKey);
+            } else {
+                showNotify('At least one site role must remain selected.', 'error');
+                return;
+            }
+        } else {
+            selectedSiteRoles.add(roleKey);
+        }
+        renderSiteRolePills();
+    }
 
     function toggleFormUrl() {
         if (isInternalInput.checked) {
@@ -83,38 +201,163 @@
         }
     }
 
+    function toggleDiscordRoleFields() {
+        discordRoleConfig.style.display = giveDiscordRoleInput.checked ? 'block' : 'none';
+    }
+
+    function toggleSiteAccountFields() {
+        siteAccountConfig.style.display = createSiteAccountInput.checked ? 'block' : 'none';
+    }
+
+    function handleDiscordRoleSelectChange() {
+        const val = discordRoleSelect.value;
+        if (val === '__custom__') {
+            discordRoleManualContainer.style.display = 'block';
+            discordRoleManualInput.focus();
+        } else if (val) {
+            discordRoleManualContainer.style.display = 'none';
+            discordRoleManualInput.value = val;
+        } else {
+            discordRoleManualContainer.style.display = 'none';
+            discordRoleManualInput.value = '';
+        }
+    }
+
+    async function fetchDiscordRoles(forceNotify = false) {
+        try {
+            const res = await fetch('/api/discord/roles');
+            if (!res.ok) throw new Error('Could not fetch Discord roles');
+            discordRolesCache = await res.json();
+            
+            const currentValue = discordRoleManualInput.value || discordRoleSelect.value;
+            discordRoleSelect.innerHTML = '<option value="">-- Select Discord Role --</option>' +
+                discordRolesCache.map(r => `<option value="${r.id}" style="color: ${r.color || '#fff'};">${r.name}</option>`).join('') +
+                '<option value="__custom__">⚙️ Enter Custom Role ID...</option>';
+            
+            if (currentValue) {
+                const found = discordRolesCache.some(r => r.id === currentValue);
+                if (found) {
+                    discordRoleSelect.value = currentValue;
+                    discordRoleManualContainer.style.display = 'none';
+                } else {
+                    discordRoleSelect.value = '__custom__';
+                    discordRoleManualContainer.style.display = 'block';
+                    discordRoleManualInput.value = currentValue;
+                }
+            }
+            if (forceNotify) showNotify('Discord roles refreshed!');
+            renderAppListBadges();
+        } catch (err) {
+            console.warn('Failed to load Discord roles:', err);
+            discordRoleSelect.innerHTML = '<option value="">-- Roles Unavailable --</option><option value="__custom__" selected>⚙️ Enter Custom Role ID...</option>';
+            discordRoleManualContainer.style.display = 'block';
+        }
+    }
+
+    function getDiscordRoleIdToSave() {
+        if (!giveDiscordRoleInput.checked) return null;
+        const selectVal = discordRoleSelect.value;
+        const manualVal = discordRoleManualInput.value.trim();
+        if (selectVal === '__custom__' || !selectVal) {
+            return manualVal || null;
+        }
+        return selectVal;
+    }
+
+    function getSelectedSiteRolesToSave() {
+        if (!createSiteAccountInput.checked) return null;
+        const roles = Array.from(selectedSiteRoles).map(k => roleDefinitions[k]?.name || k);
+        return roles.length > 0 ? roles : ['Performer'];
+    }
+
+    function renderAppListBadges() {
+        if (allSlots.length > 0) renderSlots(allSlots);
+    }
+
+    function renderSlots(slots) {
+        if (slots.length === 0) {
+            appsList.innerHTML = '<p style="text-align: center; color: #666;">No application slots configured yet.</p>';
+            return;
+        }
+
+        appsList.innerHTML = slots.map(s => {
+            const isAutoClosed = s.autoCloseAt && new Date(s.autoCloseAt) < new Date();
+            const displayStatus = isAutoClosed ? 'CLOSED (AUTO)' : s.status.toUpperCase();
+            const typeLabel = s.isInternal ? `<span style="font-size:0.7rem; background:var(--primary-blue); color:#000; padding:2px 6px; border-radius:4px; margin-left:10px; font-weight:600;">INTERNAL: ${s.roleType}</span>` : `<span style="font-size:0.7rem; background:rgba(255,255,255,0.1); color:#ccc; padding:2px 6px; border-radius:4px; margin-left:10px;">EXTERNAL</span>`;
+
+            let discordRoleBadge = '';
+            if (s.giveDiscordRole) {
+                let roleName = s.discordRoleId;
+                if (discordRolesCache.length > 0) {
+                    const match = discordRolesCache.find(r => r.id === s.discordRoleId);
+                    if (match) roleName = `@${match.name}`;
+                }
+                discordRoleBadge = `<span style="display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; padding:3px 8px; border-radius:4px; background:rgba(88, 101, 242, 0.15); border:1px solid rgba(88, 101, 242, 0.35); color:#8da2fb;"><i class="fab fa-discord"></i> Role: ${roleName || 'Unset'}</span>`;
+            }
+
+            let siteAccountBadge = '';
+            if (s.createSiteAccount) {
+                let rolesList = 'Performer';
+                if (s.siteRoles) {
+                    try {
+                        const parsed = JSON.parse(s.siteRoles);
+                        if (Array.isArray(parsed)) rolesList = parsed.join(', ');
+                    } catch(e) {
+                        rolesList = s.siteRoles;
+                    }
+                }
+                siteAccountBadge = `<span style="display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; padding:3px 8px; border-radius:4px; background:rgba(0, 230, 118, 0.15); border:1px solid rgba(0, 230, 118, 0.35); color:#00e676;">🌐 Account: ${rolesList}</span>`;
+            }
+
+            const badgesHtml = (discordRoleBadge || siteAccountBadge)
+                ? `<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">${discordRoleBadge}${siteAccountBadge}</div>`
+                : '';
+
+            return `
+            <div class="schedule-item" style="border-left: 4px solid ${isAutoClosed || s.status === 'closed' ? 'var(--accent-red)' : '#00e676'}; background: var(--card-bg); padding: 15px 18px; border-radius: 12px; display:flex; align-items:center; justify-content:space-between; gap:15px; flex-wrap:wrap;">
+                <div style="flex: 1; min-width: 250px;">
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 5px;">
+                        <strong style="font-size: 1.1rem; color: ${isAutoClosed || s.status === 'closed' ? 'var(--accent-red)' : '#00e676'};">${s.roleName}</strong>
+                        ${typeLabel}
+                        <span style="font-size:0.75rem; color:#aaa; margin-left:6px;">— ${displayStatus}</span>
+                    </div>
+                    <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 5px;">
+                        ${s.deadline ? 'Display: <strong>' + s.deadline + '</strong>' : ''}
+                        ${s.autoCloseAt ? ' | Auto-Close: <strong>' + new Date(s.autoCloseAt).toLocaleString() + '</strong>' : ''}
+                    </span>
+                    ${badgesHtml}
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-cc btn-small btn-dark" onclick="startAppEdit(${s.id})">Edit</button>
+                    <button class="btn-cc btn-small btn-danger" onclick="promptDeleteSlot(${s.id})">Delete</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+
     async function loadApps() {
         try {
             const res = await fetch('/api/apps/all');
-            const slots = await res.json();
-            if (slots.length === 0) {
-                appsList.innerHTML = '<p style="text-align: center; color: #666;">No slots yet.</p>';
-                return;
-            }
-            appsList.innerHTML = slots.map(s => {
-                const isAutoClosed = s.autoCloseAt && new Date(s.autoCloseAt) < new Date();
-                const displayStatus = isAutoClosed ? 'CLOSED (AUTO)' : s.status.toUpperCase();
-                const typeLabel = s.isInternal ? `<span style="font-size:0.7rem; background:var(--primary-blue); color:#000; padding:2px 6px; border-radius:4px; margin-left:10px;">INTERNAL: ${s.roleType}</span>` : '';
-                return `
-                <div class="schedule-item" style="border-left: 4px solid ${isAutoClosed || s.status === 'closed' ? 'var(--accent-red)' : '#00e676'}; background: var(--card-bg); padding: 15px; border-radius: 12px;">
-                    <div style="flex: 1;">
-                        <strong style="font-size: 1.1rem; color: ${isAutoClosed || s.status === 'closed' ? 'var(--accent-red)' : '#00e676'};">${s.roleName}${typeLabel} - ${displayStatus}</strong>
-                        <span style="display: block; font-size: 0.8rem; color: #888; margin-top: 5px;">${s.deadline ? 'Display: ' + s.deadline : ''}${s.autoCloseAt ? ' | Auto-Close: ' + new Date(s.autoCloseAt).toLocaleString() : ''}</span>
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn-cc btn-small btn-dark" onclick="startAppEdit(${s.id}, '${s.roleName}', '${s.roleType}', '${s.deadline || ''}', \`${s.description || ''}\`, '${s.formUrl || ''}', '${s.status}', '${s.autoCloseAt || ''}', ${s.isInternal})">Edit</button>
-                        <button class="btn-cc btn-small btn-danger" onclick="deleteAppSlot(${s.id})">Delete</button>
-                    </div>
-                </div>
-                `;
-            }).join('');
-        } catch (e) { appsList.innerHTML = 'Error loading.'; }
+            allSlots = await res.json();
+            renderSlots(allSlots);
+        } catch (e) { appsList.innerHTML = '<p style="text-align: center; color: var(--accent-red);">Failed to load application slots.</p>'; }
     }
 
     async function addAppSlot() {
         if (editAppId) return finishAppEdit();
         const roleName = roleNameInput.value.trim();
-        if (!roleName) return showNotify('Name required', 'error');
+        if (!roleName) return showNotify('Role Name is required!', 'error');
+
+        const giveDiscordRole = giveDiscordRoleInput.checked;
+        const discordRoleId = getDiscordRoleIdToSave();
+        if (giveDiscordRole && !discordRoleId) {
+            return showNotify('Please select or specify a Discord Role ID!', 'error');
+        }
+
+        const createSiteAccount = createSiteAccountInput.checked;
+        const siteRoles = getSelectedSiteRolesToSave();
+
         try {
             const res = await fetch('/api/apps/add', {
                 method: 'POST',
@@ -127,68 +370,189 @@
                     description: descriptionInput.value.trim(), 
                     formUrl: isInternalInput.checked ? '' : formUrlInput.value.trim(), 
                     isInternal: isInternalInput.checked,
-                    status: statusSelect.value 
+                    status: statusSelect.value,
+                    giveDiscordRole,
+                    discordRoleId,
+                    createSiteAccount,
+                    siteRoles
                 })
             });
-            if (res.ok) { showNotify('Created!'); clearForm(); loadApps(); }
-        } catch (e) { showNotify('Error', 'error'); }
+            if (res.ok) {
+                showNotify('Application slot created successfully!');
+                clearForm();
+                loadApps();
+            } else {
+                showNotify('Failed to create application slot.', 'error');
+            }
+        } catch (e) { showNotify('Network error occurred.', 'error'); }
     }
 
-    function startAppEdit(id, name, type, deadline, desc, url, status, autoClose, isInternal) {
+    function startAppEdit(id) {
+        const s = allSlots.find(x => x.id === id);
+        if (!s) return;
         editAppId = id;
-        roleNameInput.value = name;
-        roleTypeSelect.value = type;
-        deadlineInput.value = deadline;
-        descriptionInput.value = desc;
-        formUrlInput.value = url;
-        statusSelect.value = status;
-        isInternalInput.checked = isInternal;
+        roleNameInput.value = s.roleName || '';
+        roleTypeSelect.value = s.roleType || 'DJ';
+        deadlineInput.value = s.deadline || '';
+        descriptionInput.value = s.description || '';
+        formUrlInput.value = s.formUrl || '';
+        statusSelect.value = s.status || 'closed';
+        isInternalInput.checked = !!s.isInternal;
         toggleFormUrl();
-        if (autoClose) autoCloseInput.value = autoClose.slice(0, 16);
+        if (s.autoCloseAt) autoCloseInput.value = s.autoCloseAt.slice(0, 16);
         else autoCloseInput.value = '';
+
+        // Discord Role Automation
+        giveDiscordRoleInput.checked = !!s.giveDiscordRole;
+        toggleDiscordRoleFields();
+        if (s.discordRoleId) {
+            const foundInSelect = discordRolesCache.some(r => r.id === s.discordRoleId);
+            if (foundInSelect) {
+                discordRoleSelect.value = s.discordRoleId;
+                discordRoleManualContainer.style.display = 'none';
+                discordRoleManualInput.value = s.discordRoleId;
+            } else {
+                discordRoleSelect.value = '__custom__';
+                discordRoleManualContainer.style.display = 'block';
+                discordRoleManualInput.value = s.discordRoleId;
+            }
+        } else {
+            discordRoleSelect.value = '';
+            discordRoleManualContainer.style.display = 'none';
+            discordRoleManualInput.value = '';
+        }
+
+        // Site Account Automation
+        createSiteAccountInput.checked = !!s.createSiteAccount;
+        toggleSiteAccountFields();
+        selectedSiteRoles.clear();
+        let slotRoles = ['performer'];
+        if (s.siteRoles) {
+            try {
+                const parsed = JSON.parse(s.siteRoles);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    slotRoles = parsed.map(r => r.toLowerCase());
+                }
+            } catch(e) {
+                if (typeof s.siteRoles === 'string') {
+                    slotRoles = s.siteRoles.split(',').map(r => r.trim().toLowerCase()).filter(Boolean);
+                }
+            }
+        }
+        slotRoles.forEach(r => selectedSiteRoles.add(r));
+        if (selectedSiteRoles.size === 0) selectedSiteRoles.add('performer');
+        renderSiteRolePills();
+
         addAppBtn.innerText = "Save Changes";
         cancelAppEditBtn.style.display = "inline-block";
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async function finishAppEdit() {
+        const roleName = roleNameInput.value.trim();
+        if (!roleName) return showNotify('Role Name is required!', 'error');
+
+        const giveDiscordRole = giveDiscordRoleInput.checked;
+        const discordRoleId = getDiscordRoleIdToSave();
+        if (giveDiscordRole && !discordRoleId) {
+            return showNotify('Please select or specify a Discord Role ID!', 'error');
+        }
+
+        const createSiteAccount = createSiteAccountInput.checked;
+        const siteRoles = getSelectedSiteRolesToSave();
+
         try {
             const res = await fetch(`/api/apps/${editAppId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    roleName: roleNameInput.value.trim(), 
+                    roleName, 
                     roleType: roleTypeSelect.value,
                     deadline: deadlineInput.value.trim(), 
                     autoCloseAt: autoCloseInput.value || null, 
                     description: descriptionInput.value.trim(), 
                     formUrl: isInternalInput.checked ? '' : formUrlInput.value.trim(), 
                     isInternal: isInternalInput.checked,
-                    status: statusSelect.value 
+                    status: statusSelect.value,
+                    giveDiscordRole,
+                    discordRoleId,
+                    createSiteAccount,
+                    siteRoles
                 })
             });
-            if (res.ok) { showNotify('Updated!'); cancelAppEdit(); loadApps(); }
-        } catch (e) { showNotify('Error', 'error'); }
+            if (res.ok) {
+                showNotify('Application slot updated successfully!');
+                cancelAppEdit();
+                loadApps();
+            } else {
+                showNotify('Failed to update slot.', 'error');
+            }
+        } catch (e) { showNotify('Network error occurred.', 'error'); }
     }
 
     function clearForm() {
-        roleNameInput.value = ''; deadlineInput.value = ''; autoCloseInput.value = ''; descriptionInput.value = ''; formUrlInput.value = '';
+        roleNameInput.value = '';
+        deadlineInput.value = '';
+        autoCloseInput.value = '';
+        descriptionInput.value = '';
+        formUrlInput.value = '';
         isInternalInput.checked = false;
         toggleFormUrl();
+
+        giveDiscordRoleInput.checked = false;
+        toggleDiscordRoleFields();
+        discordRoleSelect.value = '';
+        discordRoleManualInput.value = '';
+        discordRoleManualContainer.style.display = 'none';
+
+        createSiteAccountInput.checked = false;
+        toggleSiteAccountFields();
+        selectedSiteRoles.clear();
+        selectedSiteRoles.add('performer');
+        renderSiteRolePills();
     }
 
     function cancelAppEdit() {
-        editAppId = null; clearForm(); addAppBtn.innerText = "Create Slot"; cancelAppEditBtn.style.display = "none";
+        editAppId = null;
+        clearForm();
+        addAppBtn.innerText = "Create Slot";
+        cancelAppEditBtn.style.display = "none";
     }
 
-    async function deleteAppSlot(id) {
-        if (!confirm('Delete?')) return;
+    function promptDeleteSlot(id) {
+        pendingDeleteId = id;
+        const s = allSlots.find(x => x.id === id);
+        const modalMsg = document.getElementById('delete-slot-modal-msg');
+        if (s && modalMsg) {
+            modalMsg.innerText = `Are you sure you want to delete the "${s.roleName}" application slot? All submissions linked to this slot will remain safely archived in the database.`;
+        }
+        document.getElementById('delete-slot-modal').style.display = 'flex';
+    }
+
+    function closeDeleteSlotModal() {
+        pendingDeleteId = null;
+        document.getElementById('delete-slot-modal').style.display = 'none';
+    }
+
+    async function executeDeleteSlot() {
+        if (!pendingDeleteId) return;
+        const idToDelete = pendingDeleteId;
+        closeDeleteSlotModal();
         try {
-            const res = await fetch(`/api/apps/${id}`, { method: 'DELETE' });
-            if (res.ok) { showNotify('Deleted.'); loadApps(); }
-        } catch (e) { showNotify('Error', 'error'); }
+            const res = await fetch(`/api/apps/${idToDelete}`, { method: 'DELETE' });
+            if (res.ok) {
+                showNotify('Application slot deleted.');
+                if (editAppId === idToDelete) cancelAppEdit();
+                loadApps();
+            } else {
+                showNotify('Failed to delete slot.', 'error');
+            }
+        } catch (e) { showNotify('Network error occurred.', 'error'); }
     }
 
+    // Initialize UI
+    renderSiteRolePills();
+    fetchDiscordRoles();
     loadApps();
 </script>
 

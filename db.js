@@ -86,7 +86,11 @@ const AppSlot = sequelize.define('AppSlot', {
     status: { type: DataTypes.ENUM('open', 'closed'), defaultValue: 'closed' },
     deadline: { type: DataTypes.STRING }, // Display string
     autoCloseAt: { type: DataTypes.DATE }, // Machine readable date for auto-close
-    order: { type: DataTypes.INTEGER, defaultValue: 0 }
+    order: { type: DataTypes.INTEGER, defaultValue: 0 },
+    giveDiscordRole: { type: DataTypes.BOOLEAN, defaultValue: false },
+    discordRoleId: { type: DataTypes.STRING, allowNull: true },
+    createSiteAccount: { type: DataTypes.BOOLEAN, defaultValue: false },
+    siteRoles: { type: DataTypes.TEXT, allowNull: true, defaultValue: '["Performer"]' }
 });
 
 // 7. Gallery (Discord Synced)

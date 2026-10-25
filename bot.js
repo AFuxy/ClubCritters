@@ -105,6 +105,129 @@ client.on(Events.InteractionCreate, async interaction => {
 
                 if (action === 'approve') {
                     await submission.update({ status: 'accepted' });
+                    const slot = submission.AppSlot;
+
+                    // 1. Give Discord Role if configured
+                    let discordRoleStatus = null;
+                    if (slot?.giveDiscordRole && slot?.discordRoleId) {
+                        try {
+                            const guildId = interaction.guildId || process.env.DISCORD_GUILD_ID;
+                            let guild = interaction.guild;
+                            if (!guild && guildId) {
+                                guild = await client.guilds.fetch(guildId).catch(() => null);
+                            }
+                            if (guild) {
+                                const member = await guild.members.fetch(submission.discordId).catch(() => null);
+                                if (member) {
+                                    await member.roles.add(slot.discordRoleId);
+                                    discordRoleStatus = `✅ Added Role <@&${slot.discordRoleId}>`;
+                                } else {
+                                    discordRoleStatus = `⚠️ User not found in Discord server`;
+                                }
+                            } else {
+                                discordRoleStatus = `⚠️ Could not access Discord server`;
+                            }
+                        } catch (roleErr) {
+                            console.error("[BOT] Failed to add Discord role on app approval:", roleErr);
+                            discordRoleStatus = `❌ Role assign failed: ${roleErr.message}`;
+                        }
+                    }
+
+                    // 2. Auto-Create / Update Website Account if configured
+                    let rosterStatus = null;
+                    let siteAccountCreatedOrUpdated = false;
+                    if (slot?.createSiteAccount) {
+                        try {
+                            const { Roster } = require('./db');
+                            let siteRolesToAdd = ['Performer'];
+                            if (slot.siteRoles) {
+                                try {
+                                    const parsed = JSON.parse(slot.siteRoles);
+                                    if (Array.isArray(parsed) && parsed.length > 0) siteRolesToAdd = parsed;
+                                } catch (e) {
+                                    if (typeof slot.siteRoles === 'string') {
+                                        siteRolesToAdd = slot.siteRoles.split(',').map(s => s.trim()).filter(Boolean);
+                                    }
+                                }
+                            }
+
+                            const existingRoster = await Roster.findByPk(submission.discordId);
+                            if (existingRoster) {
+                                let existingRoles = [];
+                                const raw = existingRoster.type;
+                                if (Array.isArray(raw)) {
+                                    existingRoles = raw;
+                                } else if (typeof raw === 'string') {
+                                    if (raw.startsWith('[') && raw.endsWith(']')) {
+                                        try { existingRoles = JSON.parse(raw); } catch (e) {}
+                                    } else {
+                                        existingRoles = raw.split(/\s*,\s*|\s*\/\s*/).filter(Boolean);
+                                    }
+                                }
+                                let addedAny = false;
+                                for (const r of siteRolesToAdd) {
+                                    if (!existingRoles.some(er => er.toLowerCase() === r.toLowerCase())) {
+                                        existingRoles.push(r);
+                                        addedAny = true;
+                                    }
+                                }
+                                if (addedAny) {
+                                    await existingRoster.update({ type: JSON.stringify(existingRoles) });
+                                }
+                                rosterStatus = `✅ Profile updated with: **${siteRolesToAdd.join(', ')}**`;
+                                siteAccountCreatedOrUpdated = true;
+                            } else {
+                                let applicantUser = null;
+                                try {
+                                    applicantUser = await client.users.fetch(submission.discordId);
+                                } catch (e) {}
+
+                                let displayName = applicantUser ? (applicantUser.globalName || applicantUser.username) : (submission.discordTag || 'New Member');
+                                let vrcUserId = null;
+                                let vrcDisplayName = null;
+
+                                if (submission.answers) {
+                                    const answers = typeof submission.answers === 'string' ? JSON.parse(submission.answers) : submission.answers;
+                                    for (const [key, val] of Object.entries(answers)) {
+                                        if (typeof val === 'string' && val.trim()) {
+                                            const kLower = key.toLowerCase();
+                                            if (kLower.includes('dj name') || kLower.includes('stage name') || kLower.includes('performer name') || (kLower.includes('name') && !applicantUser?.globalName)) {
+                                                displayName = val.trim();
+                                            }
+                                            if (kLower.includes('vrchat') || kLower.includes('vrc')) {
+                                                const match = val.match(/usr_[a-f0-9-]+/i);
+                                                if (match) {
+                                                    vrcUserId = match[0];
+                                                } else {
+                                                    vrcDisplayName = val.trim();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                const avatarUrl = applicantUser && applicantUser.avatar
+                                    ? applicantUser.displayAvatarURL({ extension: 'png', size: 512 })
+                                    : '/cdn/logos/club/Logo.png';
+
+                                await Roster.create({
+                                    discordId: submission.discordId,
+                                    name: displayName || 'New Member',
+                                    type: JSON.stringify(siteRolesToAdd),
+                                    title: '',
+                                    imageUrl: avatarUrl,
+                                    links: {},
+                                    vrcUserId: vrcUserId,
+                                    vrcDisplayName: vrcDisplayName
+                                });
+                                rosterStatus = `✅ Created site profile as **${displayName}** (${siteRolesToAdd.join(', ')})`;
+                                siteAccountCreatedOrUpdated = true;
+                            }
+                        } catch (rosterErr) {
+                            console.error("[BOT] Failed to create/update roster account on app approval:", rosterErr);
+                            rosterStatus = `❌ Site profile error: ${rosterErr.message}`;
+                        }
+                    }
 
                     const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
                     const fields = originalEmbed.data.fields.map(f => {
@@ -113,6 +236,12 @@ client.on(Events.InteractionCreate, async interaction => {
                     });
                     originalEmbed.setFields(fields);
                     originalEmbed.addFields({ name: 'Decision By', value: `<@${interaction.user.id}>`, inline: true });
+                    if (discordRoleStatus) {
+                        originalEmbed.addFields({ name: 'Discord Role', value: discordRoleStatus, inline: false });
+                    }
+                    if (rosterStatus) {
+                        originalEmbed.addFields({ name: 'Website Account', value: rosterStatus, inline: false });
+                    }
                     originalEmbed.setColor('#00e676');
 
                     await interaction.update({ 
@@ -124,9 +253,16 @@ client.on(Events.InteractionCreate, async interaction => {
                     // DM Applicant
                     try {
                         const applicant = await client.users.fetch(submission.discordId);
-                        await applicant.send({
-                            content: `✨ **Congratulations!** Your application for **${submission.AppSlot.roleName}** at Club FuRN has been **ACCEPTED**! \n\nA staff member will be in touch shortly.`
-                        });
+                        let dmContent = `✨ **Congratulations!** Your application for **${slot?.roleName || 'Club FuRN'}** has been **ACCEPTED**!\n\n`;
+                        if (siteAccountCreatedOrUpdated) {
+                            dmContent += `🌐 **Website Profile:** An account has been created/updated for you on our site! You can log in via Discord at https://clubfurn.com/panel to customize your bio, links, and avatar.\n\n`;
+                        }
+                        if (discordRoleStatus && discordRoleStatus.startsWith('✅')) {
+                            dmContent += `🏷️ **Discord Role:** You have been granted your role in our Discord server!\n\n`;
+                        }
+                        dmContent += `A staff member will also be in touch shortly. Welcome to the team! 🎉`;
+
+                        await applicant.send({ content: dmContent });
                     } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
 
                 } else if (action === 'deny') {

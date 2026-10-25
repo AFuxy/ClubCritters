@@ -1001,6 +1001,38 @@ router.get('/discord/status', isStaff, (req, res) => {
     res.json({ status: getDiscordStatus() });
 });
 
+router.get('/discord/roles', isStaff, async (req, res) => {
+    try {
+        const { client } = require('../bot');
+        if (!client || !client.isReady()) {
+            return res.status(503).json({ error: 'Discord bot is not ready' });
+        }
+        const guildId = process.env.DISCORD_GUILD_ID;
+        if (!guildId) {
+            return res.status(500).json({ error: 'DISCORD_GUILD_ID is not configured' });
+        }
+        const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+        if (!guild) {
+            return res.status(404).json({ error: 'Discord guild not found' });
+        }
+        const roles = await guild.roles.fetch();
+        const formatted = roles
+            .filter(r => r.name !== '@everyone' && !r.managed)
+            .map(r => ({
+                id: r.id,
+                name: r.name,
+                color: r.hexColor !== '#000000' ? r.hexColor : '#99aab5',
+                position: r.position
+            }))
+            .sort((a, b) => b.position - a.position);
+
+        res.json(formatted);
+    } catch (err) {
+        console.error('[API] Error fetching Discord roles:', err);
+        res.status(500).json({ error: 'Failed to fetch roles' });
+    }
+});
+
 router.post('/vrchat/verify', isStaff, async (req, res) => {
     const { code } = req.body;
     const result = await verifyVRC(code);
@@ -1616,17 +1648,60 @@ router.get('/apps/all', isStaff, async (req, res) => {
 
 router.post('/apps/add', isHostOrOwner, async (req, res) => {
     try {
-        const { roleName, roleType, description, formUrl, isInternal, status, deadline, autoCloseAt } = req.body;
-        await AppSlot.create({ roleName, roleType, description, formUrl, isInternal, status, deadline, autoCloseAt });
+        const {
+            roleName,
+            roleType,
+            description,
+            formUrl,
+            isInternal,
+            status,
+            deadline,
+            autoCloseAt,
+            giveDiscordRole,
+            discordRoleId,
+            createSiteAccount,
+            siteRoles
+        } = req.body;
+
+        const normalizedSiteRoles = typeof siteRoles === 'object'
+            ? JSON.stringify(siteRoles)
+            : (siteRoles || '["Performer"]');
+
+        await AppSlot.create({
+            roleName,
+            roleType,
+            description,
+            formUrl,
+            isInternal: !!isInternal,
+            status: status || 'closed',
+            deadline: deadline || null,
+            autoCloseAt: autoCloseAt || null,
+            giveDiscordRole: !!giveDiscordRole,
+            discordRoleId: discordRoleId ? String(discordRoleId).trim() : null,
+            createSiteAccount: !!createSiteAccount,
+            siteRoles: normalizedSiteRoles
+        });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) {
+        console.error('[API] Error adding app slot:', err);
+        res.status(500).json({ error: 'Failed' });
+    }
 });
 
 router.patch('/apps/:id', isHostOrOwner, async (req, res) => {
     try {
-        await AppSlot.update(req.body, { where: { id: req.params.id } });
+        const updates = { ...req.body };
+        if (updates.siteRoles !== undefined && typeof updates.siteRoles === 'object') {
+            updates.siteRoles = JSON.stringify(updates.siteRoles);
+        }
+        if (updates.autoCloseAt === '') updates.autoCloseAt = null;
+        if (updates.discordRoleId === '') updates.discordRoleId = null;
+        await AppSlot.update(updates, { where: { id: req.params.id } });
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) {
+        console.error('[API] Error updating app slot:', err);
+        res.status(500).json({ error: 'Failed' });
+    }
 });
 
 router.delete('/apps/:id', isHostOrOwner, async (req, res) => {
