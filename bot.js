@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, Events, REST, Routes, Collection, EmbedBuilder, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild, auditGroupMembers, autoAnnounceLivePartnerEvents } = require('./utils/bot-utils');
+const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild, auditGroupMembers, autoAnnounceLivePartnerEvents, archiveTicketChannel } = require('./utils/bot-utils');
 require('dotenv').config();
 
 const client = new Client({
@@ -265,7 +265,16 @@ client.on(Events.InteractionCreate, async interaction => {
                         await applicant.send({ content: dmContent });
                     } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
 
+                    // Move ticket channel to top of Archive category
+                    const ticketChannel = interaction.channel || (interaction.channelId ? await client.channels.fetch(interaction.channelId).catch(() => null) : null);
+                    if (ticketChannel) {
+                        await archiveTicketChannel(ticketChannel, `Application accepted by ${interaction.user.tag}`, client);
+                    } else {
+                        console.warn(`[BOT] ⚠️ Could not find ticket channel to archive for accepted submission #${submission.id}`);
+                    }
+
                 } else if (action === 'deny') {
+                    console.log(`[BOT] 🔴 Staff ${interaction.user.tag} clicked Deny on submission #${submissionId}. Showing modal...`);
                     // Show Modal for reason
                     const modal = new ModalBuilder()
                         .setCustomId(`app_deny_modal_${submissionId}`)
@@ -357,36 +366,76 @@ client.on(Events.InteractionCreate, async interaction => {
             const dmReason = rawReason ? `**Reason provided:** ${rawReason}` : "The team didn't provide specific feedback this time, but we'd love to see you keep hanging out in the community and apply again during our next recruitment cycle!";
 
             try {
+                console.log(`[BOT] 📝 Processing denial modal for submission ID #${submissionId}...`);
                 const submission = await ApplicationSubmission.findByPk(submissionId, { include: [AppSlot] });
-                await submission.update({ status: 'declined' });
+                if (!submission) {
+                    console.warn(`[BOT] ⚠️ Submission #${submissionId} not found in database.`);
+                    if (!interaction.replied) await interaction.reply({ content: "❌ Submission not found in database.", flags: MessageFlags.Ephemeral });
+                    return;
+                }
 
-                const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
-                const fields = originalEmbed.data.fields.map(f => {
-                    if (f.name === 'Status') return { ...f, value: 'DECLINED' };
-                    return f;
-                });
-                originalEmbed.setFields(fields);
+                await submission.update({ status: 'declined' });
+                console.log(`[BOT] ❌ Marked submission #${submission.id} as DECLINED in database.`);
+
+                let originalEmbed;
+                if (interaction.message?.embeds?.[0]) {
+                    originalEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
+                    const fields = (originalEmbed.data.fields || []).map(f => {
+                        if (f.name === 'Status') return { ...f, value: 'DECLINED' };
+                        return f;
+                    });
+                    originalEmbed.setFields(fields);
+                } else {
+                    originalEmbed = new EmbedBuilder()
+                        .setTitle(`Application: ${submission.AppSlot?.roleName || 'Recruitment'}`)
+                        .addFields(
+                            { name: 'Applicant', value: `<@${submission.discordId}> (${submission.discordTag})`, inline: true },
+                            { name: 'Status', value: 'DECLINED', inline: true }
+                        );
+                }
+
                 originalEmbed.addFields(
                     { name: 'Decision By', value: `<@${interaction.user.id}>`, inline: true },
                     { name: 'Reason', value: reason, inline: false }
                 );
                 originalEmbed.setColor('#ff5252');
 
-                await interaction.update({ 
-                    content: `📢 **Application Processed: DECLINED**`,
-                    embeds: [originalEmbed],
-                    components: [] 
-                });
+                if (interaction.message) {
+                    await interaction.update({ 
+                        content: `📢 **Application Processed: DECLINED**`,
+                        embeds: [originalEmbed],
+                        components: [] 
+                    });
+                } else {
+                    await interaction.reply({ 
+                        content: `📢 **Application Processed: DECLINED**`,
+                        embeds: [originalEmbed] 
+                    });
+                }
 
                 // DM Applicant
                 try {
                     const applicant = await client.users.fetch(submission.discordId);
                     await applicant.send({
-                        content: `📩 **Update on your application:** Your application for **${submission.AppSlot.roleName}** at Club FuRN has been **DECLINED**. \n\n${dmReason}`
+                        content: `📩 **Update on your application:** Your application for **${submission.AppSlot?.roleName || 'Club FuRN'}** at Club FuRN has been **DECLINED**. \n\n${dmReason}`
                     });
+                    console.log(`[BOT] 📬 Sent decline DM to ${submission.discordId}`);
                 } catch (e) { console.log(`[BOT] Could not DM applicant ${submission.discordId} (DMs closed)`); }
 
-            } catch (err) { console.error("[BOT] Modal Error:", err); }
+                // Move ticket channel to top of Archive category
+                const ticketChannel = interaction.channel || (interaction.channelId ? await client.channels.fetch(interaction.channelId).catch(() => null) : null);
+                if (ticketChannel) {
+                    await archiveTicketChannel(ticketChannel, `Application declined by ${interaction.user.tag}`, client);
+                } else {
+                    console.warn(`[BOT] ⚠️ Could not find ticket channel to archive for denied submission #${submission.id}`);
+                }
+
+            } catch (err) {
+                console.error("[BOT] Modal Error:", err);
+                if (!interaction.replied) {
+                    await interaction.reply({ content: `❌ Error processing denial: ${err.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
+                }
+            }
         }
     }
 });

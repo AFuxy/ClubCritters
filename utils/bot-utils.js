@@ -307,6 +307,35 @@ async function createApplicationTicket(submission, slot) {
 }
 
 /**
+ * Move a ticket channel to the top of the archive category with intact permissions
+ */
+async function archiveTicketChannel(channelOrId, reason = 'Application processed', client = null) {
+    const archiveCategoryId = process.env.DISCORD_APPS_ARCHIVE_CATEGORY_ID || '1492651196220182548';
+    if (!channelOrId) {
+        console.warn('[BOT] ⚠️ archiveTicketChannel called without a channel');
+        return;
+    }
+    let channel = channelOrId;
+    if (typeof channelOrId === 'string' && client) {
+        channel = await client.channels.fetch(channelOrId).catch(() => null);
+    }
+    if (!channel || typeof channel.setParent !== 'function') {
+        console.warn(`[BOT] ⚠️ archiveTicketChannel: could not resolve channel object (${channelOrId})`);
+        return;
+    }
+    try {
+        console.log(`[BOT] 📁 Moving channel #${channel.name} (${channel.id}) to archive category ${archiveCategoryId}...`);
+        await channel.setParent(archiveCategoryId, { lockPermissions: false, reason });
+        await channel.setPosition(0, { reason }).catch(posErr => {
+            console.warn(`[BOT] ⚠️ Could not set position 0 on #${channel.name}:`, posErr.message);
+        });
+        console.log(`[BOT] ✅ Successfully moved ticket channel #${channel.name} to top of archive category (${archiveCategoryId}).`);
+    } catch (moveErr) {
+        console.error(`[BOT] ❌ Failed to move channel #${channel.name} to archive category:`, moveErr.message);
+    }
+}
+
+/**
  * Add a user to the main guild using their OAuth2 access token
  */
 async function joinGuild(client, userId, accessToken) {
@@ -710,5 +739,5 @@ async function autoAnnounceLivePartnerEvents(client) {
     }
 }
 
-module.exports = { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, createApplicationTicket, joinGuild, auditGroupMembers, postPartnerEventAnnouncement, autoAnnounceLivePartnerEvents };
+module.exports = { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, createApplicationTicket, archiveTicketChannel, joinGuild, auditGroupMembers, postPartnerEventAnnouncement, autoAnnounceLivePartnerEvents };
 
