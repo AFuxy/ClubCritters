@@ -79,16 +79,28 @@ client.once(Events.ClientReady, (c) => {
 
 client.on(Events.InteractionCreate, async interaction => {
     if (process.env.DISABLE_VRC_BOT === 'true') return;
-    // 1. Handle Slash Commands
-    if (interaction.isChatInputCommand()) {
+
+    // 1. Handle Slash & Context Menu Commands
+    if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
         try {
             await command.execute(interaction);
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({ content: 'There was an error while executing this command!' }).catch(() => {});
+            } else {
+                await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral }).catch(() => {});
+            }
         }
+        return;
+    }
+
+    // 2. Handle Event Call Interactions (Slot Claims, Modals, Trackers, Checklist Toggles)
+    if (interaction.customId && interaction.customId.startsWith('evt_')) {
+        const { handleEventCallInteraction } = require('./utils/event-call-utils');
+        return await handleEventCallInteraction(interaction, client);
     }
 
     // 2. Handle Application Buttons

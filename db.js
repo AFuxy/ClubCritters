@@ -242,6 +242,20 @@ const PartnerEvent = sequelize.define('PartnerEvent', {
 Partner.hasMany(PartnerEvent, { foreignKey: 'partnerId', as: 'events', onDelete: 'CASCADE' });
 PartnerEvent.belongsTo(Partner, { foreignKey: 'partnerId', as: 'partner' });
 
+// 15. Event Calls (Lineup calls for DJs)
+const EventCall = sequelize.define('EventCall', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    title: { type: DataTypes.STRING, allowNull: false },
+    eventDate: { type: DataTypes.STRING, allowNull: false },
+    channelId: { type: DataTypes.STRING, allowNull: false },
+    messageId: { type: DataTypes.STRING },
+    coordinationChannelId: { type: DataTypes.STRING },
+    trackerMessageId: { type: DataTypes.STRING },
+    hasLights: { type: DataTypes.BOOLEAN, defaultValue: false },
+    slotsData: { type: DataTypes.JSON, allowNull: false },
+    status: { type: DataTypes.ENUM('open', 'closed'), defaultValue: 'open' }
+});
+
 async function initDB() {
     try {
         await sequelize.authenticate();
@@ -253,4 +267,4 @@ async function initDB() {
     }
 }
 
-module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, InstanceVisitor, InstanceLogPerformers, Partner, PartnerEvent, initDB };
+module.exports = { sequelize, Settings, Roster, Schedule, Archive, Stats, AppSlot, Gallery, ApplicationSubmission, InstanceLog, VrcGroupAudit, InstanceVisitor, InstanceLogPerformers, Partner, PartnerEvent, EventCall, initDB };
