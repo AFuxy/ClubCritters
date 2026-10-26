@@ -256,12 +256,19 @@ const EventCall = sequelize.define('EventCall', {
         type: DataTypes.JSON, 
         allowNull: false,
         get() {
-            const raw = this.getDataValue('slotsData');
+            let raw = this.getDataValue('slotsData');
             if (!raw) return [];
             if (typeof raw === 'string') {
-                try { return JSON.parse(raw); } catch (e) { return []; }
+                try { raw = JSON.parse(raw); } catch (e) { return []; }
             }
-            return Array.isArray(raw) ? raw : [];
+            if (Array.isArray(raw)) return raw;
+            if (raw && typeof raw === 'object') {
+                const values = Object.values(raw);
+                if (values.some(v => v && typeof v === 'object' && ('index' in v || 'startTimeUtc' in v || 'timeSlotStr' in v))) {
+                    return values.filter(v => v && typeof v === 'object' && ('index' in v || 'startTimeUtc' in v || 'timeSlotStr' in v));
+                }
+            }
+            return [];
         }
     },
     status: { type: DataTypes.ENUM('open', 'closed'), defaultValue: 'open' }

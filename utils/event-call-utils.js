@@ -23,12 +23,13 @@ function formatUtcTime(date) {
 }
 
 /**
- * Safely parse slotsData whether it is an Array, string, or model instance
+ * Safely parse slotsData whether it is an Array, string, dictionary object, or model instance
  */
 function parseSlotsData(eventCall) {
     if (!eventCall) return [];
     let data = eventCall.slotsData;
     if (typeof data === 'string') {
+        if (!data.trim()) return [];
         try {
             data = JSON.parse(data);
         } catch (e) {
@@ -36,7 +37,14 @@ function parseSlotsData(eventCall) {
             return [];
         }
     }
-    return Array.isArray(data) ? data : [];
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+        const values = Object.values(data);
+        if (values.some(v => v && typeof v === 'object' && ('index' in v || 'startTimeUtc' in v || 'timeSlotStr' in v))) {
+            return values.filter(v => v && typeof v === 'object' && ('index' in v || 'startTimeUtc' in v || 'timeSlotStr' in v));
+        }
+    }
+    return [];
 }
 
 /**
