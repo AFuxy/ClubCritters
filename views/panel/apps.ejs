@@ -1,118 +1,238 @@
 <%- include('header') %>
 
+<style>
+    /* Submissions filter button styling */
+    .sub-filter-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 18px;
+        border-radius: 8px;
+        font-size: 0.84rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #181d28;
+        color: #b0b8c5;
+        outline: none;
+        user-select: none;
+    }
+    .sub-filter-btn:hover {
+        background: #202636;
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+    .sub-filter-btn.active[data-status="all"] {
+        background: var(--primary-blue, #29c5f6) !important;
+        color: #000 !important;
+        border-color: var(--primary-blue, #29c5f6) !important;
+        font-weight: 700;
+        box-shadow: 0 0 16px rgba(41, 197, 246, 0.4);
+    }
+    .sub-filter-btn.active[data-status="pending"] {
+        background: #ffd700 !important;
+        color: #000 !important;
+        border-color: #ffd700 !important;
+        font-weight: 700;
+        box-shadow: 0 0 16px rgba(255, 215, 0, 0.4);
+    }
+    .sub-filter-btn.active[data-status="accepted"] {
+        background: #00e676 !important;
+        color: #000 !important;
+        border-color: #00e676 !important;
+        font-weight: 700;
+        box-shadow: 0 0 16px rgba(0, 230, 118, 0.4);
+    }
+    .sub-filter-btn.active[data-status="declined"] {
+        background: #ff5252 !important;
+        color: #fff !important;
+        border-color: #ff5252 !important;
+        font-weight: 700;
+        box-shadow: 0 0 16px rgba(255, 82, 82, 0.4);
+    }
+    .sub-filter-btn[data-status="pending"] .badge-num { color: #ffd700; font-weight: 700; }
+    .sub-filter-btn[data-status="accepted"] .badge-num { color: #00e676; font-weight: 700; }
+    .sub-filter-btn[data-status="declined"] .badge-num { color: #ff5252; font-weight: 700; }
+    .sub-filter-btn.active .badge-num { color: inherit !important; }
+</style>
+
 <div class="staff-hub">
     <div class="staff-section">
-        <h2>Application Manager</h2>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">Manage recruitment roles, form deadlines, and approval automations for Club FuRN.</p>
-
-        <div id="add-app-form" class="grid-2" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-            <div class="form-group">
-                <label>Role Name</label>
-                <input type="text" id="app-role-name" placeholder="DJ, Staff, Dancer, etc.">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px; margin-bottom: 25px;">
+            <div>
+                <h2 style="margin: 0;">Recruitment & Application Manager</h2>
+                <p style="font-size: 0.8rem; color: #888; margin: 5px 0 0 0;">Manage recruitment roles, form deadlines, automations, and review submitted applications.</p>
             </div>
-            <div class="form-group">
-                <label>Role Type (Form Style)</label>
-                <select id="app-role-type">
-                    <option value="DJ">DJ Application</option>
-                    <option value="Singer">Singer Application</option>
-                    <option value="Musician/Band">Musician/Band Application</option>
-                    <option value="Event Staff">Event Staff Application</option>
-                    <option value="Other">Other / General</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Display Deadline</label>
-                <input type="text" id="app-deadline" placeholder="e.g. March 15th, Midnight UTC">
-            </div>
-            <div class="form-group">
-                <label>Auto-Close Date (UTC)</label>
-                <input type="datetime-local" id="app-auto-close">
-            </div>
-            <div class="form-group">
-                <label>Status</label>
-                <select id="app-status">
-                    <option value="open">Open</option>
-                    <option value="closed">Closed</option>
-                </select>
-            </div>
-            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 25px;">
-                <input type="checkbox" id="app-is-internal" style="width: auto; cursor: pointer;" onchange="toggleFormUrl()">
-                <label style="margin: 0; cursor: pointer;" for="app-is-internal">Use Internal Site Form</label>
-            </div>
-            <div class="form-group" id="form-url-group">
-                <label>External Form URL</label>
-                <input type="text" id="app-form-url" placeholder="https://forms.gle/...">
-            </div>
-            <div class="form-group" style="grid-column: span 2;">
-                <label>Description / Requirements</label>
-                <textarea id="app-description" rows="3" placeholder="Brief requirements or instructions for applicants..."></textarea>
-            </div>
-
-            <!-- Approval Automations Section -->
-            <div class="form-group" style="grid-column: span 2; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px; margin-top: 5px; margin-bottom: 10px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 10px;">
-                    <div>
-                        <h4 style="margin: 0; font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 8px;">
-                            <span>⚡</span> On-Approval Automations
-                        </h4>
-                        <p style="font-size: 0.75rem; color: #888; margin: 3px 0 0 0;">Actions executed instantly by the bot when staff clicks "Approve" on an applicant's ticket.</p>
-                    </div>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <!-- Discord Role Granting -->
-                    <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; user-select: none;">
-                                <input type="checkbox" id="app-give-discord-role" style="width: auto; cursor: pointer;" onchange="toggleDiscordRoleFields()">
-                                <span style="font-weight: 600; font-size: 0.88rem; color: #e0e0e0;">Grant Discord Role</span>
-                            </label>
-                            <span style="font-size: 0.72rem; color: #888;">Assigns a role to the applicant in Discord</span>
-                        </div>
-
-                        <div id="discord-role-config" style="margin-top: 12px; display: none;">
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <select id="app-discord-role-select" style="flex: 1; padding: 8px 12px; border-radius: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff;" onchange="handleDiscordRoleSelectChange()">
-                                    <option value="">-- Loading Discord Roles... --</option>
-                                </select>
-                                <button type="button" class="btn-cc btn-small btn-dark" onclick="fetchDiscordRoles(true)" title="Refresh Roles from Discord" style="padding: 7px 12px; font-size: 0.8rem;">↻ Refresh</button>
-                            </div>
-                            <div id="discord-role-manual-container" style="margin-top: 8px; display: none;">
-                                <input type="text" id="app-discord-role-manual" placeholder="Enter manual Role ID (e.g. 107384920491829...)" style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 0.8rem; border-radius: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff;">
-                                <span style="font-size: 0.7rem; color: #888; margin-top: 4px; display: block;">Enter the Snowflake ID of the Discord role to assign.</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Site Account Creation -->
-                    <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; user-select: none;">
-                                <input type="checkbox" id="app-create-site-account" style="width: auto; cursor: pointer;" onchange="toggleSiteAccountFields()">
-                                <span style="font-weight: 600; font-size: 0.88rem; color: #e0e0e0;">Auto-Create Site Account</span>
-                            </label>
-                            <span style="font-size: 0.72rem; color: #888;">Adds user to roster directory & enables panel login</span>
-                        </div>
-
-                        <div id="site-account-config" style="margin-top: 12px; display: none;">
-                            <label style="font-size: 0.75rem; color: #aaa; margin-bottom: 8px; display: block;">On-Site Roles to Assign:</label>
-                            <div id="site-role-pills" style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                <!-- Rendered dynamically -->
-                            </div>
-                            <span style="font-size: 0.7rem; color: #888; margin-top: 8px; display: block;">Click to toggle role tags. If the user already has a roster profile, these roles will be merged into their account.</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group" style="display: flex; align-items: center; gap: 10px; grid-column: span 2; margin-top: 10px;">
-                <button id="add-app-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addAppSlot()">Create Slot</button>
-                <button id="cancel-app-edit-btn" class="btn-cc btn-dark btn-small" style="margin: 0; display: none;" onclick="cancelAppEdit()">Cancel</button>
+            
+            <!-- Top Tab Switcher -->
+            <div style="display: flex; gap: 6px; background: rgba(0,0,0,0.35); padding: 5px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+                <button id="tab-btn-slots" class="btn-cc btn-small" onclick="switchAppTab('slots')" style="border-radius: 8px; padding: 7px 16px; font-size: 0.82rem; background: var(--primary-blue); color: #000; font-weight: 700; border: none; cursor: pointer; transition: all 0.2s ease;">
+                    ⚙️ Open Roles (<span id="slots-count-badge">0</span>)
+                </button>
+                <button id="tab-btn-submissions" class="btn-cc btn-small" onclick="switchAppTab('submissions')" style="border-radius: 8px; padding: 7px 16px; font-size: 0.82rem; background: transparent; color: #888; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s ease;">
+                    📋 Submissions (<span id="submissions-count-badge">0</span>)
+                </button>
             </div>
         </div>
 
-        <div id="apps-list" style="display: flex; flex-direction: column; gap: 15px;">
-            <p style="text-align: center; color: #666;">Loading application slots...</p>
+        <!-- ==================== TAB 1: OPEN ROLES & AUTOMATIONS ==================== -->
+        <div id="tab-content-slots">
+            <div id="add-app-form" class="grid-2" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+                <div class="form-group">
+                    <label>Role Name</label>
+                    <input type="text" id="app-role-name" placeholder="DJ, Staff, Dancer, etc.">
+                </div>
+                <div class="form-group">
+                    <label>Role Type (Form Style)</label>
+                    <select id="app-role-type">
+                        <option value="DJ">DJ Application</option>
+                        <option value="Singer">Singer Application</option>
+                        <option value="Musician/Band">Musician/Band Application</option>
+                        <option value="Event Staff">Event Staff Application</option>
+                        <option value="Other">Other / General</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Display Deadline</label>
+                    <input type="text" id="app-deadline" placeholder="e.g. March 15th, Midnight UTC">
+                </div>
+                <div class="form-group">
+                    <label>Auto-Close Date (UTC)</label>
+                    <input type="datetime-local" id="app-auto-close">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="app-status">
+                        <option value="open">Open</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 25px;">
+                    <input type="checkbox" id="app-is-internal" style="width: auto; cursor: pointer;" onchange="toggleFormUrl()">
+                    <label style="margin: 0; cursor: pointer;" for="app-is-internal">Use Internal Site Form</label>
+                </div>
+                <div class="form-group" id="form-url-group">
+                    <label>External Form URL</label>
+                    <input type="text" id="app-form-url" placeholder="https://forms.gle/...">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Description / Requirements</label>
+                    <textarea id="app-description" rows="3" placeholder="Brief requirements or instructions for applicants..."></textarea>
+                </div>
+
+                <!-- Approval Automations Section -->
+                <div class="form-group" style="grid-column: span 2; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px; margin-top: 5px; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 10px;">
+                        <div>
+                            <h4 style="margin: 0; font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                <span>⚡</span> On-Approval Automations
+                            </h4>
+                            <p style="font-size: 0.75rem; color: #888; margin: 3px 0 0 0;">Actions executed instantly by the bot when staff clicks "Approve" on an applicant's ticket.</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <!-- Discord Role Granting -->
+                        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; user-select: none;">
+                                    <input type="checkbox" id="app-give-discord-role" style="width: auto; cursor: pointer;" onchange="toggleDiscordRoleFields()">
+                                    <span style="font-weight: 600; font-size: 0.88rem; color: #e0e0e0;">Grant Discord Role</span>
+                                </label>
+                                <span style="font-size: 0.72rem; color: #888;">Assigns a role to the applicant in Discord</span>
+                            </div>
+
+                            <div id="discord-role-config" style="margin-top: 12px; display: none;">
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <select id="app-discord-role-select" style="flex: 1; padding: 8px 12px; border-radius: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff;" onchange="handleDiscordRoleSelectChange()">
+                                        <option value="">-- Loading Discord Roles... --</option>
+                                    </select>
+                                    <button type="button" class="btn-cc btn-small btn-dark" onclick="fetchDiscordRoles(true)" title="Refresh Roles from Discord" style="padding: 7px 12px; font-size: 0.8rem;">↻ Refresh</button>
+                                </div>
+                                <div id="discord-role-manual-container" style="margin-top: 8px; display: none;">
+                                    <input type="text" id="app-discord-role-manual" placeholder="Enter manual Role ID (e.g. 107384920491829...)" style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 0.8rem; border-radius: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                                    <span style="font-size: 0.7rem; color: #888; margin-top: 4px; display: block;">Enter the Snowflake ID of the Discord role to assign.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Site Account Creation -->
+                        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; user-select: none;">
+                                    <input type="checkbox" id="app-create-site-account" style="width: auto; cursor: pointer;" onchange="toggleSiteAccountFields()">
+                                    <span style="font-weight: 600; font-size: 0.88rem; color: #e0e0e0;">Auto-Create Site Account</span>
+                                </label>
+                                <span style="font-size: 0.72rem; color: #888;">Adds user to roster directory & enables panel login</span>
+                            </div>
+
+                            <div id="site-account-config" style="margin-top: 12px; display: none;">
+                                <label style="font-size: 0.75rem; color: #aaa; margin-bottom: 8px; display: block;">On-Site Roles to Assign:</label>
+                                <div id="site-role-pills" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                                <span style="font-size: 0.7rem; color: #888; margin-top: 8px; display: block;">Click to toggle role tags. If the user already has a roster profile, these roles will be merged into their account.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px; grid-column: span 2; margin-top: 10px;">
+                    <button id="add-app-btn" class="btn-cc btn-primary" style="margin: 0; flex: 1;" onclick="addAppSlot()">Create Slot</button>
+                    <button id="cancel-app-edit-btn" class="btn-cc btn-dark btn-small" style="margin: 0; display: none;" onclick="cancelAppEdit()">Cancel</button>
+                </div>
+            </div>
+
+            <div id="apps-list" style="display: flex; flex-direction: column; gap: 15px;">
+                <p style="text-align: center; color: #666;">Loading application slots...</p>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 2: SUBMISSIONS HISTORY ==================== -->
+        <div id="tab-content-submissions" style="display: none;">
+            <!-- Search & Slot Filter Row -->
+            <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+                <div style="position: relative; flex: 1; min-width: 280px;">
+                    <span style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #777; font-size: 1.1rem; pointer-events: none;">🔍</span>
+                    <input type="text" id="sub-search-input" placeholder="Search applicant, Discord ID, or role..." style="width: 100%; box-sizing: border-box; padding: 13px 18px 13px 46px; font-size: 1rem; border-radius: 10px; background: #12151d; border: 1px solid rgba(255,255,255,0.16); color: #fff; outline: none; transition: border-color 0.2s, box-shadow 0.2s;" onfocus="this.style.borderColor='var(--primary-blue)'; this.style.boxShadow='0 0 12px rgba(41, 197, 246, 0.25)';" onblur="this.style.borderColor='rgba(255,255,255,0.16)'; this.style.boxShadow='none';">
+                </div>
+                <select id="sub-slot-filter" style="padding: 13px 18px; font-size: 0.95rem; border-radius: 10px; background: #12151d; border: 1px solid rgba(255,255,255,0.16); color: #fff; cursor: pointer; outline: none; min-width: 180px;">
+                    <option value="all">All Roles</option>
+                </select>
+            </div>
+
+            <!-- Status Filter Pills Row -->
+            <div style="display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; align-items: center;">
+                <span style="font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-right: 4px;">Status:</span>
+                <button type="button" class="sub-filter-btn active" data-status="all" onclick="setSubStatusFilter('all', this)">
+                    All (<span id="badge-count-all" class="badge-num">0</span>)
+                </button>
+                <button type="button" class="sub-filter-btn" data-status="pending" onclick="setSubStatusFilter('pending', this)">
+                    ⏳ Pending (<span id="badge-count-pending" class="badge-num">0</span>)
+                </button>
+                <button type="button" class="sub-filter-btn" data-status="accepted" onclick="setSubStatusFilter('accepted', this)">
+                    ✅ Accepted (<span id="badge-count-accepted" class="badge-num">0</span>)
+                </button>
+                <button type="button" class="sub-filter-btn" data-status="declined" onclick="setSubStatusFilter('declined', this)">
+                    ❌ Declined (<span id="badge-count-declined" class="badge-num">0</span>)
+                </button>
+            </div>
+
+            <!-- Submissions List -->
+            <div id="submissions-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <p style="text-align: center; color: #666;">Loading submissions...</p>
+            </div>
+
+            <!-- Submissions Pagination -->
+            <div id="submissions-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap; gap: 10px;">
+                <div id="sub-pagination-info" style="font-size: 0.85rem; color: #888;">Showing 0 submissions</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button id="sub-btn-prev" class="btn-cc btn-small btn-secondary" onclick="changeSubPage(-1)" disabled>&larr; Prev</button>
+                    <span id="sub-page-display" style="font-size: 0.85rem; font-weight: bold; color: #eee; min-width: 60px; text-align: center;">1 / 1</span>
+                    <button id="sub-btn-next" class="btn-cc btn-small btn-secondary" onclick="changeSubPage(1)" disabled>Next &rarr;</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -130,7 +250,83 @@
     </div>
 </div>
 
+<!-- Full Application Submission Detail Modal -->
+<div id="submission-detail-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(6px); z-index: 10000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;" onclick="handleModalBackdropClick(event)">
+    <div style="background: var(--card-bg, #161a23); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 25px; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7); position: relative;" onclick="event.stopPropagation()">
+        <!-- Modal Header -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <img id="sub-modal-avatar" src="/cdn/logos/club/Logo.png" alt="Avatar" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1);">
+                <div>
+                    <h3 id="sub-modal-tag" style="margin: 0; font-size: 1.2rem; color: #fff;">Applicant</h3>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 0.78rem; color: #888;">
+                        <span id="sub-modal-id">ID: 0</span>
+                        <span>•</span>
+                        <span id="sub-modal-role" style="color: var(--primary-blue); font-weight: 600;">Role</span>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-cc btn-small btn-dark" onclick="closeSubmissionModal()" style="font-size: 1.1rem; padding: 4px 10px; border-radius: 6px;">✕</button>
+        </div>
+
+        <!-- Meta status row -->
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem;">
+            <div><span style="color: #888;">Status:</span> <strong id="sub-modal-status">PENDING</strong></div>
+            <div><span style="color: #888;">Submitted:</span> <span id="sub-modal-time">Date</span></div>
+            <div id="sub-modal-channel-container" style="display: none;"><span style="color: #888;">Discord Ticket:</span> <span id="sub-modal-channel" style="color: #8da2fb; font-family: monospace;">#channel</span></div>
+        </div>
+
+        <!-- Answers Section -->
+        <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: #eee; border-left: 3px solid var(--primary-blue); padding-left: 8px;">Submitted Application Answers</h4>
+        <div id="sub-modal-answers-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px;">
+            <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px;">
+            <button class="btn-cc btn-dark btn-small" onclick="closeSubmissionModal()">Close Window</button>
+        </div>
+    </div>
+</div>
+
 <script>
+    // Tab switching
+    let currentAppTab = 'slots';
+
+    function switchAppTab(tab) {
+        currentAppTab = tab;
+        const btnSlots = document.getElementById('tab-btn-slots');
+        const btnSubs = document.getElementById('tab-btn-submissions');
+        const contentSlots = document.getElementById('tab-content-slots');
+        const contentSubs = document.getElementById('tab-content-submissions');
+
+        if (tab === 'slots') {
+            btnSlots.style.background = 'var(--primary-blue)';
+            btnSlots.style.color = '#000';
+            btnSlots.style.fontWeight = '700';
+
+            btnSubs.style.background = 'transparent';
+            btnSubs.style.color = '#888';
+            btnSubs.style.fontWeight = '600';
+
+            contentSlots.style.display = 'block';
+            contentSubs.style.display = 'none';
+        } else {
+            btnSubs.style.background = 'var(--primary-blue)';
+            btnSubs.style.color = '#000';
+            btnSubs.style.fontWeight = '700';
+
+            btnSlots.style.background = 'transparent';
+            btnSlots.style.color = '#888';
+            btnSlots.style.fontWeight = '600';
+
+            contentSlots.style.display = 'none';
+            contentSubs.style.display = 'block';
+            loadSubmissions();
+        }
+    }
+
+    // --- SLOTS MANAGEMENT ---
     const appsList = document.getElementById('apps-list');
     const roleNameInput = document.getElementById('app-role-name');
     const roleTypeSelect = document.getElementById('app-role-type');
@@ -275,6 +471,15 @@
     }
 
     function renderSlots(slots) {
+        document.getElementById('slots-count-badge').innerText = slots.length;
+        
+        // Update slot filter in submissions tab
+        const subSlotSelect = document.getElementById('sub-slot-filter');
+        const currentSelectedSlot = subSlotSelect.value;
+        subSlotSelect.innerHTML = '<option value="all">All Roles</option>' +
+            slots.map(s => `<option value="${s.id}">${s.roleName}</option>`).join('');
+        if (currentSelectedSlot) subSlotSelect.value = currentSelectedSlot;
+
         if (slots.length === 0) {
             appsList.innerHTML = '<p style="text-align: center; color: #666;">No application slots configured yet.</p>';
             return;
@@ -550,10 +755,246 @@
         } catch (e) { showNotify('Network error occurred.', 'error'); }
     }
 
+    // ==================== SUBMISSIONS LOGIC ====================
+    let loadedSubmissions = [];
+    let subStatusFilter = 'all';
+    let subSlotFilter = 'all';
+    let subSearchQuery = '';
+    let subPage = 1;
+    let subLimit = 20;
+    let subTotalPages = 1;
+    let subSearchDebounce = null;
+
+    const subSearchInput = document.getElementById('sub-search-input');
+    const subSlotSelect = document.getElementById('sub-slot-filter');
+    const submissionsList = document.getElementById('submissions-list');
+    const subPaginationInfo = document.getElementById('sub-pagination-info');
+    const subPageDisplay = document.getElementById('sub-page-display');
+    const subBtnPrev = document.getElementById('sub-btn-prev');
+    const subBtnNext = document.getElementById('sub-btn-next');
+
+    // Debounced search
+    subSearchInput.addEventListener('input', (e) => {
+        clearTimeout(subSearchDebounce);
+        subSearchDebounce = setTimeout(() => {
+            subSearchQuery = e.target.value.trim();
+            subPage = 1;
+            loadSubmissions();
+        }, 300);
+    });
+
+    subSlotSelect.addEventListener('change', (e) => {
+        subSlotFilter = e.target.value;
+        subPage = 1;
+        loadSubmissions();
+    });
+
+    function setSubStatusFilter(status, btn) {
+        subStatusFilter = status;
+        document.querySelectorAll('.sub-filter-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        subPage = 1;
+        loadSubmissions();
+    }
+
+    function changeSubPage(delta) {
+        const newPage = subPage + delta;
+        if (newPage >= 1 && newPage <= subTotalPages) {
+            subPage = newPage;
+            loadSubmissions();
+        }
+    }
+
+    async function loadSubmissions() {
+        submissionsList.innerHTML = '<p style="text-align: center; color: #888;">Loading submissions...</p>';
+        try {
+            const params = new URLSearchParams({
+                status: subStatusFilter,
+                slotId: subSlotFilter,
+                q: subSearchQuery,
+                page: subPage,
+                limit: subLimit
+            });
+            const res = await fetch(`/api/apps/submissions?${params.toString()}`);
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            
+            loadedSubmissions = data.submissions || [];
+            subTotalPages = data.totalPages || 1;
+            subPage = data.page || 1;
+
+            // Update badge counts
+            if (data.counts) {
+                document.getElementById('submissions-count-badge').innerText = data.counts.all || 0;
+                document.getElementById('badge-count-all').innerText = data.counts.all || 0;
+                document.getElementById('badge-count-pending').innerText = data.counts.pending || 0;
+                document.getElementById('badge-count-accepted').innerText = data.counts.accepted || 0;
+                document.getElementById('badge-count-declined').innerText = data.counts.declined || 0;
+            }
+
+            renderSubmissions(loadedSubmissions, data.total);
+        } catch (e) {
+            submissionsList.innerHTML = '<p style="text-align: center; color: var(--accent-red);">Failed to load submissions.</p>';
+        }
+    }
+
+    function renderSubmissions(submissions, total) {
+        subPaginationInfo.innerText = `Showing ${submissions.length} of ${total} submissions`;
+        subPageDisplay.innerText = `${subPage} / ${subTotalPages}`;
+        subBtnPrev.disabled = subPage <= 1;
+        subBtnNext.disabled = subPage >= subTotalPages;
+
+        if (submissions.length === 0) {
+            submissionsList.innerHTML = '<div style="text-align:center; padding: 40px; color:#777; background:rgba(0,0,0,0.15); border-radius:12px;">No applications found matching your criteria.</div>';
+            return;
+        }
+
+        submissionsList.innerHTML = submissions.map(sub => {
+            const roleName = sub.AppSlot?.roleName || 'Unknown Role';
+            const roleType = sub.AppSlot?.roleType || 'General';
+            
+            let statusColor = '#ffd700';
+            let statusBg = 'rgba(255, 215, 0, 0.15)';
+            let statusBorder = 'rgba(255, 215, 0, 0.4)';
+            if (sub.status === 'accepted') {
+                statusColor = '#00e676';
+                statusBg = 'rgba(0, 230, 118, 0.15)';
+                statusBorder = 'rgba(0, 230, 118, 0.4)';
+            } else if (sub.status === 'declined') {
+                statusColor = '#ff5252';
+                statusBg = 'rgba(255, 82, 82, 0.15)';
+                statusBorder = 'rgba(255, 82, 82, 0.4)';
+            }
+
+            const formattedDate = new Date(sub.timestamp || sub.createdAt).toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+
+            // Extract quick highlights from answers
+            const answers = typeof sub.answers === 'string' ? JSON.parse(sub.answers || '{}') : (sub.answers || {});
+            let stageName = answers['DJ Name'] || answers['Stage Name'] || answers['Band Name'] || answers['Name'] || '';
+            let genreInfo = answers['Genre Family'] || answers['Genres'] || '';
+            let demoLink = answers['Demo Link'] || '';
+
+            return `
+            <div class="schedule-item" style="border-left: 4px solid ${statusColor}; background: var(--card-bg); padding: 15px 18px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 260px;">
+                    <img src="${sub.avatarUrl || '/cdn/logos/club/Logo.png'}" alt="Avatar" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.08);">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <strong style="font-size: 1rem; color: #fff;">${sub.discordTag || 'Unknown Applicant'}</strong>
+                            <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: ${statusBg}; border: 1px solid ${statusBorder}; color: ${statusColor}; font-weight: 700; text-transform: uppercase;">${sub.status}</span>
+                            <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(41, 197, 246, 0.15); border: 1px solid rgba(41, 197, 246, 0.35); color: #29c5f6; font-weight: 600;">${roleName} (${roleType})</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px; font-size: 0.78rem; color: #888; flex-wrap: wrap;">
+                            <span>ID: <code style="font-size: 0.72rem; color: #aaa;">${sub.discordId}</code></span>
+                            <span>•</span>
+                            <span>📅 ${formattedDate}</span>
+                            ${stageName ? `<span>•</span><span>Stage: <strong style="color: #ddd;">${stageName}</strong></span>` : ''}
+                            ${genreInfo ? `<span>•</span><span>Genre: <strong style="color: #ddd;">${genreInfo}</strong></span>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    ${demoLink ? `<a href="${demoLink}" target="_blank" class="btn-cc btn-small btn-dark" style="text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Listen to Demo">🎵 Demo</a>` : ''}
+                    <button class="btn-cc btn-small btn-primary" onclick="openSubmissionModal(${sub.id})">📄 View Details</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+
+    // Modal logic
+    function openSubmissionModal(id) {
+        const sub = loadedSubmissions.find(s => s.id === id);
+        if (!sub) return;
+
+        document.getElementById('sub-modal-avatar').src = sub.avatarUrl || '/cdn/logos/club/Logo.png';
+        document.getElementById('sub-modal-tag').innerText = sub.discordTag || 'Unknown Applicant';
+        document.getElementById('sub-modal-id').innerText = `ID: ${sub.discordId}`;
+        document.getElementById('sub-modal-role').innerText = `${sub.AppSlot?.roleName || 'Unknown Role'} (${sub.AppSlot?.roleType || 'General'})`;
+
+        const statusEl = document.getElementById('sub-modal-status');
+        statusEl.innerText = (sub.status || 'PENDING').toUpperCase();
+        if (sub.status === 'accepted') statusEl.style.color = '#00e676';
+        else if (sub.status === 'declined') statusEl.style.color = '#ff5252';
+        else statusEl.style.color = '#ffd700';
+
+        document.getElementById('sub-modal-time').innerText = new Date(sub.timestamp || sub.createdAt).toLocaleString();
+
+        const channelContainer = document.getElementById('sub-modal-channel-container');
+        if (sub.channelId) {
+            channelContainer.style.display = 'block';
+            document.getElementById('sub-modal-channel').innerText = `<#${sub.channelId}> (${sub.channelId})`;
+        } else {
+            channelContainer.style.display = 'none';
+        }
+
+        // Render answers
+        const answersContainer = document.getElementById('sub-modal-answers-container');
+        const rawAnswers = typeof sub.answers === 'string' ? JSON.parse(sub.answers || '{}') : (sub.answers || {});
+        
+        if (!rawAnswers || Object.keys(rawAnswers).length === 0) {
+            answersContainer.innerHTML = '<p style="color: #888; font-size: 0.85rem; font-style: italic;">No form fields were recorded for this submission.</p>';
+        } else {
+            answersContainer.innerHTML = Object.entries(rawAnswers).map(([key, value]) => {
+                let formattedVal = '<span style="color: #666; font-style: italic;">None provided</span>';
+                if (value !== null && value !== undefined && String(value).trim() !== '') {
+                    const str = String(value).trim();
+                    if (str.startsWith('http://') || str.startsWith('https://')) {
+                        formattedVal = `<a href="${str}" target="_blank" rel="noopener noreferrer" style="color: var(--primary-blue); text-decoration: underline; word-break: break-all; display: inline-flex; align-items: center; gap: 4px;">🔗 ${str}</a>`;
+                    } else {
+                        formattedVal = `<span style="color: #e0e0e0; white-space: pre-wrap; word-break: break-word;">${str}</span>`;
+                    }
+                }
+                return `
+                <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 14px;">
+                    <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #8da2fb; font-weight: 700; margin-bottom: 4px;">${key}</div>
+                    <div style="font-size: 0.88rem;">${formattedVal}</div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        document.getElementById('submission-detail-modal').style.display = 'flex';
+    }
+
+    function closeSubmissionModal() {
+        document.getElementById('submission-detail-modal').style.display = 'none';
+    }
+
+    function handleModalBackdropClick(e) {
+        if (e.target.id === 'submission-detail-modal') {
+            closeSubmissionModal();
+        }
+    }
+
+    async function fetchSubmissionCounts() {
+        try {
+            const res = await fetch('/api/apps/submissions?limit=1');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data && data.counts) {
+                const subBadge = document.getElementById('submissions-count-badge');
+                if (subBadge) subBadge.innerText = data.counts.all ?? 0;
+                const bAll = document.getElementById('badge-count-all');
+                if (bAll) bAll.innerText = data.counts.all ?? 0;
+                const bPending = document.getElementById('badge-count-pending');
+                if (bPending) bPending.innerText = data.counts.pending ?? 0;
+                const bAccepted = document.getElementById('badge-count-accepted');
+                if (bAccepted) bAccepted.innerText = data.counts.accepted ?? 0;
+                const bDeclined = document.getElementById('badge-count-declined');
+                if (bDeclined) bDeclined.innerText = data.counts.declined ?? 0;
+            }
+        } catch (e) {}
+    }
+
     // Initialize UI
     renderSiteRolePills();
     fetchDiscordRoles();
     loadApps();
+    fetchSubmissionCounts();
 </script>
 
 <%- include('footer') %>

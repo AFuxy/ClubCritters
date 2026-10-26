@@ -1711,6 +1711,77 @@ router.delete('/apps/:id', isHostOrOwner, async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
+// --- APPLICATION SUBMISSIONS ROUTES ---
+router.get('/apps/submissions', isStaff, async (req, res) => {
+    try {
+        const { Op } = require('sequelize');
+        const { status, slotId, q, page = 1, limit = 20 } = req.query;
+        const where = {};
+        if (status && status !== 'all') {
+            where.status = status;
+        }
+        if (slotId && slotId !== 'all') {
+            where.slotId = parseInt(slotId, 10);
+        }
+        if (q && q.trim()) {
+            const query = q.trim();
+            where[Op.or] = [
+                { discordTag: { [Op.like]: `%${query}%` } },
+                { discordId: { [Op.like]: `%${query}%` } },
+                { '$AppSlot.roleName$': { [Op.like]: `%${query}%` } }
+            ];
+        }
+
+        const pageSize = limit === 'all' ? 1000 : Math.max(1, parseInt(limit, 10) || 20);
+        const offset = limit === 'all' ? 0 : (Math.max(1, parseInt(page, 10) || 1) - 1) * pageSize;
+
+        const { count, rows } = await ApplicationSubmission.findAndCountAll({
+            where,
+            include: [{ model: AppSlot, attributes: ['id', 'roleName', 'roleType'] }],
+            order: [['timestamp', 'DESC'], ['createdAt', 'DESC']],
+            limit: pageSize,
+            offset
+        });
+
+        const [allCount, pendingCount, acceptedCount, declinedCount] = await Promise.all([
+            ApplicationSubmission.count(),
+            ApplicationSubmission.count({ where: { status: 'pending' } }),
+            ApplicationSubmission.count({ where: { status: 'accepted' } }),
+            ApplicationSubmission.count({ where: { status: 'declined' } })
+        ]);
+
+        const { client } = require('../bot');
+        const formattedSubmissions = await Promise.all(rows.map(async sub => {
+            let avatarUrl = '/cdn/logos/club/Logo.png';
+            if (client && client.isReady() && sub.discordId) {
+                try {
+                    const user = client.users.cache.get(sub.discordId) || await client.users.fetch(sub.discordId).catch(() => null);
+                    if (user) avatarUrl = user.displayAvatarURL({ extension: 'png', size: 128 });
+                } catch (e) {}
+            }
+            const json = sub.toJSON();
+            json.avatarUrl = avatarUrl;
+            return json;
+        }));
+
+        res.json({
+            submissions: formattedSubmissions,
+            total: count,
+            page: parseInt(page, 10) || 1,
+            totalPages: Math.ceil(count / pageSize) || 1,
+            counts: {
+                all: allCount,
+                pending: pendingCount,
+                accepted: acceptedCount,
+                declined: declinedCount
+            }
+        });
+    } catch (err) {
+        console.error('[API] Error fetching application submissions:', err);
+        res.status(500).json({ error: 'Failed to fetch submissions' });
+    }
+});
+
 // --- ARCHIVE ROUTES ---
 router.get('/archives/my', isAuthenticated, async (req, res) => {
     try {
