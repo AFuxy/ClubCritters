@@ -634,23 +634,18 @@ async function handleEventCallInteraction(interaction, client) {
 
     // 4. Staff Selects Slot in Checklist Management Panel
     if (customId.startsWith('evt_sel_slot_')) {
+        await interaction.deferUpdate().catch(() => {});
+
         const callId = customId.replace('evt_sel_slot_', '');
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
-        }
-
-        if (eventCall.status === 'closed') {
-            return interaction.reply({ 
-                content: 'This lineup call is closed and no longer accepting claims.', 
-                flags: MessageFlags.Ephemeral 
-            });
+            return interaction.followUp({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
         }
 
         const { buildStaffManagePanel } = require('../commands/event-check');
         const selectedIndex = parseInt(interaction.values[0], 10) || 0;
         const panel = buildStaffManagePanel(eventCall, selectedIndex);
-        return interaction.update(panel);
+        return await interaction.editReply(panel).catch(() => {});
     }
 
     // 5. Staff Toggles Set / Video / Lights
@@ -664,6 +659,8 @@ async function handleEventCallInteraction(interaction, client) {
             });
         }
 
+        await interaction.deferUpdate().catch(() => {});
+
         const parts = customId.split('_');
         const action = parts[2]; // 'set', 'vid', 'lgt'
         const callId = parts[3];
@@ -671,19 +668,12 @@ async function handleEventCallInteraction(interaction, client) {
 
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
-        }
-
-        if (eventCall.status === 'closed') {
-            return interaction.reply({ 
-                content: 'This lineup call is closed and no longer accepting claims.', 
-                flags: MessageFlags.Ephemeral 
-            });
+            return interaction.followUp({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
         }
 
         const slots = parseSlotsData(eventCall);
         if (!slots[slotIndex]) {
-            return interaction.reply({ content: '❌ Slot not found.', flags: MessageFlags.Ephemeral });
+            return interaction.followUp({ content: 'Slot not found.', flags: MessageFlags.Ephemeral });
         }
 
         if (action === 'set') slots[slotIndex].hasSet = !slots[slotIndex].hasSet;
@@ -694,20 +684,21 @@ async function handleEventCallInteraction(interaction, client) {
         eventCall.changed('slotsData', true);
         await eventCall.save();
 
-        // Update Tracker Message in coordination channel
+        const { buildStaffManagePanel } = require('../commands/event-check');
+        const panel = buildStaffManagePanel(eventCall, slotIndex);
+        await interaction.editReply(panel).catch(() => {});
+
+        // Update Tracker Message in coordination channel (background update)
         if (eventCall.trackerMessageId) {
             try {
-                const coordChannel = await client.channels.fetch(eventCall.coordinationChannelId);
+                const coordChannel = await client.channels.fetch(eventCall.coordinationChannelId).catch(() => null);
                 const trackerMsg = await coordChannel?.messages.fetch(eventCall.trackerMessageId).catch(() => null);
                 if (trackerMsg) {
                     await trackerMsg.edit({ content: renderTrackerContent(eventCall) });
                 }
             } catch (e) {}
         }
-
-        const { buildStaffManagePanel } = require('../commands/event-check');
-        const panel = buildStaffManagePanel(eventCall, slotIndex);
-        return interaction.update(panel);
+        return;
     }
 
     // 6. Staff Re-opens a Slot
@@ -721,26 +712,21 @@ async function handleEventCallInteraction(interaction, client) {
             });
         }
 
+        await interaction.deferUpdate().catch(() => {});
+
         const parts = customId.split('_');
         const callId = parts[2];
         const slotIndex = parseInt(parts[3], 10);
 
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
-        }
-
-        if (eventCall.status === 'closed') {
-            return interaction.reply({ 
-                content: 'This lineup call is closed and no longer accepting claims.', 
-                flags: MessageFlags.Ephemeral 
-            });
+            return interaction.followUp({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
         }
 
         const slots = parseSlotsData(eventCall);
         const slot = slots[slotIndex];
         if (!slot) {
-            return interaction.reply({ content: '❌ Slot not found.', flags: MessageFlags.Ephemeral });
+            return interaction.followUp({ content: 'Slot not found.', flags: MessageFlags.Ephemeral });
         }
 
         // Clear slot from MySQL Schedule
@@ -764,9 +750,13 @@ async function handleEventCallInteraction(interaction, client) {
         eventCall.changed('slotsData', true);
         await eventCall.save();
 
+        const { buildStaffManagePanel } = require('../commands/event-check');
+        const panel = buildStaffManagePanel(eventCall, slotIndex);
+        await interaction.editReply(panel).catch(() => {});
+
         // Update announcement message (re-enables slot button and marks OPEN)
         try {
-            const annChannel = await client.channels.fetch(eventCall.channelId);
+            const annChannel = await client.channels.fetch(eventCall.channelId).catch(() => null);
             const annMsg = await annChannel?.messages.fetch(eventCall.messageId).catch(() => null);
             if (annMsg) {
                 await annMsg.edit({
@@ -778,7 +768,7 @@ async function handleEventCallInteraction(interaction, client) {
 
         // Update tracker message & manage channel access
         try {
-            const coordChannel = await client.channels.fetch(eventCall.coordinationChannelId);
+            const coordChannel = await client.channels.fetch(eventCall.coordinationChannelId).catch(() => null);
             if (coordChannel) {
                 // If the DJ has no other slots in this event, revoke coordination channel access
                 if (slot.claimedByDiscordId) {
@@ -796,10 +786,7 @@ async function handleEventCallInteraction(interaction, client) {
                 }
             }
         } catch (e) {}
-
-        const { buildStaffManagePanel } = require('../commands/event-check');
-        const panel = buildStaffManagePanel(eventCall, slotIndex);
-        return interaction.update(panel);
+        return;
     }
 
     // 7. Staff Manually Closes or Re-opens Event Call
@@ -812,16 +799,22 @@ async function handleEventCallInteraction(interaction, client) {
             });
         }
 
+        await interaction.deferUpdate().catch(() => {});
+
         const callId = customId.replace('evt_close_toggle_', '');
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
+            return interaction.followUp({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
         }
 
         const newStatus = eventCall.status === 'closed' ? 'open' : 'closed';
         await eventCall.update({ status: newStatus });
 
-        // Update announcement message
+        const { buildStaffManagePanel } = require('../commands/event-check');
+        const panel = buildStaffManagePanel(eventCall, 0);
+        await interaction.editReply(panel).catch(() => {});
+
+        // Update announcement message in background
         try {
             const annChannel = await client.channels.fetch(eventCall.channelId).catch(() => null);
             if (annChannel) {
@@ -834,10 +827,7 @@ async function handleEventCallInteraction(interaction, client) {
                 }
             }
         } catch (e) {}
-
-        const { buildStaffManagePanel } = require('../commands/event-check');
-        const panel = buildStaffManagePanel(eventCall, 0);
-        return interaction.update(panel);
+        return;
     }
 }
 

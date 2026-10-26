@@ -105,7 +105,13 @@ client.on(Events.InteractionCreate, async interaction => {
     // 2. Handle Event Call Interactions (Slot Claims, Modals, Trackers, Checklist Toggles)
     if (interaction.customId && interaction.customId.startsWith('evt_')) {
         const { handleEventCallInteraction } = require('./utils/event-call-utils');
-        return await handleEventCallInteraction(interaction, client);
+        return await handleEventCallInteraction(interaction, client).catch(err => {
+            if (err?.code === 10062) {
+                console.warn('[EVENT-CALL] Interaction expired before completion (Discord 10062).');
+            } else {
+                console.error('[EVENT-CALL] Error handling interaction:', err);
+            }
+        });
     }
 
     // 2. Handle Application Buttons
