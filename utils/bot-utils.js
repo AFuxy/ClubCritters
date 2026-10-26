@@ -311,12 +311,15 @@ async function createApplicationTicket(submission, slot) {
  */
 async function joinGuild(client, userId, accessToken) {
     const guildId = process.env.DISCORD_GUILD_ID;
-    if (!guildId) return false;
+    if (!guildId || !accessToken) return false;
     try {
         const guild = await client.guilds.fetch(guildId);
         await guild.members.add(userId, { accessToken });
         return true;
-    } catch (err) { return false; }
+    } catch (err) {
+        console.error(`[BOT] Failed to add user ${userId} to guild:`, err.message);
+        return false;
+    }
 }
 
 /**

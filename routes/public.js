@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Roster, Settings, Schedule, Archive, Gallery, AppSlot, ApplicationSubmission, InstanceLog, Partner, PartnerEvent, sequelize } = require('../db');
-const { getGuildMember } = require('../bot');
+const { getGuildMember, joinGuild } = require('../bot');
 const { getInstanceData, getGroupInstanceData, getGroupStats, getUserInfo, getVrcStatus } = require('../utils/vrc-api');
 const { parseGenres, getParentCategory } = require('../utils/genre-taxonomy');
 const { Op } = require('sequelize');
@@ -578,6 +578,32 @@ router.post('/api/public/apps/submit', async (req, res) => {
 
         const discordId = req.user.discordId;
         const discordTag = req.user.discordData?.username || req.user.name || "Unknown";
+
+        // Auto-join applicant to Discord server upon submission (only once)
+        const accessToken = req.session?.discordAccessToken || req.user?.accessToken;
+        const alreadyJoinedInSession = req.session?.hasJoinedGuildViaApp;
+
+        if (accessToken && !alreadyJoinedInSession) {
+            try {
+                const existingMember = await getGuildMember(discordId).catch(() => null);
+                if (!existingMember) {
+                    const previousSubmissionsCount = await ApplicationSubmission.count({ where: { discordId } });
+                    if (previousSubmissionsCount === 0) {
+                        const joined = await joinGuild(discordId, accessToken);
+                        if (joined) {
+                            console.log(`[APP] 🚀 Auto-joined applicant ${discordId} (${discordTag}) to Discord guild upon submission.`);
+                        }
+                    }
+                }
+            } catch (joinErr) {
+                console.error(`[APP] ⚠️ Error during auto-join for ${discordId}:`, joinErr);
+            } finally {
+                if (req.session) {
+                    req.session.hasJoinedGuildViaApp = true;
+                    req.session.discordAccessToken = null;
+                }
+            }
+        }
 
         const submission = await ApplicationSubmission.create({
             slotId,

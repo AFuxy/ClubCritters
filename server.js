@@ -3,7 +3,7 @@ const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
 const { Roster, Settings, initDB } = require('./db');
-const { getGuildMember, joinGuild } = require('./bot');
+const { getGuildMember } = require('./bot');
 require('dotenv').config();
 
 const app = express();
@@ -19,9 +19,14 @@ const safeParseJSON = (data) => {
 };
 
 // Passport Serialization
-passport.serializeUser((user, done) => done(null, user.discordId));
-passport.deserializeUser(async (id, done) => {
+passport.serializeUser((user, done) => {
+    done(null, { discordId: user.discordId, name: user.name });
+});
+
+passport.deserializeUser(async (serialized, done) => {
     try {
+        const id = typeof serialized === 'object' && serialized !== null ? serialized.discordId : serialized;
+        const cachedName = typeof serialized === 'object' && serialized !== null ? serialized.name : null;
         let user = await Roster.findByPk(id);
         
         if (user) {
@@ -38,7 +43,7 @@ passport.deserializeUser(async (id, done) => {
         if (!user) {
             user = { 
                 discordId: id, 
-                name: guildMember?.nickname || "Applicant", 
+                name: guildMember?.nickname || cachedName || "Applicant", 
                 type: "Public", 
                 links: {},
                 isPublic: true 
@@ -59,19 +64,16 @@ passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID,
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL: process.env.DISCORD_REDIRECT_URI,
-    scope: ['identify', 'guilds.join']
-}, async (accessToken, refreshToken, profile, done) => {
+    scope: ['identify', 'guilds.join'],
+    passReqToCallback: true
+}, async (req, accessToken, refreshToken, profile, done) => {
     try {
-        // 1. Try to join the user to the guild automatically
-        await joinGuild(profile.id, accessToken);
-
-        // 2. Check if they are now in the guild
-        const guildMember = await getGuildMember(profile.id);
-        if (!guildMember) {
-            return done(null, false, { message: 'You must be in the Club FuRN Discord to login.' });
+        // Store OAuth access token in session for application submission join permission
+        if (req && req.session) {
+            req.session.discordAccessToken = accessToken;
         }
 
-        // 3. Find or identify user
+        // Find or identify user
         let user = await Roster.findByPk(profile.id);
         
         if (user && user.isBanned) {
@@ -80,9 +82,16 @@ passport.use(new DiscordStrategy({
 
         if (!user) {
             // For applicants, we return a virtual user object
-            return done(null, { discordId: profile.id, name: profile.username, type: "Public", isPublic: true });
+            return done(null, { 
+                discordId: profile.id, 
+                name: profile.global_name || profile.username, 
+                type: "Public", 
+                isPublic: true, 
+                accessToken 
+            });
         }
 
+        user.accessToken = accessToken;
         return done(null, user);
     } catch (err) {
         return done(err, null);
