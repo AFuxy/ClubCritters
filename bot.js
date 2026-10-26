@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, Events, REST, Routes, Collection, EmbedBuilde
 const fs = require('fs');
 const path = require('path');
 const { autoUpdateStatus, getGuildMember, updateBotStatus, downloadFile, joinGuild, auditGroupMembers, autoAnnounceLivePartnerEvents, archiveTicketChannel } = require('./utils/bot-utils');
+const { checkAndCloseEventCalls } = require('./utils/event-call-utils');
 require('dotenv').config();
 
 const client = new Client({
@@ -63,6 +64,10 @@ client.once(Events.ClientReady, (c) => {
     // Partner Event Live Announcements Loop (Every 60s)
     setInterval(() => autoAnnounceLivePartnerEvents(client), 60000);
     setTimeout(() => autoAnnounceLivePartnerEvents(client), 5000);
+
+    // Event Call Auto-Close Check Loop (Every 60s)
+    setInterval(() => checkAndCloseEventCalls(client), 60000);
+    setTimeout(() => checkAndCloseEventCalls(client), 5000);
 
     // VRChat Status & Group Audit Loops
     if (process.env.DISABLE_VRC_BOT !== 'true') {

@@ -94,14 +94,24 @@ function renderAnnouncementEmbed(eventCall) {
     const slots = parseSlotsData(eventCall);
     const firstSlot = slots[0];
     const startUnixDesc = firstSlot && Number.isFinite(firstSlot.startUnix) ? firstSlot.startUnix : Math.floor(Date.now() / 1000);
+    const isClosed = eventCall.status === 'closed';
+    const isAllClaimed = slots.length > 0 && slots.every(s => s.isClaimed);
+
+    let statusDescription = '';
+    if (isClosed) {
+        statusDescription = `**Lineup Call Closed** — This lineup call is now closed.\nTimes are displayed in your local device timezone.`;
+    } else if (isAllClaimed) {
+        statusDescription = `**Lineup Full** — All slots have been claimed.\nIf a slot opens back up, it will become available here.\nTimes are displayed in your local device timezone.`;
+    } else {
+        statusDescription = `Click an open slot button below to claim your set (first-come, first-served).\nTimes are displayed in your local device timezone.`;
+    }
 
     const embed = new EmbedBuilder()
-        .setTitle(`Lineup Call: ${eventCall.title}`)
-        .setColor('#29C5F6')
+        .setTitle(isClosed ? `Lineup Call (Closed): ${eventCall.title}` : `Lineup Call: ${eventCall.title}`)
+        .setColor(isClosed ? '#607d8b' : (isAllClaimed ? '#ff9800' : '#29C5F6'))
         .setDescription(
             `**Event Date:** <t:${startUnixDesc}:D>\n` +
-            `Click an open slot button below to claim your set (first-come, first-served).\n` +
-            `Times are displayed in your local device timezone.`
+            statusDescription
         )
         .setFooter({ text: 'Club FuRN Event System • Times shown in your local timezone' })
         .setTimestamp();
@@ -113,7 +123,7 @@ function renderAnnouncementEmbed(eventCall) {
             if (!slot.isClaimed) {
                 embed.addFields({
                     name: `Slot ${slot.index + 1}: ${slot.timeSlotStr || 'TBD'}`,
-                    value: `<t:${startUnix}:t> – <t:${endUnix}:t>\n**OPEN**`,
+                    value: `<t:${startUnix}:t> – <t:${endUnix}:t>\n**${isClosed ? 'CLOSED' : 'OPEN'}**`,
                     inline: false
                 });
             } else {
@@ -135,6 +145,7 @@ function renderAnnouncementEmbed(eventCall) {
  */
 function buildAnnouncementButtons(eventCall) {
     const slots = parseSlotsData(eventCall);
+    const isClosed = eventCall.status === 'closed';
     const rows = [];
     let currentRow = new ActionRowBuilder();
 
@@ -149,7 +160,8 @@ function buildAnnouncementButtons(eventCall) {
                 new ButtonBuilder()
                     .setCustomId(`evt_claim_${eventCall.id}_${slot.index}`)
                     .setLabel(`Slot ${slot.index + 1} (${slot.startLabel || 'Open'})`)
-                    .setStyle(ButtonStyle.Success)
+                    .setStyle(isClosed ? ButtonStyle.Secondary : ButtonStyle.Success)
+                    .setDisabled(isClosed)
             );
         } else {
             const rawLabel = `Slot ${slot.index + 1}: ${slot.djName || 'Claimed'}`;
@@ -350,6 +362,52 @@ async function syncScheduleSlot(slot, isReopen = false) {
 }
 
 /**
+ * Close an active Event Call
+ */
+async function closeEventCall(eventCall, client, reason = 'Event started') {
+    if (!eventCall || eventCall.status === 'closed') return;
+    await eventCall.update({ status: 'closed' });
+    console.log(`[EVENT-CALL] Closed EventCall #${eventCall.id} (${eventCall.title}): ${reason}`);
+
+    // Update announcement message
+    try {
+        const channel = await client.channels.fetch(eventCall.channelId).catch(() => null);
+        if (channel) {
+            const msg = await channel.messages.fetch(eventCall.messageId).catch(() => null);
+            if (msg) {
+                await msg.edit({
+                    embeds: [renderAnnouncementEmbed(eventCall)],
+                    components: buildAnnouncementButtons(eventCall)
+                });
+            }
+        }
+    } catch (e) {
+        console.error('[EVENT-CALL] Error updating announcement message on close:', e.message);
+    }
+}
+
+/**
+ * Recurring check to auto-close event calls once the event start time arrives
+ */
+async function checkAndCloseEventCalls(client) {
+    try {
+        const now = Date.now();
+        const openCalls = await EventCall.findAll({ where: { status: 'open' } });
+        for (const call of openCalls) {
+            const slots = parseSlotsData(call);
+            if (slots.length === 0) continue;
+            const firstSlot = slots[0];
+            const startTime = new Date(firstSlot.startTimeUtc).getTime();
+            if (Number.isFinite(startTime) && now >= startTime) {
+                await closeEventCall(call, client, 'Event started');
+            }
+        }
+    } catch (err) {
+        console.error('[EVENT-CALL] Error checking auto-close event calls:', err.message);
+    }
+}
+
+/**
  * Master dispatcher for all Event Call interactions (buttons, modals, select menus)
  */
 async function handleEventCallInteraction(interaction, client) {
@@ -397,7 +455,14 @@ async function handleEventCallInteraction(interaction, client) {
 
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: '❌ Event call not found.', flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
+        }
+
+        if (eventCall.status === 'closed') {
+            return interaction.reply({ 
+                content: 'This lineup call is closed and no longer accepting claims.', 
+                flags: MessageFlags.Ephemeral 
+            });
         }
 
         const slots = parseSlotsData(eventCall);
@@ -462,7 +527,13 @@ async function handleEventCallInteraction(interaction, client) {
 
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.editReply({ content: '❌ Event call not found.' });
+            return interaction.editReply({ content: 'Event call not found.' });
+        }
+
+        if (eventCall.status === 'closed') {
+            return interaction.editReply({ 
+                content: 'This lineup call is closed and no longer accepting claims.' 
+            });
         }
 
         const slots = parseSlotsData(eventCall);
@@ -566,7 +637,14 @@ async function handleEventCallInteraction(interaction, client) {
         const callId = customId.replace('evt_sel_slot_', '');
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: '❌ Event call not found.', flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
+        }
+
+        if (eventCall.status === 'closed') {
+            return interaction.reply({ 
+                content: 'This lineup call is closed and no longer accepting claims.', 
+                flags: MessageFlags.Ephemeral 
+            });
         }
 
         const { buildStaffManagePanel } = require('../commands/event-check');
@@ -593,7 +671,14 @@ async function handleEventCallInteraction(interaction, client) {
 
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: '❌ Event call not found.', flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
+        }
+
+        if (eventCall.status === 'closed') {
+            return interaction.reply({ 
+                content: 'This lineup call is closed and no longer accepting claims.', 
+                flags: MessageFlags.Ephemeral 
+            });
         }
 
         const slots = parseSlotsData(eventCall);
@@ -642,7 +727,14 @@ async function handleEventCallInteraction(interaction, client) {
 
         const eventCall = await EventCall.findByPk(callId);
         if (!eventCall) {
-            return interaction.reply({ content: '❌ Event call not found.', flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
+        }
+
+        if (eventCall.status === 'closed') {
+            return interaction.reply({ 
+                content: 'This lineup call is closed and no longer accepting claims.', 
+                flags: MessageFlags.Ephemeral 
+            });
         }
 
         const slots = parseSlotsData(eventCall);
@@ -709,6 +801,44 @@ async function handleEventCallInteraction(interaction, client) {
         const panel = buildStaffManagePanel(eventCall, slotIndex);
         return interaction.update(panel);
     }
+
+    // 7. Staff Manually Closes or Re-opens Event Call
+    if (customId.startsWith('evt_close_toggle_')) {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) && 
+            !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ 
+                content: 'Only staff members can close or re-open event calls.', 
+                flags: MessageFlags.Ephemeral 
+            });
+        }
+
+        const callId = customId.replace('evt_close_toggle_', '');
+        const eventCall = await EventCall.findByPk(callId);
+        if (!eventCall) {
+            return interaction.reply({ content: 'Event call not found.', flags: MessageFlags.Ephemeral });
+        }
+
+        const newStatus = eventCall.status === 'closed' ? 'open' : 'closed';
+        await eventCall.update({ status: newStatus });
+
+        // Update announcement message
+        try {
+            const annChannel = await client.channels.fetch(eventCall.channelId).catch(() => null);
+            if (annChannel) {
+                const annMsg = await annChannel.messages.fetch(eventCall.messageId).catch(() => null);
+                if (annMsg) {
+                    await annMsg.edit({
+                        embeds: [renderAnnouncementEmbed(eventCall)],
+                        components: buildAnnouncementButtons(eventCall)
+                    });
+                }
+            }
+        } catch (e) {}
+
+        const { buildStaffManagePanel } = require('../commands/event-check');
+        const panel = buildStaffManagePanel(eventCall, 0);
+        return interaction.update(panel);
+    }
 }
 
 module.exports = {
@@ -720,5 +850,7 @@ module.exports = {
     renderTrackerContent,
     getOrCreateCoordinationChannel,
     syncScheduleSlot,
-    handleEventCallInteraction
+    handleEventCallInteraction,
+    closeEventCall,
+    checkAndCloseEventCalls
 };

@@ -27,11 +27,13 @@ function buildStaffManagePanel(eventCall, selectedIndex = 0) {
           (eventCall.hasLights ? `• Stage Lights: ${slot.hasLights ? '✅ Complete' : '❌ Pending'}\n` : '')
         : '*Slot is currently OPEN / Unclaimed. Toggle buttons activate once a DJ claims this slot.*';
 
+    const isClosed = eventCall.status === 'closed';
+
     const embed = new EmbedBuilder()
         .setTitle(`Lineup Checklist Manager — ${eventCall.title}`)
-        .setColor('#29C5F6')
+        .setColor(isClosed ? '#607d8b' : '#29C5F6')
         .setDescription(
-            `Use the controls below to verify DJ deliverables and toggle checkmarks on the public tracker.\n\n` +
+            `**Lineup Status:** ${isClosed ? 'Closed' : 'Open'}\n\n` +
             `**Currently Managing:** Slot ${slot.index + 1} (${slot.timeSlotStr})\n` +
             `**Performer:** ${slot.isClaimed ? `**${slot.djName}** (<@${slot.claimedByDiscordId}>)` : '*Open Slot*'}\n` +
             `• **Genre:** ${slot.genre || 'N/A'}\n` +
@@ -97,7 +99,15 @@ function buildStaffManagePanel(eventCall, selectedIndex = 0) {
         );
     }
 
-    return { embeds: [embed], components: [selectRow, buttonsRow] };
+    // Event-level actions row
+    const eventActionsRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`evt_close_toggle_${eventCall.id}`)
+            .setLabel(isClosed ? 'Re-open Event Call' : 'Close Event Call')
+            .setStyle(isClosed ? ButtonStyle.Success : ButtonStyle.Secondary)
+    );
+
+    return { embeds: [embed], components: [selectRow, buttonsRow, eventActionsRow] };
 }
 
 module.exports = {
