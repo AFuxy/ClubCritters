@@ -212,6 +212,11 @@
             <h1 id="main-title">JOIN THE CREW</h1>
             <p id="status-subtext">Club FuRN Recruitment</p>
 
+            <div id="selection-banner" style="display: none; max-width: 600px; margin: 20px auto 10px auto; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.35); border-radius: 12px; padding: 14px 20px; color: #ffd700; font-size: 0.92rem; align-items: center; gap: 12px; text-align: left;">
+                <span style="font-size: 1.3rem; flex-shrink: 0;">ℹ️</span>
+                <span id="selection-banner-text" style="line-height: 1.4;"></span>
+            </div>
+
             <div id="loading-apps" style="margin-top: 80px; text-align: center;">
                 <div class="spinner" style="width: 60px; height: 60px;"></div>
                 <p style="color:#888; font-weight: bold; letter-spacing: 1px;">SCANNING FOR OPENINGS...</p>
@@ -235,6 +240,11 @@
                 <% if (user) { %>
                     <form id="dynamic-application-form">
                         <input type="hidden" id="field-slot-id">
+                        
+                        <div id="form-error-banner" style="display: none; background: rgba(255, 68, 68, 0.12); border: 1px solid rgba(255, 68, 68, 0.35); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; color: #ff8888; font-size: 0.9rem; align-items: center; gap: 12px;">
+                            <span style="font-size: 1.3rem; flex-shrink: 0;">⚠️</span>
+                            <span id="form-error-text" style="line-height: 1.4;"></span>
+                        </div>
                         
                         <div id="dynamic-fields-container">
                             <!-- JS will inject fields here -->
@@ -273,6 +283,30 @@
 
     <script src="/cdn/js/theme-engine.js"></script>
     <script>
+        function showFormError(msg) {
+            const banner = document.getElementById('form-error-banner');
+            const text = document.getElementById('form-error-text');
+            if (banner && text) {
+                text.innerText = msg;
+                banner.style.display = 'flex';
+                banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function hideFormError() {
+            const banner = document.getElementById('form-error-banner');
+            if (banner) banner.style.display = 'none';
+        }
+
+        function showSelectionBanner(msg) {
+            const banner = document.getElementById('selection-banner');
+            const text = document.getElementById('selection-banner-text');
+            if (banner && text) {
+                text.innerText = msg;
+                banner.style.display = 'flex';
+            }
+        }
+
         const selectionView = document.getElementById('selection-view');
         const formView = document.getElementById('form-view');
         const appsContainer = document.getElementById('apps-container');
@@ -381,10 +415,14 @@
                                 <h2>${app.roleName}</h2>
                                 <p>${app.description || 'No description provided.'}</p>
                                 ${isOpen ? 
+                                    (app.userStatus === 'pending' ?
+                                        `<button class="btn-cc btn-dark" disabled style="opacity: 0.85; cursor: not-allowed; border: 1px solid rgba(255, 215, 0, 0.4); color: #ffd700;" title="You already have a pending application under review for this role.">⏳ Under Review</button>` :
+                                    (app.userStatus === 'already_approved' ?
+                                        `<button class="btn-cc btn-dark" disabled style="opacity: 0.85; cursor: not-allowed; border: 1px solid rgba(0, 230, 118, 0.4); color: #00e676;" title="You have already been approved for this role!">✅ Already Approved</button>` :
                                     (app.isInternal ? 
                                         `<button onclick="trackAppClick('${app.id}', '${app.roleName}'); handleInternalApply('${app.id}', '${app.roleName}', \`${app.description || ''}\`, '${app.roleType}')" class="btn-cc btn-primary">Apply Now</button>` :
                                         `<a href="${app.formUrl}" target="_blank" class="btn-cc btn-primary" onclick="trackAppClick('${app.id}', '${app.roleName}')">Apply Now</a>`
-                                    ) : 
+                                    ))) : 
                                     `<button class="btn-cc btn-dark" disabled>Applications Closed</button>`
                                 }
                             </div>
@@ -399,7 +437,15 @@
                 const autoSlotId = urlParams.get('slotId');
                 if (autoSlotId) {
                     const slot = apps.find(a => a.id.toString() === autoSlotId);
-                    if (slot) openInternalForm(slot.id, slot.roleName, slot.description, slot.roleType, false);
+                    if (slot) {
+                        if (slot.userStatus === 'pending') {
+                            showSelectionBanner('⏳ You already have an application under review for ' + slot.roleName + '.');
+                        } else if (slot.userStatus === 'already_approved') {
+                            showSelectionBanner('✅ You have already been approved for ' + slot.roleName + ' and cannot re-apply.');
+                        } else {
+                            openInternalForm(slot.id, slot.roleName, slot.description, slot.roleType, false);
+                        }
+                    }
                 }
 
             } catch (e) {
@@ -424,6 +470,7 @@
             document.getElementById('form-role-title').innerText = name.toUpperCase() + " APPLICATION";
             document.getElementById('form-role-desc').innerText = desc;
             document.getElementById('field-slot-id').value = id;
+            hideFormError();
             
             // Build dynamic fields
             const fields = FORM_DEFINITIONS[type] || FORM_DEFINITIONS['Other'];
@@ -485,13 +532,14 @@
                         formView.innerHTML = `<div class="internal-form-container" style="text-align: center; padding: 60px 40px;"><div style="font-size: 4rem; margin-bottom: 20px;">✅</div><h2 style="color: #00e676; margin-bottom: 10px;">Submitted!</h2><p style="color: #ccc;">Your application for ${document.getElementById('form-role-title').innerText} has been received.</p><p style="color: #888; font-size: 0.88rem; margin-top: 10px;">You have also been added to our Discord server. A staff member will review your submission shortly!</p><a href="/" class="btn-cc btn-primary" style="margin-top: 30px;">Return Home</a></div>`;
                     } else {
                         const errorData = await res.json().catch(() => ({}));
-                        alert(errorData.error || "Submission failed.");
+                        showFormError(errorData.error || "Submission failed.");
                         submitBtn.disabled = false;
                         submitBtn.innerText = "Submit Application";
                     }
                 } catch (err) {
-                    alert("Network error.");
+                    showFormError("Network error occurred. Please try again.");
                     submitBtn.disabled = false;
+                    submitBtn.innerText = "Submit Application";
                 }
             });
         }

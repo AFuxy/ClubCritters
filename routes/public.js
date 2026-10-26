@@ -431,10 +431,59 @@ router.get('/api/public/apps', async (req, res) => {
     try {
         const slots = await AppSlot.findAll({ order: [['order', 'ASC']] });
         const now = new Date();
+        const discordId = req.user?.discordId;
+
+        let userSubmissions = [];
+        let rosterMember = null;
+        if (discordId) {
+            [userSubmissions, rosterMember] = await Promise.all([
+                ApplicationSubmission.findAll({ where: { discordId } }),
+                Roster.findByPk(discordId).catch(() => null)
+            ]);
+        }
+
+        const isApprovedRosterPerformer = rosterMember && !rosterMember.isBanned && (() => {
+            const raw = String(rosterMember.type || '').toLowerCase();
+            return raw.includes('dj') || raw.includes('resident') || raw.includes('performer');
+        })();
+
         const mapped = slots.map(s => {
             let status = s.status;
             if (s.autoCloseAt && new Date(s.autoCloseAt) < now) status = 'closed';
-            return { id: s.id, roleName: s.roleName, roleType: s.roleType, description: s.description, formUrl: s.formUrl, isInternal: s.isInternal, status: status, deadline: s.deadline };
+
+            let userStatus = 'can_apply';
+            let userStatusMessage = null;
+
+            if (discordId) {
+                const pendingSub = userSubmissions.find(sub => sub.slotId === s.id && sub.status === 'pending');
+                if (pendingSub) {
+                    userStatus = 'pending';
+                    userStatusMessage = 'Application Under Review';
+                } else if (s.allowRepeatSubmissions === false) {
+                    const isAcceptedThisSlot = userSubmissions.some(sub => sub.slotId === s.id && sub.status === 'accepted');
+                    const isPerformerSlot = ['DJ', 'Singer', 'Musician/Band'].includes(s.roleType) || (s.roleName && s.roleName.toLowerCase().includes('dj'));
+                    const isAcceptedAnyPerformer = isPerformerSlot && userSubmissions.some(sub => sub.status === 'accepted');
+
+                    if (isAcceptedThisSlot || (isPerformerSlot && (isAcceptedAnyPerformer || isApprovedRosterPerformer))) {
+                        userStatus = 'already_approved';
+                        userStatusMessage = 'Role Already Approved';
+                    }
+                }
+            }
+
+            return {
+                id: s.id,
+                roleName: s.roleName,
+                roleType: s.roleType,
+                description: s.description,
+                formUrl: s.formUrl,
+                isInternal: s.isInternal,
+                status: status,
+                deadline: s.deadline,
+                allowRepeatSubmissions: s.allowRepeatSubmissions,
+                userStatus,
+                userStatusMessage
+            };
         });
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
@@ -578,6 +627,73 @@ router.post('/api/public/apps/submit', async (req, res) => {
 
         const discordId = req.user.discordId;
         const discordTag = req.user.discordData?.username || req.user.name || "Unknown";
+
+        // 1. Duplicate Pending Submission Guard
+        const existingPending = await ApplicationSubmission.findOne({
+            where: {
+                slotId: slot.id,
+                discordId,
+                status: 'pending'
+            }
+        });
+        if (existingPending) {
+            return res.status(400).json({
+                error: 'You already have a pending application for this role under review. Please wait for staff to process your application.'
+            });
+        }
+
+        // 2. Repeat Application Guard (Once Approved)
+        if (slot.allowRepeatSubmissions === false) {
+            // Check A: User already has an accepted submission for this exact slot
+            const existingAccepted = await ApplicationSubmission.findOne({
+                where: {
+                    slotId: slot.id,
+                    discordId,
+                    status: 'accepted'
+                }
+            });
+            if (existingAccepted) {
+                return res.status(400).json({
+                    error: 'You have already been approved for this role and cannot re-apply.'
+                });
+            }
+
+            // Check B: Performer slot repeat rule across performer roles and Roster
+            const isPerformerSlot = ['DJ', 'Singer', 'Musician/Band'].includes(slot.roleType) || (slot.roleName && slot.roleName.toLowerCase().includes('dj'));
+            if (isPerformerSlot) {
+                const anyAcceptedPerformer = await ApplicationSubmission.findOne({
+                    where: {
+                        discordId,
+                        status: 'accepted'
+                    },
+                    include: [{
+                        model: AppSlot,
+                        required: false
+                    }]
+                });
+                if (anyAcceptedPerformer) {
+                    const subSlot = anyAcceptedPerformer.AppSlot;
+                    const wasPerformerSub = !subSlot || ['DJ', 'Singer', 'Musician/Band'].includes(subSlot.roleType) || (subSlot.roleName && subSlot.roleName.toLowerCase().includes('dj'));
+                    if (wasPerformerSub) {
+                        return res.status(400).json({
+                            error: 'You have already been approved as a Club FuRN performer and cannot re-apply.'
+                        });
+                    }
+                }
+
+                // Check active Roster
+                const rosterMember = await Roster.findByPk(discordId);
+                if (rosterMember && !rosterMember.isBanned) {
+                    const rawType = String(rosterMember.type || '').toLowerCase();
+                    const isApprovedPerformer = rawType.includes('dj') || rawType.includes('resident') || rawType.includes('performer');
+                    if (isApprovedPerformer) {
+                        return res.status(400).json({
+                            error: 'You are already an active performer on the Club FuRN roster and cannot re-apply.'
+                        });
+                    }
+                }
+            }
+        }
 
         // Auto-join applicant to Discord server upon submission (only once)
         const accessToken = req.session?.discordAccessToken || req.user?.accessToken;

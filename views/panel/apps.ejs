@@ -175,6 +175,20 @@
                                 <span style="font-size: 0.7rem; color: #888; margin-top: 8px; display: block;">Click to toggle role tags. If the user already has a roster profile, these roles will be merged into their account.</span>
                             </div>
                         </div>
+
+                        <!-- Repeat Applications Rule -->
+                        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 14px 16px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; user-select: none;">
+                                    <input type="checkbox" id="app-allow-repeat" style="width: auto; cursor: pointer;">
+                                    <span style="font-weight: 600; font-size: 0.88rem; color: #e0e0e0;">Allow Repeat Submissions (After Approval)</span>
+                                </label>
+                                <span style="font-size: 0.72rem; color: #888;">Controls whether approved applicants can apply again</span>
+                            </div>
+                            <span style="font-size: 0.7rem; color: #777; margin-top: 6px; display: block;">
+                                Leave <strong>unchecked</strong> for unique roles (like <strong>DJs & Performers</strong>) so approved members cannot re-apply. Enable for roles where members can apply repeatedly (like staff applying for different duties).
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -330,6 +344,14 @@
     const appsList = document.getElementById('apps-list');
     const roleNameInput = document.getElementById('app-role-name');
     const roleTypeSelect = document.getElementById('app-role-type');
+    if (roleTypeSelect) {
+        roleTypeSelect.addEventListener('change', () => {
+            if (!editAppId && allowRepeatInput) {
+                const isPerformer = ['DJ', 'Singer', 'Musician/Band'].includes(roleTypeSelect.value);
+                allowRepeatInput.checked = !isPerformer;
+            }
+        });
+    }
     const deadlineInput = document.getElementById('app-deadline');
     const autoCloseInput = document.getElementById('app-auto-close');
     const descriptionInput = document.getElementById('app-description');
@@ -350,6 +372,7 @@
     const createSiteAccountInput = document.getElementById('app-create-site-account');
     const siteAccountConfig = document.getElementById('site-account-config');
     const siteRolePillsContainer = document.getElementById('site-role-pills');
+    const allowRepeatInput = document.getElementById('app-allow-repeat');
 
     let editAppId = null;
     let allSlots = [];
@@ -514,9 +537,11 @@
                 siteAccountBadge = `<span style="display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; padding:3px 8px; border-radius:4px; background:rgba(0, 230, 118, 0.15); border:1px solid rgba(0, 230, 118, 0.35); color:#00e676;">🌐 Account: ${rolesList}</span>`;
             }
 
-            const badgesHtml = (discordRoleBadge || siteAccountBadge)
-                ? `<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">${discordRoleBadge}${siteAccountBadge}</div>`
-                : '';
+            const repeatBadge = s.allowRepeatSubmissions === false
+                ? `<span style="display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; padding:3px 8px; border-radius:4px; background:rgba(255, 82, 82, 0.12); border:1px solid rgba(255, 82, 82, 0.3); color:#ff7b7b;">🚫 No Repeats</span>`
+                : `<span style="display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; padding:3px 8px; border-radius:4px; background:rgba(41, 197, 246, 0.12); border:1px solid rgba(41, 197, 246, 0.3); color:var(--primary-blue);">🔁 Repeat Allowed</span>`;
+
+            const badgesHtml = `<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">${discordRoleBadge}${siteAccountBadge}${repeatBadge}</div>`;
 
             return `
             <div class="schedule-item" style="border-left: 4px solid ${isAutoClosed || s.status === 'closed' ? 'var(--accent-red)' : '#00e676'}; background: var(--card-bg); padding: 15px 18px; border-radius: 12px; display:flex; align-items:center; justify-content:space-between; gap:15px; flex-wrap:wrap;">
@@ -579,7 +604,8 @@
                     giveDiscordRole,
                     discordRoleId,
                     createSiteAccount,
-                    siteRoles
+                    siteRoles,
+                    allowRepeatSubmissions: allowRepeatInput.checked
                 })
             });
             if (res.ok) {
@@ -630,6 +656,7 @@
         // Site Account Automation
         createSiteAccountInput.checked = !!s.createSiteAccount;
         toggleSiteAccountFields();
+        allowRepeatInput.checked = s.allowRepeatSubmissions !== false;
         selectedSiteRoles.clear();
         let slotRoles = ['performer'];
         if (s.siteRoles) {
@@ -682,7 +709,8 @@
                     giveDiscordRole,
                     discordRoleId,
                     createSiteAccount,
-                    siteRoles
+                    siteRoles,
+                    allowRepeatSubmissions: allowRepeatInput.checked
                 })
             });
             if (res.ok) {
@@ -715,6 +743,8 @@
         selectedSiteRoles.clear();
         selectedSiteRoles.add('performer');
         renderSiteRolePills();
+        const isPerformer = ['DJ', 'Singer', 'Musician/Band'].includes(roleTypeSelect.value);
+        allowRepeatInput.checked = !isPerformer;
     }
 
     function cancelAppEdit() {

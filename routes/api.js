@@ -1660,7 +1660,8 @@ router.post('/apps/add', isHostOrOwner, async (req, res) => {
             giveDiscordRole,
             discordRoleId,
             createSiteAccount,
-            siteRoles
+            siteRoles,
+            allowRepeatSubmissions
         } = req.body;
 
         const normalizedSiteRoles = typeof siteRoles === 'object'
@@ -1679,7 +1680,8 @@ router.post('/apps/add', isHostOrOwner, async (req, res) => {
             giveDiscordRole: !!giveDiscordRole,
             discordRoleId: discordRoleId ? String(discordRoleId).trim() : null,
             createSiteAccount: !!createSiteAccount,
-            siteRoles: normalizedSiteRoles
+            siteRoles: normalizedSiteRoles,
+            allowRepeatSubmissions: allowRepeatSubmissions !== undefined ? !!allowRepeatSubmissions : (!['DJ', 'Singer', 'Musician/Band'].includes(roleType))
         });
         res.json({ success: true });
     } catch (err) {
@@ -1696,6 +1698,9 @@ router.patch('/apps/:id', isHostOrOwner, async (req, res) => {
         }
         if (updates.autoCloseAt === '') updates.autoCloseAt = null;
         if (updates.discordRoleId === '') updates.discordRoleId = null;
+        if (updates.allowRepeatSubmissions !== undefined) {
+            updates.allowRepeatSubmissions = !!updates.allowRepeatSubmissions;
+        }
         await AppSlot.update(updates, { where: { id: req.params.id } });
         res.json({ success: true });
     } catch (err) {

@@ -90,7 +90,8 @@ const AppSlot = sequelize.define('AppSlot', {
     giveDiscordRole: { type: DataTypes.BOOLEAN, defaultValue: false },
     discordRoleId: { type: DataTypes.STRING, allowNull: true },
     createSiteAccount: { type: DataTypes.BOOLEAN, defaultValue: false },
-    siteRoles: { type: DataTypes.TEXT, allowNull: true, defaultValue: '["Performer"]' }
+    siteRoles: { type: DataTypes.TEXT, allowNull: true, defaultValue: '["Performer"]' },
+    allowRepeatSubmissions: { type: DataTypes.BOOLEAN, defaultValue: true }
 });
 
 // 7. Gallery (Discord Synced)
