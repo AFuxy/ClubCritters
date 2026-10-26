@@ -96,12 +96,12 @@ function renderAnnouncementEmbed(eventCall) {
     const startUnixDesc = firstSlot && Number.isFinite(firstSlot.startUnix) ? firstSlot.startUnix : Math.floor(Date.now() / 1000);
 
     const embed = new EmbedBuilder()
-        .setTitle(`📢 LINEUP CALL: ${eventCall.title}`)
+        .setTitle(`Lineup Call: ${eventCall.title}`)
         .setColor('#29C5F6')
         .setDescription(
-            `📅 **Event Date:** <t:${startUnixDesc}:D>\n` +
-            `⚡ **First-Come, First-Served** — Click an open slot button below to claim your set!\n` +
-            `🕒 Times are displayed in your **local device timezone**.`
+            `**Event Date:** <t:${startUnixDesc}:D>\n` +
+            `Click an open slot button below to claim your set (first-come, first-served).\n` +
+            `Times are displayed in your local device timezone.`
         )
         .setFooter({ text: 'Club FuRN Event System • Times shown in your local timezone' })
         .setTimestamp();
@@ -112,15 +112,15 @@ function renderAnnouncementEmbed(eventCall) {
             const endUnix = Number.isFinite(slot.endUnix) ? slot.endUnix : 0;
             if (!slot.isClaimed) {
                 embed.addFields({
-                    name: `🎧 Slot ${slot.index + 1}: ${slot.timeSlotStr || 'TBD'}`,
-                    value: `🕒 <t:${startUnix}:t> – <t:${endUnix}:t>\n🟢 **OPEN**`,
+                    name: `Slot ${slot.index + 1}: ${slot.timeSlotStr || 'TBD'}`,
+                    value: `<t:${startUnix}:t> – <t:${endUnix}:t>\n**OPEN**`,
                     inline: false
                 });
             } else {
                 const b2bInfo = slot.setType && slot.setType.toLowerCase().includes('b2b') ? ` [${slot.setType}]` : '';
                 embed.addFields({
-                    name: `🎧 Slot ${slot.index + 1}: ${slot.timeSlotStr || 'TBD'}`,
-                    value: `🕒 <t:${startUnix}:t> – <t:${endUnix}:t>\n🔴 Claimed by **${slot.djName || 'DJ'}**${b2bInfo} • *${slot.genre || 'Open Format'}*`,
+                    name: `Slot ${slot.index + 1}: ${slot.timeSlotStr || 'TBD'}`,
+                    value: `<t:${startUnix}:t> – <t:${endUnix}:t>\nClaimed by **${slot.djName || 'DJ'}**${b2bInfo} • *${slot.genre || 'Open Format'}*`,
                     inline: false
                 });
             }
@@ -179,9 +179,9 @@ function renderTrackerContent(eventCall) {
     const firstSlot = slots[0];
 
     let lines = [];
-    lines.push(`📋 **LINEUP STATUS TRACKER — ${eventCall.title}**`);
+    lines.push(`**Lineup Status Tracker — ${eventCall.title}**`);
     if (firstSlot && Number.isFinite(firstSlot.startUnix)) {
-        lines.push(`📅 **Event Date:** <t:${firstSlot.startUnix}:D>`);
+        lines.push(`Event Date: <t:${firstSlot.startUnix}:D>`);
     }
     lines.push(`───────────────────────────────────────`);
 
@@ -192,19 +192,16 @@ function renderTrackerContent(eventCall) {
             (!eventCall.hasLights || slot.hasLights);
 
         const statusIcon = isAllDone ? '✅' : '⏳';
-        const djLabel = slot.isClaimed ? `**${slot.djName}**` : '*[Open Slot]*';
+        const djLabel = slot.isClaimed ? slot.djName : '[Open Slot]';
         const startUnix = Number.isFinite(slot.startUnix) ? slot.startUnix : 0;
 
         lines.push(`\n${statusIcon} **<t:${startUnix}:t> – ${djLabel}**`);
-        lines.push(`  ▫️ Set: ${slot.hasSet ? '✅' : '❌'}`);
-        lines.push(`  ▫️ Video: ${slot.hasVideo ? '✅' : '❌'}`);
+        lines.push(`  - Set: ${slot.hasSet ? '✅' : '❌'}`);
+        lines.push(`  - Video: ${slot.hasVideo ? '✅' : '❌'}`);
         if (eventCall.hasLights) {
-            lines.push(`  ▫️ Lights: ${slot.hasLights ? '✅' : '❌'}`);
+            lines.push(`  - Lights: ${slot.hasLights ? '✅' : '❌'}`);
         }
     });
-
-    lines.push(`\n───────────────────────────────────────`);
-    lines.push(`*Staff: Right-click this message → Apps → Manage Lineup Checklist (or run \`/event-check\`) to toggle checkmarks.*`);
 
     return lines.join('\n');
 }
@@ -228,10 +225,11 @@ async function getOrCreateCoordinationChannel(guild, eventDateStr, categoryId = 
     );
 
     if (existing) {
+        await existing.setPosition(0, { reason: 'Move coordination channel to top of category' }).catch(() => {});
         return existing;
     }
 
-    // 2. Create channel in the specified category
+    // 2. Create channel at the top of the specified category
     const permissionOverwrites = [
         {
             id: guild.id,
@@ -266,9 +264,12 @@ async function getOrCreateCoordinationChannel(guild, eventDateStr, categoryId = 
         name: targetChannelName,
         type: ChannelType.GuildText,
         parent: categoryId || null,
+        position: 0,
         permissionOverwrites,
         reason: `Event coordination channel for ${monthName}`
     });
+
+    await createdChannel.setPosition(0, { reason: 'Move coordination channel to top of category' }).catch(() => {});
 
     return createdChannel;
 }
@@ -383,7 +384,7 @@ async function handleEventCallInteraction(interaction, client) {
         await interaction.message.delete().catch(() => {});
 
         return interaction.reply({
-            content: '✅ **Lineup Checklist Tracker posted!**\nRight-click it anytime → Apps → **Manage Lineup Checklist** (or run \`/event-check\`) to update checkmarks.',
+            content: '**Lineup Checklist Tracker posted.**\nRight-click it anytime → Apps → **Manage Lineup Checklist** (or run `/event-check`) to update checkmarks.',
             flags: MessageFlags.Ephemeral
         });
     }
@@ -530,7 +531,7 @@ async function handleEventCallInteraction(interaction, client) {
             console.error('[EVENT-CALL] Failed to update announcement message:', msgErr.message);
         }
 
-        // Add DJ to Coordination Channel & Announce
+        // Add DJ to Coordination Channel
         try {
             const coordChannel = await client.channels.fetch(eventCall.coordinationChannelId);
             if (coordChannel) {
@@ -540,15 +541,6 @@ async function handleEventCallInteraction(interaction, client) {
                     SendMessages: true,
                     ReadMessageHistory: true,
                     AttachFiles: true
-                });
-
-                // Post welcome card
-                await coordChannel.send({
-                    content: `🎉 **Slot ${slotIndex + 1} Claimed!** Welcome <@${interaction.user.id}> (**${djName}**)!\n` +
-                             `• **Time:** <t:${slot.startUnix}:t> – <t:${slot.endUnix}:t> (<t:${slot.startUnix}:D>)\n` +
-                             `• **Genre:** ${genre}\n` +
-                             `• **Set Type:** ${setType}\n` +
-                             `• **Visuals / Lights:** ${visuals || 'Standard'}`
                 });
 
                 // Update Tracker Message if present
@@ -564,8 +556,8 @@ async function handleEventCallInteraction(interaction, client) {
         }
 
         return interaction.editReply({
-            content: `🎉 **Slot ${slotIndex + 1} (${slot.timeSlotStr}) successfully claimed!**\n` +
-                     `You have been added to <#${eventCall.coordinationChannelId}>. Head over there for set uploads, stream keys, and event coordination!`
+            content: `**Slot ${slotIndex + 1} (${slot.timeSlotStr}) successfully claimed.**\n` +
+                     `You have been added to <#${eventCall.coordinationChannelId}>. Head over there for event coordination!`
         });
     }
 
@@ -710,10 +702,6 @@ async function handleEventCallInteraction(interaction, client) {
                         await trackerMsg.edit({ content: renderTrackerContent(eventCall) });
                     }
                 }
-
-                await coordChannel.send({
-                    content: `⚠️ **Slot ${slotIndex + 1} (${slot.timeSlotStr}) has been re-opened by <@${interaction.user.id}>.**`
-                }).catch(() => {});
             }
         } catch (e) {}
 

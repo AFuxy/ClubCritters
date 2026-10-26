@@ -28,7 +28,7 @@ function buildStaffManagePanel(eventCall, selectedIndex = 0) {
         : '*Slot is currently OPEN / Unclaimed. Toggle buttons activate once a DJ claims this slot.*';
 
     const embed = new EmbedBuilder()
-        .setTitle(`🛠️ Lineup Checklist Manager — ${eventCall.title}`)
+        .setTitle(`Lineup Checklist Manager — ${eventCall.title}`)
         .setColor('#29C5F6')
         .setDescription(
             `Use the controls below to verify DJ deliverables and toggle checkmarks on the public tracker.\n\n` +
@@ -55,7 +55,7 @@ function buildStaffManagePanel(eventCall, selectedIndex = 0) {
                     description: s.timeSlotStr,
                     value: String(s.index),
                     default: s.index === slot.index,
-                    emoji: isAllDone ? '✅' : (s.isClaimed ? '⏳' : '🟢')
+                    emoji: isAllDone ? '✅' : undefined
                 };
             })
         );
@@ -92,7 +92,7 @@ function buildStaffManagePanel(eventCall, selectedIndex = 0) {
         buttonsRow.addComponents(
             new ButtonBuilder()
                 .setCustomId(`evt_reopen_${eventCall.id}_${slot.index}`)
-                .setLabel('🔄 Re-open Slot')
+                .setLabel('Re-open Slot')
                 .setStyle(ButtonStyle.Secondary)
         );
     }

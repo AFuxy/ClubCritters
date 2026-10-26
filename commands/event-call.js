@@ -94,7 +94,7 @@ module.exports = {
 
             // 4. Send the prompt card in the coordination channel for staff
             const promptEmbed = new EmbedBuilder()
-                .setTitle(`🛠️ Event Coordination Channel Ready — ${title}`)
+                .setTitle(`Event Coordination Ready — ${title}`)
                 .setColor('#29C5F6')
                 .setDescription(
                     `Welcome staff! You can post your welcome, guidelines, and event info message above.\n\n` +
@@ -104,7 +104,7 @@ module.exports = {
             const promptRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`evt_post_tracker_${eventCall.id}`)
-                    .setLabel('📋 Post Checklist Tracker Here')
+                    .setLabel('Post Checklist Tracker Here')
                     .setStyle(ButtonStyle.Primary)
             );
 
@@ -116,7 +116,7 @@ module.exports = {
 
             const currentChannel = interaction.channel || (await interaction.guild?.channels.fetch(interaction.channelId).catch(() => null));
             if (!currentChannel) {
-                return interaction.editReply({ content: '❌ Could not access the current channel to post the announcement.' });
+                return interaction.editReply({ content: 'Could not access the current channel to post the announcement.' });
             }
 
             const announcementMsg = await currentChannel.send({
@@ -129,10 +129,10 @@ module.exports = {
 
             // 6. Confirm to staff
             await interaction.editReply({
-                content: `✅ **Event Lineup Call successfully posted!**\n` +
-                         `• **Announcement Channel:** <#${interaction.channelId}>\n` +
-                         `• **Coordination Channel:** <#${coordChannel.id}>\n\n` +
-                         `*Tip: Go into <#${coordChannel.id}>, type your info/rules post, and click "Post Checklist Tracker Here"!*`
+                content: `**Event Lineup Call posted.**\n` +
+                         `• Announcement Channel: <#${interaction.channelId}>\n` +
+                         `• Coordination Channel: <#${coordChannel.id}>\n\n` +
+                         `*Tip: Go into <#${coordChannel.id}>, type your info post, and click "Post Checklist Tracker Here".*`
             });
 
         } catch (err) {
