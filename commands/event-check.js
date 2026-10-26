@@ -9,9 +9,10 @@ const {
     StringSelectMenuBuilder 
 } = require('discord.js');
 const { EventCall } = require('../db');
+const { parseSlotsData } = require('../utils/event-call-utils');
 
 function buildStaffManagePanel(eventCall, selectedIndex = 0) {
-    const slots = eventCall.slotsData || [];
+    const slots = parseSlotsData(eventCall);
     if (slots.length === 0) {
         return {
             embeds: [new EmbedBuilder().setTitle(`Lineup Checklist Manager — ${eventCall.title}`).setDescription('No slots defined.')],

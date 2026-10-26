@@ -23,6 +23,23 @@ function formatUtcTime(date) {
 }
 
 /**
+ * Safely parse slotsData whether it is an Array, string, or model instance
+ */
+function parseSlotsData(eventCall) {
+    if (!eventCall) return [];
+    let data = eventCall.slotsData;
+    if (typeof data === 'string') {
+        try {
+            data = JSON.parse(data);
+        } catch (e) {
+            console.error('[EVENT-CALL] Error parsing slotsData JSON:', e);
+            return [];
+        }
+    }
+    return Array.isArray(data) ? data : [];
+}
+
+/**
  * Build slots data array from date, start time, slot count, and duration
  */
 function buildSlotsData(dateStr, startUtcStr, slotCount = 6, durationMinutes = 60) {
@@ -66,15 +83,15 @@ function buildSlotsData(dateStr, startUtcStr, slotCount = 6, durationMinutes = 6
  * Render Public Announcement Embed with Dynamic Discord Timestamps
  */
 function renderAnnouncementEmbed(eventCall) {
-    const slots = eventCall.slotsData || [];
+    const slots = parseSlotsData(eventCall);
     const firstSlot = slots[0];
-    const lastSlot = slots[slots.length - 1];
+    const startUnixDesc = firstSlot && Number.isFinite(firstSlot.startUnix) ? firstSlot.startUnix : Math.floor(Date.now() / 1000);
 
     const embed = new EmbedBuilder()
         .setTitle(`📢 LINEUP CALL: ${eventCall.title}`)
         .setColor('#29C5F6')
         .setDescription(
-            `📅 **Event Date:** <t:${firstSlot ? firstSlot.startUnix : 0}:D>\n` +
+            `📅 **Event Date:** <t:${startUnixDesc}:D>\n` +
             `⚡ **First-Come, First-Served** — Click an open slot button below to claim your set!\n` +
             `🕒 Times are displayed in your **local device timezone**.`
         )
@@ -83,17 +100,19 @@ function renderAnnouncementEmbed(eventCall) {
 
     if (slots.length > 0) {
         slots.forEach(slot => {
+            const startUnix = Number.isFinite(slot.startUnix) ? slot.startUnix : 0;
+            const endUnix = Number.isFinite(slot.endUnix) ? slot.endUnix : 0;
             if (!slot.isClaimed) {
                 embed.addFields({
-                    name: `🎧 Slot ${slot.index + 1}: ${slot.timeSlotStr}`,
-                    value: `🕒 <t:${slot.startUnix}:t> – <t:${slot.endUnix}:t>\n🟢 **OPEN**`,
+                    name: `🎧 Slot ${slot.index + 1}: ${slot.timeSlotStr || 'TBD'}`,
+                    value: `🕒 <t:${startUnix}:t> – <t:${endUnix}:t>\n🟢 **OPEN**`,
                     inline: false
                 });
             } else {
                 const b2bInfo = slot.setType && slot.setType.toLowerCase().includes('b2b') ? ` [${slot.setType}]` : '';
                 embed.addFields({
-                    name: `🎧 Slot ${slot.index + 1}: ${slot.timeSlotStr}`,
-                    value: `🕒 <t:${slot.startUnix}:t> – <t:${slot.endUnix}:t>\n🔴 Claimed by **${slot.djName || 'DJ'}**${b2bInfo} • *${slot.genre || 'Open Format'}*`,
+                    name: `🎧 Slot ${slot.index + 1}: ${slot.timeSlotStr || 'TBD'}`,
+                    value: `🕒 <t:${startUnix}:t> – <t:${endUnix}:t>\n🔴 Claimed by **${slot.djName || 'DJ'}**${b2bInfo} • *${slot.genre || 'Open Format'}*`,
                     inline: false
                 });
             }
@@ -107,7 +126,7 @@ function renderAnnouncementEmbed(eventCall) {
  * Build Announcement Slot Buttons (Up to 5 buttons per row)
  */
 function buildAnnouncementButtons(eventCall) {
-    const slots = eventCall.slotsData || [];
+    const slots = parseSlotsData(eventCall);
     const rows = [];
     let currentRow = new ActionRowBuilder();
 
@@ -121,7 +140,7 @@ function buildAnnouncementButtons(eventCall) {
             currentRow.addComponents(
                 new ButtonBuilder()
                     .setCustomId(`evt_claim_${eventCall.id}_${slot.index}`)
-                    .setLabel(`Slot ${slot.index + 1} (${slot.startLabel})`)
+                    .setLabel(`Slot ${slot.index + 1} (${slot.startLabel || 'Open'})`)
                     .setStyle(ButtonStyle.Success)
             );
         } else {
@@ -148,12 +167,12 @@ function buildAnnouncementButtons(eventCall) {
  * Render the Lineup Checklist Tracker message for the coordination channel
  */
 function renderTrackerContent(eventCall) {
-    const slots = eventCall.slotsData || [];
+    const slots = parseSlotsData(eventCall);
     const firstSlot = slots[0];
 
     let lines = [];
     lines.push(`📋 **LINEUP STATUS TRACKER — ${eventCall.title}**`);
-    if (firstSlot) {
+    if (firstSlot && Number.isFinite(firstSlot.startUnix)) {
         lines.push(`📅 **Event Date:** <t:${firstSlot.startUnix}:D>`);
     }
     lines.push(`───────────────────────────────────────`);
@@ -166,8 +185,9 @@ function renderTrackerContent(eventCall) {
 
         const statusIcon = isAllDone ? '✅' : '⏳';
         const djLabel = slot.isClaimed ? `**${slot.djName}**` : '*[Open Slot]*';
+        const startUnix = Number.isFinite(slot.startUnix) ? slot.startUnix : 0;
 
-        lines.push(`\n${statusIcon} **<t:${slot.startUnix}:t> – ${djLabel}**`);
+        lines.push(`\n${statusIcon} **<t:${startUnix}:t> – ${djLabel}**`);
         lines.push(`  ▫️ Set: ${slot.hasSet ? '✅' : '❌'}`);
         lines.push(`  ▫️ Video: ${slot.hasVideo ? '✅' : '❌'}`);
         if (eventCall.hasLights) {
@@ -250,11 +270,20 @@ async function getOrCreateCoordinationChannel(guild, eventDateStr, categoryId = 
  */
 async function syncScheduleSlot(slot, isReopen = false) {
     try {
+        if (!slot || !slot.startTimeUtc) return;
+        const startDate = new Date(slot.startTimeUtc);
+        const endDate = new Date(slot.endTimeUtc);
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            console.error('[SCHEDULE-SYNC] ❌ Invalid date for slot:', slot.timeSlotStr, slot.startTimeUtc, slot.endTimeUtc);
+            return;
+        }
+
         if (isReopen) {
             // Delete from Schedule table if re-opened
             await Schedule.destroy({
                 where: {
-                    startTimeUtc: new Date(slot.startTimeUtc)
+                    startTimeUtc: startDate
                 }
             });
             console.log(`[SCHEDULE-SYNC] 🗑️ Cleared slot for ${slot.timeSlotStr} from Schedule table.`);
@@ -282,7 +311,7 @@ async function syncScheduleSlot(slot, isReopen = false) {
         // Upsert into Schedule
         const existingSlot = await Schedule.findOne({
             where: {
-                startTimeUtc: new Date(slot.startTimeUtc)
+                startTimeUtc: startDate
             }
         });
 
@@ -292,7 +321,7 @@ async function syncScheduleSlot(slot, isReopen = false) {
                 timeSlot: slot.timeSlotStr,
                 genre: slot.genre || 'Multi-Genre',
                 b2bName: b2bName,
-                endTimeUtc: new Date(slot.endTimeUtc)
+                endTimeUtc: endDate
             });
             console.log(`[SCHEDULE-SYNC] 🔄 Updated Schedule slot for ${slot.timeSlotStr}: ${slot.djName}`);
         } else {
@@ -301,8 +330,8 @@ async function syncScheduleSlot(slot, isReopen = false) {
                 timeSlot: slot.timeSlotStr,
                 genre: slot.genre || 'Multi-Genre',
                 b2bName: b2bName,
-                startTimeUtc: new Date(slot.startTimeUtc),
-                endTimeUtc: new Date(slot.endTimeUtc)
+                startTimeUtc: startDate,
+                endTimeUtc: endDate
             });
             console.log(`[SCHEDULE-SYNC] ✅ Inserted Schedule slot for ${slot.timeSlotStr}: ${slot.djName}`);
         }
@@ -362,7 +391,8 @@ async function handleEventCallInteraction(interaction, client) {
             return interaction.reply({ content: '❌ Event call not found.', flags: MessageFlags.Ephemeral });
         }
 
-        const slot = (eventCall.slotsData || [])[slotIndex];
+        const slots = parseSlotsData(eventCall);
+        const slot = slots[slotIndex];
         if (!slot) {
             return interaction.reply({ content: '❌ Slot not found.', flags: MessageFlags.Ephemeral });
         }
@@ -426,7 +456,7 @@ async function handleEventCallInteraction(interaction, client) {
             return interaction.editReply({ content: '❌ Event call not found.' });
         }
 
-        const slots = [...eventCall.slotsData];
+        const slots = parseSlotsData(eventCall);
         const slot = slots[slotIndex];
         if (!slot || slot.isClaimed) {
             return interaction.editReply({ 
@@ -566,7 +596,7 @@ async function handleEventCallInteraction(interaction, client) {
             return interaction.reply({ content: '❌ Event call not found.', flags: MessageFlags.Ephemeral });
         }
 
-        const slots = [...eventCall.slotsData];
+        const slots = parseSlotsData(eventCall);
         if (!slots[slotIndex]) {
             return interaction.reply({ content: '❌ Slot not found.', flags: MessageFlags.Ephemeral });
         }
@@ -615,7 +645,7 @@ async function handleEventCallInteraction(interaction, client) {
             return interaction.reply({ content: '❌ Event call not found.', flags: MessageFlags.Ephemeral });
         }
 
-        const slots = [...eventCall.slotsData];
+        const slots = parseSlotsData(eventCall);
         const slot = slots[slotIndex];
         if (!slot) {
             return interaction.reply({ content: '❌ Slot not found.', flags: MessageFlags.Ephemeral });
@@ -687,6 +717,7 @@ async function handleEventCallInteraction(interaction, client) {
 
 module.exports = {
     formatUtcTime,
+    parseSlotsData,
     buildSlotsData,
     renderAnnouncementEmbed,
     buildAnnouncementButtons,

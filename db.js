@@ -252,7 +252,18 @@ const EventCall = sequelize.define('EventCall', {
     coordinationChannelId: { type: DataTypes.STRING },
     trackerMessageId: { type: DataTypes.STRING },
     hasLights: { type: DataTypes.BOOLEAN, defaultValue: false },
-    slotsData: { type: DataTypes.JSON, allowNull: false },
+    slotsData: { 
+        type: DataTypes.JSON, 
+        allowNull: false,
+        get() {
+            const raw = this.getDataValue('slotsData');
+            if (!raw) return [];
+            if (typeof raw === 'string') {
+                try { return JSON.parse(raw); } catch (e) { return []; }
+            }
+            return Array.isArray(raw) ? raw : [];
+        }
+    },
     status: { type: DataTypes.ENUM('open', 'closed'), defaultValue: 'open' }
 });
 
